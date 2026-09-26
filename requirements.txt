@@ -1,0 +1,7 @@
+streamlit
+openai
+supabase
+fpdf
+requests
+pillow
+imageio-ffmpeg
