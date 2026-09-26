@@ -1,1 +1,2 @@
 .streamlit/secrets.tomlecho .envecho temp/echo output/echo audios/echo broll/echo ebooks/echo logos/echo musicas/echo *.dbecho __pycache__/echo *.pyc
+secrets.toml
