@@ -5,3 +5,4 @@ fpdf
 requests
 pillow
 imageio-ffmpeg
+google-genai>=0.1.1
