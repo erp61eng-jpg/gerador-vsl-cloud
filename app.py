@@ -371,12 +371,52 @@ def extrair_termo_broll_ia(frase: str, perfil_personagem: str = "") -> str:
     except Exception:
         return "business lifestyle"
 
+def gerar_conteudo_ebook_ia(nicho_produto: str, publico: str, promessa_angulo: str) -> dict:
+    client = OpenAI(api_key=OPENAI_API_KEY)
+    prompt = f"""
+    Atue como autoridade sênior de infoprodutos, copywriter profissional e educador técnico.
+    Escreva um E-book / Manual Operacional de alto valor comercial, denso, persuasivo e didático.
+
+    PARÂMETROS DO PRODUTO:
+    - Nicho: {nicho_produto}
+    - Público-Alvo e Dores: {publico}
+    - Promessa / Solução: {promessa_angulo}
+
+    EXIGÊNCIAS RÍGIDAS DE QUALIDADE:
+    1. A introdução deve ser profunda (mínimo 300 palavras), analisando a causa oculta do fracasso da concorrência e o método apresentado.
+    2. Cada um dos 4 capítulos DEVE ter entre 350 e 500 palavras, contendo fundamentação, passos práticos, checklists e roteiros.
+    3. Indique termos em INGLÊS precisos (2 a 4 palavras) para fotos reais no Pexels.
+
+    Retorne ESTRITAMENTE um JSON estruturado com o esquema:
+    {{
+      "titulo": "Título Comercial Magnético",
+      "subtitulo": "Subtítulo Persuasivo Focado em Execução",
+      "termo_capa": "termo em ingles para foto de capa",
+      "introducao": "Texto longo da introdução...",
+      "capitulos": [
+        {{"numero": 1, "titulo": "Fundamentos Críticos e Setup", "termo_busca_foto": "termo ingles", "conteudo": "Texto completo..."}},
+        {{"numero": 2, "titulo": "O Mecanismo Operacional e Implementação", "termo_busca_foto": "termo ingles", "conteudo": "Texto completo..."}},
+        {{"numero": 3, "titulo": "Scripts, Modelos e Checklists", "termo_busca_foto": "termo ingles", "conteudo": "Texto completo..."}},
+        {{"numero": 4, "titulo": "Cronograma de 7 Dias e Blindagem", "termo_busca_foto": "termo ingles", "conteudo": "Texto completo..."}}
+      ]
+    }}
+    """
+    resp = client.chat.completions.create(
+        model="gpt-4o-mini",
+        response_format={"type": "json_object"},
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.7
+    )
+    return json.loads(resp.choices[0].message.content)
+
 # ==============================================================================
-# NOVO MOTOR DE E-BOOK PROFUNDO VIA GOOGLE GEMINI (COM TRATAMENTO RESILIENTE)
+# MOTOR DE E-BOOK PROFUNDO VIA GOOGLE GEMINI (MODELOS ATIVOS 3.8 / 3.1)
 # ==============================================================================
 def gerar_conteudo_ebook_gemini(nicho_produto: str, publico: str, promessa_angulo: str) -> dict:
     chave_gemini = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY", "")).strip()
     if not chave_gemini:
+        if OPENAI_API_KEY:
+            return gerar_conteudo_ebook_ia(nicho_produto, publico, promessa_angulo)
         raise ValueError("Chave 'GEMINI_API_KEY' não encontrada na seção Secrets do Streamlit Cloud.")
 
     client = genai.Client(api_key=chave_gemini)
@@ -430,7 +470,7 @@ def gerar_conteudo_ebook_gemini(nicho_produto: str, publico: str, promessa_angul
     }}
     """
 
-    modelos_tentativa = ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-2.5-flash"]
+    modelos_tentativa = ["gemini-3.8-flash", "gemini-3.1-pro", "gemini-3.5-flash-lite", "gemini-2.5-pro"]
     resposta_obj = None
     erros_capturados = []
 
@@ -448,6 +488,8 @@ def gerar_conteudo_ebook_gemini(nicho_produto: str, publico: str, promessa_angul
             continue
 
     if not resposta_obj or not getattr(resposta_obj, "text", None):
+        if OPENAI_API_KEY:
+            return gerar_conteudo_ebook_ia(nicho_produto, publico, promessa_angulo)
         detalhes = " | ".join(erros_capturados)
         raise RuntimeError(f"Falha de comunicação com a API do Gemini. Detalhes: {detalhes}")
 
@@ -915,7 +957,7 @@ with aba_vsl:
             st.download_button("⬇️ Baixar Vídeo MP4", f, file_name=os.path.basename(st.session_state["video_pronto"]), mime="video/mp4")
 
 # ------------------------------------------------------------------------------
-# ABA 2: E-BOOK PROFISSIONAL COM FOTOS REAIS DO NICHO (MOTOR GEMINI 1.5 PRO)
+# ABA 2: E-BOOK PROFISSIONAL COM FOTOS REAIS DO NICHO (MOTOR GEMINI 3.8 / 3.1)
 # ------------------------------------------------------------------------------
 with aba_ebook:
     st.subheader("📚 Criação e Diagramação de E-books Profissionais com Fotos")
@@ -978,7 +1020,7 @@ with aba_ebook:
             if not debitar_creditos_cloud(email_usuario, "Geração de E-book Gemini", 15):
                 st.error("❌ Saldo insuficiente! Você precisa de 15 créditos.")
             else:
-                with st.spinner("🤖 O Google Gemini 1.5 Pro está redigindo o conteúdo técnico e mapeando termos fotográficos..."):
+                with st.spinner("🤖 O Google Gemini está redigindo o conteúdo técnico e mapeando termos fotográficos..."):
                     try:
                         dados_gerados = gerar_conteudo_ebook_gemini(nicho_eb, eb_pub, eb_ang)
                         st.session_state["eb_dados_sessao"] = dados_gerados
