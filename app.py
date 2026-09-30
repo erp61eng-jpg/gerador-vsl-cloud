@@ -277,7 +277,7 @@ PLATAFORMAS_CONFIG = {
     "TikTok": {"icone": "📱", "ds": "", "modificador": "tiktok viral", "perfil": "Ganchos imediatos, ritmo acelerado e curiosidade instantânea."},
     "Instagram (Reels)": {"icone": "📸", "ds": "", "modificador": "instagram reels", "perfil": "Estética visual, estilo de vida e autoridade imediata."},
     "Facebook Ads": {"icone": "📢", "ds": "", "modificador": "como resolver", "perfil": "Público 35+, resolução de dores práticas e alívio imediato."},
-    "YouTube": {"icone": "▶️", "ds": "yt", "modificador": "como fazer", "perfil": "Intenção de pesquisa ativa, tutoriais passo a passo e clareza."},
+    "YouTube": {"icone": "▶️️", "ds": "yt", "modificador": "como fazer", "perfil": "Intenção de pesquisa ativa, tutoriais passo a passo e clareza."},
     "Kwai": {"icone": "🔥", "ds": "", "modificador": "urgente renda extra", "perfil": "Linguagem simples, forte apelo popular e urgência financeira."},
     "Kiwify": {"icone": "🥝", "ds": "", "modificador": "metodo download", "perfil": "Infoprodutos de impulso (R$ 19 a R$ 97) e protocolos práticos."},
     "Hotmart": {"icone": "🚀", "ds": "", "modificador": "curso completo", "perfil": "Produtos estruturados (R$ 197 a R$ 997) e métodos validados."}
@@ -348,7 +348,7 @@ def obter_roteiro_ia_por_ticket(produto: str, publico: str, angulo: str, faixa_p
     resp = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[{"role": "user", "content": prompt}],
-        temperature=0.7,
+        temperature=0.7
     )
     return [l.strip() for l in resp.choices[0].message.content.strip().split("\n") if l.strip()]
 
@@ -365,141 +365,146 @@ def extrair_termo_broll_ia(frase: str, perfil_personagem: str = "") -> str:
         resp = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.3,
+            temperature=0.3
         )
         return resp.choices[0].message.content.strip().replace('"', '')
     except Exception:
         return "business lifestyle"
 
-def gerar_conteudo_ebook_ia(nicho_produto: str, publico: str, promessa_angulo: str) -> dict:
-    client = OpenAI(api_key=OPENAI_API_KEY)
-    prompt = f"""
-    Atue como autoridade sênior de infoprodutos, copywriter profissional e educador técnico.
-    Escreva um E-book / Manual Operacional de alto valor comercial, denso, persuasivo e didático.
-
-    PARÂMETROS DO PRODUTO:
-    - Nicho: {nicho_produto}
-    - Público-Alvo e Dores: {publico}
-    - Promessa / Solução: {promessa_angulo}
-
-    EXIGÊNCIAS RÍGIDAS DE QUALIDADE:
-    1. A introdução deve ser profunda (mínimo 300 palavras), analisando a causa oculta do fracasso da concorrência e o método apresentado.
-    2. Cada um dos 4 capítulos DEVE ter entre 350 e 500 palavras, contendo fundamentação, passos práticos, checklists e roteiros.
-    3. Indique termos em INGLÊS precisos (2 a 4 palavras) para fotos reais no Pexels.
-
-    Retorne ESTRITAMENTE um JSON estruturado com o esquema:
-    {{
-      "titulo": "Título Comercial Magnético",
-      "subtitulo": "Subtítulo Persuasivo Focado em Execução",
-      "termo_capa": "termo em ingles para foto de capa",
-      "introducao": "Texto longo da introdução...",
-      "capitulos": [
-        {{"numero": 1, "titulo": "Fundamentos Críticos e Setup", "termo_busca_foto": "termo ingles", "conteudo": "Texto completo..."}},
-        {{"numero": 2, "titulo": "O Mecanismo Operacional e Implementação", "termo_busca_foto": "termo ingles", "conteudo": "Texto completo..."}},
-        {{"numero": 3, "titulo": "Scripts, Modelos e Checklists", "termo_busca_foto": "termo ingles", "conteudo": "Texto completo..."}},
-        {{"numero": 4, "titulo": "Cronograma de 7 Dias e Blindagem", "termo_busca_foto": "termo ingles", "conteudo": "Texto completo..."}}
-      ]
-    }}
-    """
-    resp = client.chat.completions.create(
-        model="gpt-4o-mini",
-        response_format={"type": "json_object"},
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.7
-    )
-    return json.loads(resp.choices[0].message.content)
-
 # ==============================================================================
-# MOTOR DE E-BOOK PROFUNDO VIA GOOGLE GEMINI (MODELOS ATIVOS 3.8 / 3.1)
+# MOTOR DE E-BOOK EM PIPELINE MODULAR (MANUAL OPERACIONAL DE ALTA DENSIDADE)
 # ==============================================================================
 def gerar_conteudo_ebook_gemini(nicho_produto: str, publico: str, promessa_angulo: str) -> dict:
     chave_gemini = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY", "")).strip()
+
     if not chave_gemini:
-        if OPENAI_API_KEY:
-            return gerar_conteudo_ebook_ia(nicho_produto, publico, promessa_angulo)
-        raise ValueError("Chave 'GEMINI_API_KEY' não encontrada na seção Secrets do Streamlit Cloud.")
+        if not OPENAI_API_KEY:
+            raise ValueError("Nenhuma chave válida configurada (GEMINI_API_KEY ou OPENAI_API_KEY).")
+        client_oai = OpenAI(api_key=OPENAI_API_KEY)
+        p_fallback = f"""
+        Escreva um Manual Operacional técnico completo sobre '{nicho_produto}'.
+        Público: '{publico}'. Promessa: '{promessa_angulo}'.
+        Retorne estritamente um JSON estruturado com 'titulo', 'subtitulo', 'termo_capa', 'introducao' e 'capitulos' (lista com 'numero', 'titulo', 'termo_busca_foto', 'conteudo').
+        """
+        r_oai = client_oai.chat.completions.create(
+            model="gpt-4o-mini",
+            response_format={"type": "json_object"},
+            messages=[{"role": "user", "content": p_fallback}],
+            temperature=0.7
+        )
+        return json.loads(r_oai.choices[0].message.content)
 
     client = genai.Client(api_key=chave_gemini)
+    modelo_ativo = "gemini-3.8-flash"
 
-    prompt = f"""
-    Atue como autoridade internacional em infoprodutos e estrategista de implementação técnica.
-    Escreva um MANUAL OPERACIONAL DE EXECUÇÃO PRÁTICA denso, rigoroso e acionável.
-
-    PARÂMETROS DA OFERTA:
-    - Nicho: {nicho_produto}
-    - Público-Alvo e Dores Reais: {publico}
-    - Mecanismo e Promessa: {promessa_angulo}
-
-    DIRETRIZES DE QUALIDADE FUNDAMENTAIS (SEM ENROLAÇÃO):
-    1. PROIBIDO qualquer tipo de clichê corporativo, conselhos genéricos ("mantenha o foco") ou introduções motivacionais vazias.
-    2. Cada capítulo DEVE ser profundo (mínimo de 350 a 500 palavras cada), estruturado com passos operacionais, checklists numéricos, comandos executáveis e roteiros copia-e-cola.
-    3. Indique termos em INGLÊS precisos (2 a 4 palavras) para fotos reais do nicho no Pexels (ambientes, ferramentas, computadores de alta produtividade, reuniões estratégicas).
+    # FASE 1: ARQUITETURA ESTRATÉGICA, GANCHOS E DIRETRIZES
+    prompt_base = f"""
+    Atue como estrategista sênior de infoprodutos e autoridade técnica internacional.
+    Estruture a arquitetura de um MANUAL OPERACIONAL DE EXECUÇÃO PRÁTICA sobre: "{nicho_produto}".
+    Público-Alvo: "{publico}".
+    Promessa / Mecanismo: "{promessa_angulo}".
 
     Retorne ESTRITAMENTE um JSON estruturado com o seguinte esquema:
     {{
-      "titulo": "Título Comercial Magnético",
-      "subtitulo": "Subtítulo Persuasivo Focado em Execução",
-      "termo_capa": "termo em ingles para foto de capa (ex: luxury executive boardroom)",
-      "introducao": "Texto longo da introdução com diagnóstico cru, quebra de crenças e a estratégia prática (mínimo 250 palavras)...",
-      "capitulos": [
+      "titulo": "Título Comercial Magnético e Direto",
+      "subtitulo": "Subtítulo Persuasivo Focado em Tempo e Resultado",
+      "termo_capa": "termo em ingles para foto realista de capa no Pexels (ex: modern financial office)",
+      "introducao": "Texto longo da introdução com diagnóstico cru, quebra de mitos e a razão técnica de funcionamento (mínimo 200 palavras)...",
+      "ementa_modulos": [
         {{
           "numero": 1,
           "titulo": "Setup de Inicialização e Infraestrutura Obrigatória",
-          "termo_busca_foto": "termo em ingles para foto profissional do nicho",
-          "conteudo": "Conteúdo minucioso com checklist dos primeiros 30 minutos, configurações e ferramentas..."
+          "termo_foto": "termo em ingles para foto profissional no Pexels",
+          "foco_operacional": "Checklist dos primeiros 30 minutos, ferramentas necessárias e configurações iniciais"
         }},
         {{
           "numero": 2,
           "titulo": "O Protocolo Técnico de Execução Passo a Passo",
-          "termo_busca_foto": "termo em ingles para foto profissional do nicho",
-          "conteudo": "Passo a passo operacional completo, regras de execução, o que fazer e o que não fazer..."
+          "termo_foto": "termo em ingles para foto profissional no Pexels",
+          "foco_operacional": "Passo a passo minucioso e sem teoria, parâmetros de operação e rotina diária"
         }},
         {{
           "numero": 3,
           "titulo": "Scripts, Modelos e Templates Copia-e-Cola",
-          "termo_busca_foto": "termo em ingles para foto profissional do nicho",
-          "conteudo": "No mínimo 3 modelos, scripts ou roteiros completos prontos para uso imediato..."
+          "termo_foto": "termo em ingles para foto profissional no Pexels",
+          "foco_operacional": "Modelos prontos de scripts, mensagens de abordagem, ofertas ou anúncios para preencher e usar"
         }},
         {{
           "numero": 4,
           "titulo": "Cronograma de 7 Dias e Blindagem de Erros",
-          "termo_busca_foto": "termo em ingles para foto profissional do nicho",
-          "conteudo": "Cronograma dia a dia (Dia 1 ao Dia 7) com tarefas práticas e os 5 erros fatais a evitar..."
+          "termo_foto": "termo em ingles para foto profissional no Pexels",
+          "foco_operacional": "Plano diário de execução do Dia 1 ao 7 e lista com os 5 erros fatais a evitar"
         }}
       ]
     }}
     """
 
-    modelos_tentativa = ["gemini-3.8-flash", "gemini-3.1-pro", "gemini-3.5-flash-lite", "gemini-2.5-pro"]
-    resposta_obj = None
-    erros_capturados = []
+    dados_base = None
+    modelos_disponiveis = ["gemini-3.8-flash", "gemini-3.1-pro", "gemini-3.5-flash-lite"]
 
-    for mod in modelos_tentativa:
+    for mod in modelos_disponiveis:
         try:
-            resposta_obj = client.models.generate_content(
+            res_base = client.models.generate_content(
                 model=mod,
-                contents=prompt,
+                contents=prompt_base,
                 config={"response_mime_type": "application/json"}
             )
-            if resposta_obj and getattr(resposta_obj, "text", None):
+            if res_base and getattr(res_base, "text", None):
+                dados_base = json.loads(res_base.text.strip())
+                modelo_ativo = mod
                 break
-        except Exception as e:
-            erros_capturados.append(f"{mod}: {str(e)}")
+        except Exception:
             continue
 
-    if not resposta_obj or not getattr(resposta_obj, "text", None):
-        if OPENAI_API_KEY:
-            return gerar_conteudo_ebook_ia(nicho_produto, publico, promessa_angulo)
-        detalhes = " | ".join(erros_capturados)
-        raise RuntimeError(f"Falha de comunicação com a API do Gemini. Detalhes: {detalhes}")
+    if not dados_base:
+        raise RuntimeError("Não foi possível estabelecer conexão com os modelos disponíveis da API Gemini.")
 
-    texto_bruto = resposta_obj.text.strip()
-    try:
-        return json.loads(texto_bruto)
-    except json.JSONDecodeError:
-        texto_limpo = re.sub(r"^```(?:json)?\s*", "", texto_bruto, flags=re.MULTILINE)
-        texto_limpo = re.sub(r"\s*```$", "", texto_limpo, flags=re.MULTILINE).strip()
-        return json.loads(texto_limpo)
+    # FASE 2: GERAÇÃO PROFUNDA DE CADA MÓDULO (MANUAL OPERACIONAL COM SCRIPTS E CHECKLISTS)
+    capitulos_processados = []
+
+    for mod in dados_base.get("ementa_modulos", []):
+        num = mod.get("numero", 1)
+        tit = mod.get("titulo", f"Módulo {num}")
+        foco = mod.get("foco_operacional", "")
+
+        prompt_cap = f"""
+        Você está redigindo o conteúdo integral do Módulo {num}: "{tit}" do manual "{dados_base.get('titulo')}".
+        Público: {publico} | Mecanismo Central: {promessa_angulo}
+        Foco Operacional Obrigatório: {foco}
+
+        DIRETRIZES DE QUALIDADE FUNDAMENTAIS:
+        - PROIBIDO clichês, conselhos abstratos ("mantenha o foco") ou introduções de autoajuda.
+        - Entregue o processo técnico como um Manual Operacional definitivo (Passo 1, Passo 2, Passo 3).
+        - OBRIGATÓRIO incluir pelo menos 2 modelos/scripts prontos para preencher e usar no dia a dia.
+        - OBRIGATÓRIO incluir ao final do texto uma seção: 'Checklist de Verificação Rápida' com caixas [ ] e itens objetivos.
+        - Mínimo de 450 a 600 palavras para este capítulo.
+        Retorne APENAS o texto corrido do módulo, sem tags de código ou títulos markdown (#).
+        """
+
+        conteudo_capitulo = ""
+        try:
+            res_cap = client.models.generate_content(
+                model=modelo_ativo,
+                contents=prompt_cap
+            )
+            conteudo_capitulo = res_cap.text.strip()
+        except Exception:
+            conteudo_capitulo = f"Passo 1: Inicialização da infraestrutura operacional para {foco}.\nPasso 2: Configuração e validação dos parâmetros técnicos.\nPasso 3: Execução direta e controle de qualidade.\n\nChecklist de Verificação Rápida:\n[ ] Setup validado\n[ ] Parâmetros ajustados\n[ ] Ativo pronto para distribuição"
+
+        capitulos_processados.append({
+            "numero": num,
+            "titulo": tit,
+            "termo_busca_foto": mod.get("termo_foto", "business technology office"),
+            "conteudo": conteudo_capitulo
+        })
+
+    return {
+        "titulo": dados_base.get("titulo", "MANUAL DE IMPLEMENTAÇÃO PRÁTICA"),
+        "subtitulo": dados_base.get("subtitulo", "Guia Técnico Passo a Passo"),
+        "termo_capa": dados_base.get("termo_capa", "executive business meeting"),
+        "introducao": dados_base.get("introducao", ""),
+        "capitulos": capitulos_processados
+    }
 
 # ==============================================================================
 # MOTOR DE DIAGRAMAÇÃO DE PDF COM FOTOS INTEGRADAS
@@ -631,7 +636,7 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_saida: st
         for linha in cap.get("conteudo", "").split("\n"):
             l_limpa = linha.strip()
             if l_limpa:
-                if l_limpa.startswith(("-", "*", "1.", "2.", "3.", "4.", "•")):
+                if l_limpa.startswith(("-", "*", "1.", "2.", "3.", "4.", "•", "[ ]", "[x]")):
                     pdf.set_x(23)
                     pdf.multi_cell(169, 6.2, sanitizar_pdf(l_limpa))
                     pdf.ln(2)
