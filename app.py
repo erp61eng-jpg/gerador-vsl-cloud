@@ -20,7 +20,7 @@ st.set_page_config(
 )
 
 # ==============================================================================
-# LOCALIZADOR FFMPEG (PADRÃO DUBFYAI)
+# LOCALIZADOR FFMPEG
 # ==============================================================================
 def obter_executavel_ffmpeg() -> str:
     try:
@@ -98,6 +98,8 @@ if "login_concluido" not in st.session_state:
     st.session_state.login_concluido = False
 if "saved_email" not in st.session_state:
     st.session_state.saved_email = "ricardopintoedson@gmail.com"
+if "saldo_creditos" not in st.session_state:
+    st.session_state.saldo_creditos = 0
 
 # ==============================================================================
 # TELA DE ENTRADA / LOGIN
@@ -152,39 +154,41 @@ else:
 # ==============================================================================
 # SINCRONIZAÇÃO DE SALDO COM SUPABASE
 # ==============================================================================
-saldo_atual = 0
-if st.session_state.login_concluido and email_usuario:
+def carregar_saldo(email: str) -> int:
     try:
-        resposta = supabase.table("usuarios").select("*").eq("email", email_usuario).execute()
+        resposta = supabase.table("usuarios").select("*").eq("email", email).execute()
         dados_lista = getattr(resposta, "data", [])
 
         if not dados_lista:
-            saldo_inicial = 300 if email_usuario in ["ricardopintoedson@gmail.com", "erp61eng@gmail.com"] else 0
+            saldo_inicial = 300 if email in ["ricardopintoedson@gmail.com", "erp61eng@gmail.com"] else 0
             supabase.table("usuarios").insert([{
-                "email": email_usuario,
+                "email": email,
                 "saldo_creditos": saldo_inicial,
                 "creditos": saldo_inicial,
                 "total_compras": 1
             }]).execute()
-            saldo_atual = saldo_inicial
-        else:
-            usr = dados_lista[0]
-            saldo_atual = usr.get("saldo_creditos")
-            if saldo_atual is None:
-                saldo_atual = usr.get("creditos", 0)
+            return saldo_inicial
 
-            if email_usuario in ["ricardopintoedson@gmail.com", "erp61eng@gmail.com"] and (saldo_atual is None or int(saldo_atual) <= 0):
-                saldo_atual = 300
-                try:
-                    supabase.table("usuarios").update({"saldo_creditos": 300, "creditos": 300}).eq("email", email_usuario).execute()
-                except Exception:
-                    pass
-    except Exception as e:
-        saldo_atual = 300 if email_usuario in ["ricardopintoedson@gmail.com", "erp61eng@gmail.com"] else 0
+        usr = dados_lista[0]
+        saldo = usr.get("saldo_creditos")
+        if saldo is None:
+            saldo = usr.get("creditos", 0)
+
+        if email in ["ricardopintoedson@gmail.com", "erp61eng@gmail.com"] and (saldo is None or int(saldo) <= 0):
+            saldo = 300
+            try:
+                supabase.table("usuarios").update({"saldo_creditos": 300, "creditos": 300}).eq("email", email).execute()
+            except Exception:
+                pass
+        return int(saldo or 0)
+    except Exception:
+        return 300 if email in ["ricardopintoedson@gmail.com", "erp61eng@gmail.com"] else 0
+
+st.session_state.saldo_creditos = carregar_saldo(email_usuario)
 
 def debitar_creditos_cloud(email: str, operacao: str, custo: int) -> bool:
     email_limpo = str(email or "").strip().lower()
-    global saldo_atual
+    saldo_atual = st.session_state.get("saldo_creditos", 0)
     if saldo_atual >= custo:
         novo_saldo = saldo_atual - custo
         try:
@@ -193,17 +197,14 @@ def debitar_creditos_cloud(email: str, operacao: str, custo: int) -> bool:
             try:
                 supabase.table("usuarios").update({"saldo_creditos": novo_saldo}).eq("email", email_limpo).execute()
             except Exception:
-                try:
-                    supabase.table("usuarios").update({"creditos": novo_saldo}).eq("email", email_limpo).execute()
-                except Exception:
-                    pass
+                pass
 
         try:
             supabase.table("historico").insert({"email": email_limpo, "operacao": operacao, "creditos": -custo}).execute()
         except Exception:
             pass
 
-        saldo_atual = novo_saldo
+        st.session_state.saldo_creditos = novo_saldo
         return True
     return False
 
@@ -342,8 +343,8 @@ def extrair_termo_broll_ia(frase: str, perfil_personagem: str = "") -> str:
     except Exception:
         return "business lifestyle"
 
-def baixar_video_pexels(termo: str, pexels_key: str, vertical: bool, indice: int) -> str:
-    caminho_local = os.path.join(DIR_BROLL, f"broll_{indice}.mp4")
+def baixar_video_pexels(termo: str, pexels_key: str, vertical: bool, prefixo_arq: str) -> str:
+    caminho_local = os.path.join(DIR_BROLL, f"{prefixo_arq}.mp4")
     orientacao = "portrait" if vertical else "landscape"
     url = f"https://api.pexels.com/videos/search?query={urllib.parse.quote(termo)}&orientation={orientacao}&per_page=8"
     headers = {"Authorization": pexels_key}
@@ -412,11 +413,12 @@ def renderizar_vsl_completa(
     largura, altura = (1080, 1920) if vertical else (1920, 1080)
     total = len(frases)
     cenas = []
+    job_id = f"{int(time.time())}_{random.randint(1000, 9999)}"
 
     for i, frase in enumerate(frases):
         idx = i + 1
-        c_audio = os.path.join(DIR_AUDIOS, f"parte_{idx}.mp3")
-        c_cena = os.path.join(DIR_TEMP, f"cena_{idx}.mp4")
+        c_audio = os.path.join(DIR_AUDIOS, f"{job_id}_parte_{idx}.mp3")
+        c_cena = os.path.join(DIR_TEMP, f"{job_id}_cena_{idx}.mp4")
 
         sintetizar_voz_segura(frase, c_audio, voz)
         duracao = obter_duracao_audio_ffmpeg(c_audio)
@@ -424,7 +426,7 @@ def renderizar_vsl_completa(
         video_bg = None
         if pexels_key:
             termo = extrair_termo_broll_ia(frase, perfil_personagem)
-            video_bg = baixar_video_pexels(termo, pexels_key, vertical, idx)
+            video_bg = baixar_video_pexels(termo, pexels_key, vertical, f"{job_id}_broll_{idx}")
 
         if video_bg and os.path.exists(video_bg) and os.path.getsize(video_bg) > 10000:
             vf = f"scale={largura}:{altura}:force_original_aspect_ratio=increase,crop={largura}:{altura},setsar=1,fps=24,format=yuv420p"
@@ -480,7 +482,7 @@ def renderizar_vsl_completa(
         fc_map += f"[{idx_c}:v][{idx_c}:a]"
 
     fc = f"{fc_map}concat=n={total}:v=1:a=1[vcat][acat]"
-    v_concat = os.path.join(DIR_TEMP, "concatenado.mp4")
+    v_concat = os.path.join(DIR_TEMP, f"{job_id}_concatenado.mp4")
     cmd_concat = [
         FFMPEG_BIN, "-nostdin", "-y"
     ] + inputs + [
@@ -596,14 +598,15 @@ def compilar_pdf_ebook(dados: dict, caminho_saida: str):
 with st.sidebar:
     st.header("👤 Sessão Ativa")
     st.code(email_usuario)
-    st.metric(label="Saldo Disponível:", value=f"{saldo_atual} Créditos")
+    st.metric(label="Saldo Disponível:", value=f"{st.session_state.saldo_creditos} Créditos")
 
-    if saldo_atual == 0:
+    if st.session_state.saldo_creditos == 0:
         st.warning("⚠️ Saldo zerado. Realize sua recarga na aba 'Planos & Recargas'.")
 
     if st.button("🚪 Sair da Conta", use_container_width=True):
         st.session_state.login_concluido = False
         st.session_state.saved_email = ""
+        st.session_state.saldo_creditos = 0
         st.rerun()
 
     st.markdown("---")
@@ -734,7 +737,7 @@ with aba_ebook:
 
     modo_ebook = st.radio(
         "Como deseja estruturar o conteúdo do E-book?",
-        ["✍️️ Escrever / Colar Manualmente (0 Créditos)", "🤖 Gerar Conteúdo Completo via IA (15 Créditos)"],
+        ["✍ Escrever / Colar Manualmente (0 Créditos)", "🤖 Gerar Conteúdo Completo via IA (15 Créditos)"],
         horizontal=True
     )
 
