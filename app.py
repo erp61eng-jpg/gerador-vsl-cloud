@@ -344,7 +344,6 @@ def minerar_buscas_plataforma(termo_semente: str, plataforma: str) -> list[str]:
     except Exception:
         pass
 
-    # Fallback automático: contorna o bloqueio de IP do Streamlit Cloud gerando dados reais via IA
     return minerar_buscas_fallback_ia(termo_semente, plataforma)
 
 def analisar_oportunidades_ia(buscas: list[str], plataforma: str) -> list[dict]:
@@ -473,7 +472,7 @@ def gerar_conteudo_ebook_gemini(nicho_produto: str, publico: str, promessa_angul
       "titulo": "Título Comercial Magnético e Direto",
       "subtitulo": "Subtítulo Persuasivo Focado em Tempo e Resultado",
       "termo_capa": "termo em ingles para foto realista de capa no Pexels (ex: modern financial office)",
-      "introducao": "Texto longo da introdução com diagnóstico cru, quebra de mitos e a razão técnica de funcionamento (mínimo 200 palavras)...",
+      "introducao": "Texto longo da introdução com diagnóstico cru, quebra de mitos e a razão técnica de funcionamento (mínimo 250 palavras)...",
       "ementa_modulos": [
         {{
           "numero": 1,
@@ -1026,127 +1025,100 @@ with aba_vsl:
             st.download_button("⬇️ Baixar Vídeo MP4", f, file_name=os.path.basename(st.session_state["video_pronto"]), mime="video/mp4")
 
 # ------------------------------------------------------------------------------
-# ABA 2: E-BOOK PROFISSIONAL COM FOTOS REAIS DO NICHO (MOTOR GEMINI 3.8 / 3.1)
+# ABA 2: E-BOOK PROFISSIONAL COM FOTOS REAIS DO NICHO (MOTOR GEMINI PIPELINE)
 # ------------------------------------------------------------------------------
 with aba_ebook:
     st.subheader("📚 Criação e Diagramação de E-books Profissionais com Fotos")
 
-    modo_ebook = st.radio(
-        "Como deseja estruturar o conteúdo do E-book?",
-        ["🤖 Gerar Conteúdo Completo e Enriquecido via Gemini (15 Créditos)", "✍️ Escrever / Editar Manualmente (0 Créditos)"],
-        horizontal=True
-    )
+    c_eb1, c_eb2 = st.columns(2)
+    with c_eb1:
+        nicho_eb = st.text_input("Nicho ou Nome do Produto:", value=st.session_state.get("prod_nome", "Manual da Renda Extra Digital"))
+        eb_pub = st.text_area("Público e Dores:", value=st.session_state.get("pub_nome", "Pessoas comuns sem tempo que buscam validação de renda online."), height=90)
+    with c_eb2:
+        eb_ang = st.text_area("Promessa e Solução:", value=st.session_state.get("ang_nome", "Método passo a passo baseado em automações simples sem aparecer."), height=90)
 
-    if "eb_dados_sessao" not in st.session_state:
-        st.session_state["eb_dados_sessao"] = {
-            "titulo": "Manual Prático de Execução Rápida",
-            "subtitulo": "Como implementar um sistema lucrativo com passos validados",
-            "termo_capa": "modern executive workplace",
-            "introducao": "Este material foi desenvolvido para eliminar o excesso de teoria e direcionar sua energia para os pontos fundamentais que geram retorno consistente.",
-            "capitulos": [
-                {
-                    "numero": 1,
-                    "titulo": "O Alinhamento dos Fundamentos",
-                    "termo_busca_foto": "financial business plan",
-                    "conteudo": "Antes de avançar para a parte prática, é crucial entender por que a maioria das estratégias falha por pura falta de consistência inicial.\n\n1. Defina a métrica de validação prioritária.\n2. Elimine qualquer ferramenta redundante.\n3. Concentre o foco na oferta central."
-                },
-                {
-                    "numero": 2,
-                    "titulo": "O Mecanismo Único de Operação",
-                    "termo_busca_foto": "software engineering workstation",
-                    "conteudo": "Apresentamos aqui o protocolo técnico exato para colocar as ferramentas certas trabalhando em sincronia sem esforço duplicado.\n\n1. Estruturação do funil.\n2. Conexão do tráfego direto.\n3. Automação da entrega."
-                },
-                {
-                    "numero": 3,
-                    "titulo": "Execução Passo a Passo e Checklist",
-                    "termo_busca_foto": "strategy meeting team",
-                    "conteudo": "Siga o cronograma direto de execução diária para finalizar a primeira entrega nas próximas 24 horas sem distrações.\n\n- Checagem de links ativos.\n- Verificação de entregabilidade de e-mails.\n- Teste de checkout."
-                },
-                {
-                    "numero": 4,
-                    "titulo": "Escala e Sustentação dos Resultados",
-                    "termo_busca_foto": "modern skyscraper architecture",
-                    "conteudo": "Descubra como blindar seu processo, gerenciar contingências e multiplicar o volume de produção com segurança e previsibilidade."
-                }
-            ]
-        }
+    if st.button("⚡ Redigir Manual Completo com Gemini (15 Créditos)", type="primary", use_container_width=True):
+        agora = time.time()
+        if agora - st.session_state.get("_ultimo_click_eb", 0) < 12:
+            st.warning("⏳ Aguarde alguns segundos antes de solicitar nova compilação.")
+            st.stop()
+        st.session_state["_ultimo_click_eb"] = agora
 
-    if modo_ebook == "🤖 Gerar Conteúdo Completo e Enriquecido via Gemini (15 Créditos)":
-        c_eb1, c_eb2 = st.columns(2)
-        with c_eb1:
-            nicho_eb = st.text_input("Nicho ou Nome do Produto:", value=st.session_state.get("prod_nome", "Manual da Renda Extra Digital"))
-            eb_pub = st.text_area("Público e Dores:", value=st.session_state.get("pub_nome", "Pessoas comuns sem tempo que buscam validação de renda online."), height=90)
-        with c_eb2:
-            eb_ang = st.text_area("Promessa e Solução:", value=st.session_state.get("ang_nome", "Método passo a passo baseado em automações simples sem aparecer."), height=90)
-
-        if st.button("⚡ Redigir Manual Completo com Gemini (15 Créditos)", type="primary", use_container_width=True):
-            agora = time.time()
-            if agora - st.session_state.get("_ultimo_click_eb", 0) < 12:
-                st.warning("⏳ Aguarde alguns segundos antes de solicitar nova compilação.")
-                st.stop()
-            st.session_state["_ultimo_click_eb"] = agora
-
-            with st.spinner("🤖 O Google Gemini está redigindo o conteúdo técnico e mapeando termos fotográficos..."):
-                try:
-                    dados_gerados = gerar_conteudo_ebook_gemini(nicho_eb, eb_pub, eb_ang)
-                    if not debitar_creditos_cloud(email_usuario, "Geração de E-book Gemini", 15):
-                        st.error("❌ Saldo insuficiente! Você precisa de 15 créditos.")
-                    else:
-                        st.session_state["eb_dados_sessao"] = dados_gerados
-                        st.success("✅ Conteúdo gerado com o motor Gemini e termos fotográficos mapeados! Revise e clique em compilar.")
-                except Exception as erro:
-                    st.error(f"Erro na redação do infoproduto via Gemini: {erro}")
+        with st.spinner("🤖 O Google Gemini está redigindo o conteúdo técnico e mapeando termos fotográficos..."):
+            try:
+                dados_gerados = gerar_conteudo_ebook_gemini(nicho_eb, eb_pub, eb_ang)
+                if not debitar_creditos_cloud(email_usuario, "Geração de E-book Gemini", 15):
+                    st.error("❌ Saldo insuficiente! Você precisa de 15 créditos.")
+                else:
+                    st.session_state["eb_dados_sessao"] = dados_gerados
+                    st.session_state["in_eb_tit"] = dados_gerados.get("titulo", "")
+                    st.session_state["in_eb_sub"] = dados_gerados.get("subtitulo", "")
+                    st.session_state["in_eb_intro"] = dados_gerados.get("introducao", "")
+                    st.session_state["in_eb_capa_term"] = dados_gerados.get("termo_capa", "")
+                    for idx_c, cap_g in enumerate(dados_gerados.get("capitulos", [])):
+                        st.session_state[f"t_cap_mod_{idx_c}"] = cap_g.get("titulo", "")
+                        st.session_state[f"foto_cap_mod_{idx_c}"] = cap_g.get("termo_busca_foto", "")
+                        st.session_state[f"txt_cap_mod_{idx_c}"] = cap_g.get("conteudo", "")
+                    st.success("✅ Manual operacional gerado com sucesso! Revise os módulos e clique em compilar.")
+                    st.rerun()
+            except Exception as erro:
+                st.error(f"Erro na redação do infoproduto via Gemini: {erro}")
 
     st.divider()
-    st.markdown("### 📝 Editor e Configuração das Fotos por Módulo")
 
-    eb_atual = st.session_state["eb_dados_sessao"]
-    col_t1, col_t2 = st.columns([1, 1])
-    with col_t1:
-        tit_edit = st.text_input("Título do Livro:", value=eb_atual.get("titulo", ""), key="in_eb_tit")
-        termo_capa_edit = st.text_input("Foto da Capa (Termo em Inglês no Pexels):", value=eb_atual.get("termo_capa", "business strategy"), key="in_eb_capa_term")
-    with col_t2:
-        sub_edit = st.text_input("Subtítulo Persuasivo:", value=eb_atual.get("subtitulo", ""), key="in_eb_sub")
+    tem_conteudo = "eb_dados_sessao" in st.session_state and st.session_state["eb_dados_sessao"]
 
-    intro_edit = st.text_area("Introdução Estratégica:", value=eb_atual.get("introducao", ""), height=150, key="in_eb_intro")
+    if not tem_conteudo:
+        st.info("💡 Insira o Nicho e a Promessa acima e clique em **⚡ Redigir Manual Completo com Gemini (15 Créditos)** para gerar o manual operacional com scripts e checklists.")
+    else:
+        st.markdown("### 📝 Editor e Configuração das Fotos por Módulo")
+        eb_atual = st.session_state["eb_dados_sessao"]
+        col_t1, col_t2 = st.columns([1, 1])
+        with col_t1:
+            tit_edit = st.text_input("Título do Livro:", value=st.session_state.get("in_eb_tit", eb_atual.get("titulo", "")), key="in_eb_tit")
+            termo_capa_edit = st.text_input("Foto da Capa (Termo em Inglês no Pexels):", value=st.session_state.get("in_eb_capa_term", eb_atual.get("termo_capa", "business strategy")), key="in_eb_capa_term")
+        with col_t2:
+            sub_edit = st.text_input("Subtítulo Persuasivo:", value=st.session_state.get("in_eb_sub", eb_atual.get("subtitulo", "")), key="in_eb_sub")
 
-    caps_editados = []
-    st.markdown("#### 📖 Módulos e Fotos Temáticas:")
-    for c_idx, cap in enumerate(eb_atual.get("capitulos", [])):
-        with st.expander(f"Módulo {c_idx+1}: {cap.get('titulo', '')}", expanded=(c_idx == 0)):
-            c_m1, c_m2 = st.columns([2, 1])
-            with c_m1:
-                t_cap = st.text_input(f"Título do Módulo {c_idx+1}:", value=cap.get("titulo", ""), key=f"t_cap_mod_{c_idx}")
-            with c_m2:
-                foto_term = st.text_input(f"Termo da Foto (Pexels):", value=cap.get("termo_busca_foto", "workplace success"), key=f"foto_cap_mod_{c_idx}")
-            txt_cap = st.text_area(f"Conteúdo do Módulo {c_idx+1}:", value=cap.get("conteudo", ""), height=180, key=f"txt_cap_mod_{c_idx}")
-            caps_editados.append({
-                "numero": c_idx+1,
-                "titulo": t_cap,
-                "termo_busca_foto": foto_term,
-                "conteudo": txt_cap
-            })
+        intro_edit = st.text_area("Introdução Estratégica:", value=st.session_state.get("in_eb_intro", eb_atual.get("introducao", "")), height=150, key="in_eb_intro")
 
-    st.write("")
-    if st.button("📄 Compilar e Gerar PDF Diagramado com Fotos", type="primary", use_container_width=True):
-        dados_compilacao = {
-            "titulo": tit_edit,
-            "subtitulo": sub_edit,
-            "termo_capa": termo_capa_edit,
-            "introducao": intro_edit,
-            "capitulos": caps_editados
-        }
-        st.session_state["eb_dados_sessao"] = dados_compilacao
+        caps_editados = []
+        st.markdown("#### 📖 Módulos e Fotos Temáticas:")
+        for c_idx, cap in enumerate(eb_atual.get("capitulos", [])):
+            with st.expander(f"Módulo {c_idx+1}: {cap.get('titulo', '')}", expanded=(c_idx == 0)):
+                c_m1, c_m2 = st.columns([2, 1])
+                with c_m1:
+                    t_cap = st.text_input(f"Título do Módulo {c_idx+1}:", value=st.session_state.get(f"t_cap_mod_{c_idx}", cap.get("titulo", "")), key=f"t_cap_mod_{c_idx}")
+                with c_m2:
+                    foto_term = st.text_input(f"Termo da Foto (Pexels):", value=st.session_state.get(f"foto_cap_mod_{c_idx}", cap.get("termo_busca_foto", "workplace success")), key=f"foto_cap_mod_{c_idx}")
+                txt_cap = st.text_area(f"Conteúdo do Módulo {c_idx+1}:", value=st.session_state.get(f"txt_cap_mod_{c_idx}", cap.get("conteudo", "")), height=220, key=f"txt_cap_mod_{c_idx}")
+                caps_editados.append({
+                    "numero": c_idx+1,
+                    "titulo": t_cap,
+                    "termo_busca_foto": foto_term,
+                    "conteudo": txt_cap
+                })
 
-        nome_arquivo = f"ebook_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-        caminho_pdf = os.path.join(DIR_EBOOKS, nome_arquivo)
+        st.write("")
+        if st.button("📄 Compilar e Gerar PDF Diagramado com Fotos", type="primary", use_container_width=True):
+            dados_compilacao = {
+                "titulo": tit_edit,
+                "subtitulo": sub_edit,
+                "termo_capa": termo_capa_edit,
+                "introducao": intro_edit,
+                "capitulos": caps_editados
+            }
+            st.session_state["eb_dados_sessao"] = dados_compilacao
 
-        with st.spinner("📥 Baixando fotos do nicho no Pexels e diagramando páginas..."):
-            compilar_pdf_ebook_com_fotos(dados_compilacao, PEXELS_API_KEY, caminho_pdf)
-            st.session_state["pdf_pronto"] = caminho_pdf
-            st.session_state["pdf_nome"] = nome_arquivo
-            disparar_comemoracao()
-            st.rerun()
+            nome_arquivo = f"manual_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            caminho_pdf = os.path.join(DIR_EBOOKS, nome_arquivo)
+
+            with st.spinner("📥 Baixando fotos do nicho no Pexels e diagramando páginas..."):
+                compilar_pdf_ebook_com_fotos(dados_compilacao, PEXELS_API_KEY, caminho_pdf)
+                st.session_state["pdf_pronto"] = caminho_pdf
+                st.session_state["pdf_nome"] = nome_arquivo
+                disparar_comemoracao()
+                st.rerun()
 
     if st.session_state.get("pdf_pronto") and os.path.exists(st.session_state["pdf_pronto"]):
         st.success(f"✅ Arquivo compilado com fotos e diagramação completa: `{st.session_state.get('pdf_nome')}`")
