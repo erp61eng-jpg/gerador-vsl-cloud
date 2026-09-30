@@ -396,7 +396,7 @@ def sintetizar_voz_segura(texto: str, caminho_out: str, voz: str) -> str:
     raise RuntimeError("Falha ao sintetizar áudio via OpenAI Studio.")
 
 # ==============================================================================
-# MOTOR FFMPEG
+# MOTOR FFMPEG RESILIENTE
 # ==============================================================================
 def renderizar_vsl_completa(
     frases: list[str],
@@ -734,7 +734,7 @@ with aba_ebook:
 
     modo_ebook = st.radio(
         "Como deseja estruturar o conteúdo do E-book?",
-        ["✍️ Escrever / Colar Manualmente (0 Créditos)", "🤖 Gerar Conteúdo Completo via IA (15 Créditos)"],
+        ["✍️️ Escrever / Colar Manualmente (0 Créditos)", "🤖 Gerar Conteúdo Completo via IA (15 Créditos)"],
         horizontal=True
     )
 
