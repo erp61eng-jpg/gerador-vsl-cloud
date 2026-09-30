@@ -49,7 +49,7 @@ from fpdf import FPDF
 from supabase import create_client, Client
 
 # ==============================================================================
-# LEITURA DE SEGREDOS E SUPABASE
+# LEITURA DE SEGREDOS E BANCO SUPABASE
 # ==============================================================================
 def limpar_url_supabase(url_bruta: str) -> str:
     u = str(url_bruta or "").strip().strip('"').strip("'")
@@ -78,8 +78,9 @@ DIR_MUSICAS = os.path.join(BASE_DIR, "musicas")
 DIR_LOGOS   = os.path.join(BASE_DIR, "logos")
 DIR_BROLL   = os.path.join(BASE_DIR, "broll")
 DIR_EBOOKS  = os.path.join(BASE_DIR, "ebooks")
+DIR_FOTOS   = os.path.join(BASE_DIR, "fotos_ebook")
 
-for pasta in [DIR_AUDIOS, DIR_OUTPUT, DIR_TEMP, DIR_MUSICAS, DIR_LOGOS, DIR_BROLL, DIR_EBOOKS]:
+for pasta in [DIR_AUDIOS, DIR_OUTPUT, DIR_TEMP, DIR_MUSICAS, DIR_LOGOS, DIR_BROLL, DIR_EBOOKS, DIR_FOTOS]:
     os.makedirs(pasta, exist_ok=True)
 
 @st.cache_resource(show_spinner=False)
@@ -146,7 +147,6 @@ if not st.session_state.login_concluido:
                     if st.button("Entrar no Aplicativo 🚀", type="primary", use_container_width=True):
                         st.session_state.login_concluido = True
                         st.rerun()
-
     st.stop()
 else:
     email_usuario = st.session_state.saved_email
@@ -212,6 +212,62 @@ def disparar_comemoracao():
     st.balloons()
 
 # ==============================================================================
+# MOTOR PEXELS (FOTOS PARA O E-BOOK & VÍDEOS PARA VSL)
+# ==============================================================================
+def baixar_foto_nicho_pexels(termo_busca: str, pexels_key: str, identificador: str) -> str:
+    if not pexels_key or not termo_busca:
+        return None
+    caminho_local = os.path.join(DIR_FOTOS, f"foto_{identificador}.jpg")
+    url = f"https://api.pexels.com/v1/search?query={urllib.parse.quote(termo_busca)}&orientation=landscape&per_page=6"
+    headers = {"Authorization": pexels_key}
+    try:
+        res = requests.get(url, headers=headers, timeout=12)
+        if res.status_code == 200:
+            fotos = res.json().get("photos", [])
+            if fotos:
+                escolhida = random.choice(fotos)
+                link_img = escolhida.get("src", {}).get("large") or escolhida.get("src", {}).get("medium")
+                if link_img:
+                    conteudo = requests.get(link_img, timeout=20)
+                    if conteudo.status_code == 200 and len(conteudo.content) > 5000:
+                        with open(caminho_local, "wb") as f:
+                            f.write(conteudo.content)
+                        # Normalização com PIL para garantir JPEG RGB compatível com FPDF
+                        with Image.open(caminho_local) as im:
+                            rgb_im = im.convert("RGB")
+                            # Redimensionamento equilibrado (1280x720) para manter o PDF leve e nítido
+                            rgb_im.thumbnail((1280, 720), Image.Resampling.LANCZOS)
+                            rgb_im.save(caminho_local, "JPEG", quality=85)
+                        return caminho_local
+    except Exception:
+        pass
+    return None
+
+def baixar_video_pexels(termo: str, pexels_key: str, vertical: bool, prefixo_arq: str) -> str:
+    caminho_local = os.path.join(DIR_BROLL, f"{prefixo_arq}.mp4")
+    orientacao = "portrait" if vertical else "landscape"
+    url = f"https://api.pexels.com/videos/search?query={urllib.parse.quote(termo)}&orientation={orientacao}&per_page=8"
+    headers = {"Authorization": pexels_key}
+    try:
+        res = requests.get(url, headers=headers, timeout=12)
+        if res.status_code == 200:
+            videos = res.json().get("videos", [])
+            if videos:
+                escolhido = random.choice(videos)
+                arquivos = escolhido.get("video_files", [])
+                otimizados = [v for v in arquivos if 0 < v.get("width", 0) <= 1920]
+                link = otimizados[0]["link"] if otimizados else (arquivos[0]["link"] if arquivos else None)
+                if link:
+                    conteudo = requests.get(link, timeout=25)
+                    if conteudo.status_code == 200 and len(conteudo.content) > 10000:
+                        with open(caminho_local, "wb") as f:
+                            f.write(conteudo.content)
+                        return caminho_local
+    except Exception:
+        pass
+    return None
+
+# ==============================================================================
 # MOTORES DE INTELIGÊNCIA ARTIFICIAL
 # ==============================================================================
 PLATAFORMAS_CONFIG = {
@@ -246,14 +302,14 @@ def analisar_oportunidades_ia(buscas: list[str], plataforma: str) -> list[dict]:
     lista_formatada = "\n".join([f"- {b}" for b in buscas[:12]])
 
     prompt = f"""
-    Atue como estrategista para {plataforma} ({cfg['perfil']}).
+    Atue como estrategista sênior para {plataforma} ({cfg['perfil']}).
     Buscas reais mineradas:
     {lista_formatada}
 
     Retorne estritamente um JSON com a chave 'oportunidades', contendo 4 objetos com as chaves:
-    - 'produto': Nome curto da oferta
-    - 'publico': Quem compra
-    - 'angulo': Gancho principal de conversão
+    - 'produto': Nome comercial magnético da oferta
+    - 'publico': Quem compra especificamente
+    - 'angulo': Gancho principal e mecanismo de conversão
     """
 
     resposta = client.chat.completions.create(
@@ -270,24 +326,22 @@ def analisar_oportunidades_ia(buscas: list[str], plataforma: str) -> list[dict]:
 
 def obter_roteiro_ia_por_ticket(produto: str, publico: str, angulo: str, faixa_preco: str, plataforma: str) -> list[str]:
     client = OpenAI(api_key=OPENAI_API_KEY)
-
     if "Baixo" in faixa_preco:
         qtd_frases = 3
-        diretrizes = f"- Canal Alvo: {plataforma} | TICKET BAIXO (R$ 27 a R$ 97).\n- 3 frases curtas e diretas de interrupção (20 a 30s)."
+        diretrizes = f"- Canal: {plataforma} | TICKET BAIXO (R$ 27 a R$ 97).\n- 3 frases curtas e diretas de interrupção (20 a 30s)."
     elif "Médio" in faixa_preco:
         qtd_frases = 5
-        diretrizes = f"- Canal Alvo: {plataforma} | TICKET MÉDIO (R$ 197 a R$ 497).\n- 5 frases progressivas com dor, causa oculta e CTA (50 a 70s)."
+        diretrizes = f"- Canal: {plataforma} | TICKET MÉDIO (R$ 197 a R$ 497).\n- 5 frases progressivas com dor, causa oculta e CTA (50 a 70s)."
     else:
         qtd_frases = 7
-        diretrizes = f"- Canal Alvo: {plataforma} | ALTO TICKET (R$ 997+).\n- 7 frases de autoridade e qualificação (90 a 120s)."
+        diretrizes = f"- Canal: {plataforma} | ALTO TICKET (R$ 997+).\n- 7 frases de autoridade e qualificação (90 a 120s)."
 
     prompt = f"""
     Crie o roteiro de vendas persuasivo para: '{produto}'.
     Público: '{publico}'. Ângulo: '{angulo}'.
     {diretrizes}
-    Retorne APENAS as {qtd_frases} frases, exatamente uma por linha, sem títulos ou aspas.
+    Retorne APENAS as {qtd_frases} frases, exatamente uma por linha, sem numeração ou aspas.
     """
-
     resp = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[{"role": "user", "content": prompt}],
@@ -295,38 +349,9 @@ def obter_roteiro_ia_por_ticket(produto: str, publico: str, angulo: str, faixa_p
     )
     return [l.strip() for l in resp.choices[0].message.content.strip().split("\n") if l.strip()]
 
-def gerar_conteudo_ebook_ia(nicho_produto: str, publico: str, promessa_angulo: str) -> dict:
-    client = OpenAI(api_key=OPENAI_API_KEY)
-    prompt = f"""
-    Escreva um E-book / Guia Prático completo:
-    - Nicho: {nicho_produto}
-    - Público: {publico}
-    - Promessa: {promessa_angulo}
-
-    Retorne ESTRITAMENTE um JSON estruturado:
-    {{
-      "titulo": "Título Comercial Magnético",
-      "subtitulo": "Subtítulo Persuasivo",
-      "introducao": "Texto completo da introdução (mínimo 150 palavras).",
-      "capitulos": [
-        {{"numero": 1, "titulo": "Fundamentos e Preparação", "conteudo": "Conteúdo prático (mínimo 180 palavras)."}},
-        {{"numero": 2, "titulo": "O Mecanismo Único", "conteudo": "Detalhamento da técnica (mínimo 180 palavras)."}},
-        {{"numero": 3, "titulo": "Plano de Ação Imediato", "conteudo": "Passo a passo prático (mínimo 180 palavras)."}},
-        {{"numero": 4, "titulo": "Sustentação e Escala", "conteudo": "Erros e próximos passos (mínimo 180 palavras)."}}
-      ]
-    }}
-    """
-    resp = client.chat.completions.create(
-        model="gpt-4o-mini",
-        response_format={"type": "json_object"},
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.7
-    )
-    return json.loads(resp.choices[0].message.content)
-
 def extrair_termo_broll_ia(frase: str, perfil_personagem: str = "") -> str:
     client = OpenAI(api_key=OPENAI_API_KEY)
-    instrucao_tipo = f'O ator/pessoa DEVE ter o seguinte perfil: "{perfil_personagem}".' if perfil_personagem and "Decide" not in perfil_personagem else ""
+    instrucao_tipo = f'O ator/pessoa DEVE ter o perfil: "{perfil_personagem}".' if perfil_personagem and "Decide" not in perfil_personagem else ""
     prompt = f"""
     Frase narrada: "{frase}"
     {instrucao_tipo}
@@ -343,30 +368,219 @@ def extrair_termo_broll_ia(frase: str, perfil_personagem: str = "") -> str:
     except Exception:
         return "business lifestyle"
 
-def baixar_video_pexels(termo: str, pexels_key: str, vertical: bool, prefixo_arq: str) -> str:
-    caminho_local = os.path.join(DIR_BROLL, f"{prefixo_arq}.mp4")
-    orientacao = "portrait" if vertical else "landscape"
-    url = f"https://api.pexels.com/videos/search?query={urllib.parse.quote(termo)}&orientation={orientacao}&per_page=8"
-    headers = {"Authorization": pexels_key}
-    try:
-        res = requests.get(url, headers=headers, timeout=12)
-        if res.status_code == 200:
-            videos = res.json().get("videos", [])
-            if videos:
-                escolhido = random.choice(videos)
-                arquivos = escolhido.get("video_files", [])
-                otimizados = [v for v in arquivos if 0 < v.get("width", 0) <= 1920]
-                link = otimizados[0]["link"] if otimizados else (arquivos[0]["link"] if arquivos else None)
-                if link:
-                    conteudo = requests.get(link, timeout=25)
-                    if conteudo.status_code == 200 and len(conteudo.content) > 10000:
-                        with open(caminho_local, "wb") as f:
-                            f.write(conteudo.content)
-                        return caminho_local
-    except Exception:
-        pass
-    return None
+def gerar_conteudo_ebook_ia(nicho_produto: str, publico: str, promessa_angulo: str) -> dict:
+    client = OpenAI(api_key=OPENAI_API_KEY)
+    prompt = f"""
+    Atue como autoridade sênior de infoprodutos, copywriter profissional e educador técnico.
+    Escreva um E-book / Manual Operacional de alto valor comercial, denso, persuasivo e didático.
 
+    PARÂMETROS DO PRODUTO:
+    - Nicho: {nicho_produto}
+    - Público-Alvo e Dores: {publico}
+    - Promessa / Solução: {promessa_angulo}
+
+    EXIGÊNCIAS RÍGIDAS DE QUALIDADE:
+    1. A introdução deve ser profunda (mínimo 300 palavras), analisando a causa oculta do fracasso da concorrência e o método apresentado.
+    2. Cada um dos 4 capítulos DEVE ter entre 350 e 500 palavras, contendo:
+       - Fundamentação teórica sólida.
+       - Passo a passo numerado com ações executáveis.
+       - Exemplos práticos aplicados ao nicho.
+       - Alertas de erros comuns e checklist de verificação.
+    3. Para cada capítulo e para a capa, determine o melhor termo em INGLÊS (2 a 4 palavras) para buscar fotos reais de alta qualidade em bancos de imagem (locais, rotinas de trabalho, cenários do nicho, ferramentas).
+
+    Retorne ESTRITAMENTE um JSON estruturado com o seguinte esquema:
+    {{
+      "titulo": "Título Comercial Magnético",
+      "subtitulo": "Subtítulo Persuasivo Focado em Execução",
+      "termo_capa": "termo em ingles para foto de capa (ex: modern luxury office)",
+      "introducao": "Texto longo da introdução com múltiplos parágrafos...",
+      "capitulos": [
+        {{
+          "numero": 1,
+          "titulo": "Fundamentos Críticos e Desconstrução de Falhas",
+          "termo_busca_foto": "termo em ingles para foto (ex: financial analytics desk)",
+          "conteudo": "Texto completo denso e estruturado com passos..."
+        }},
+        {{
+          "numero": 2,
+          "titulo": "O Mecanismo Operacional e Implementação",
+          "termo_busca_foto": "termo em ingles para foto (ex: programmer working setup)",
+          "conteudo": "Texto completo denso e estruturado com passos..."
+        }},
+        {{
+          "numero": 3,
+          "titulo": "Plano de Execução Diária e Checklist",
+          "termo_busca_foto": "termo em ingles para foto (ex: business meeting strategy)",
+          "conteudo": "Texto completo denso e estruturado com passos..."
+        }},
+        {{
+          "numero": 4,
+          "titulo": "Blindagem, Métricas e Multiplicação de Resultados",
+          "termo_busca_foto": "termo em ingles para foto (ex: corporate skyscraper glass)",
+          "conteudo": "Texto completo denso e estruturado com passos..."
+        }}
+      ]
+    }}
+    """
+    resp = client.chat.completions.create(
+        model="gpt-4o-mini",
+        response_format={"type": "json_object"},
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.7
+    )
+    return json.loads(resp.choices[0].message.content)
+
+# ==============================================================================
+# MOTOR DE DIAGRAMAÇÃO DE PDF COM FOTOS INTEGRADAS
+# ==============================================================================
+class PDFEbookComFotos(FPDF):
+    def __init__(self, titulo_guia: str):
+        super().__init__(orientation="P", unit="mm", format="A4")
+        self.titulo_guia = sanitizar_pdf(titulo_guia)
+
+    def header(self):
+        if self.page_no() > 1:
+            self.set_font("Helvetica", "I", 8)
+            self.set_text_color(130, 140, 150)
+            self.cell(0, 8, self.titulo_guia[:50].upper(), border=0, align="L")
+            self.cell(0, 8, "PROTOCOLO PRÁTICO OFICIAL", border=0, align="R")
+            self.ln(10)
+            self.set_draw_color(220, 225, 230)
+            self.set_line_width(0.3)
+            self.line(18, 18, 192, 18)
+            self.ln(4)
+
+    def footer(self):
+        if self.page_no() > 1:
+            self.set_y(-15)
+            self.set_draw_color(220, 225, 230)
+            self.set_line_width(0.3)
+            self.line(18, 282, 192, 282)
+            self.set_font("Helvetica", "", 9)
+            self.set_text_color(130, 140, 150)
+            self.cell(0, 10, f"Página {self.page_no()}", border=0, align="C")
+
+def sanitizar_pdf(txt: str) -> str:
+    if not txt:
+        return ""
+    substituicoes = {
+        "–": "-", "—": "-", "“": '"', "”": '"', "’": "'", "‘": "'",
+        "•": "*", "…": "...", "→": "->", "←": "<-", "\t": " "
+    }
+    for orig, dest in substituicoes.items():
+        txt = txt.replace(orig, dest)
+    return txt.encode("latin-1", "replace").decode("latin-1")
+
+def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_saida: str):
+    titulo = dados.get("titulo", "GUIA OPERACIONAL")
+    subtitulo = dados.get("subtitulo", "")
+    pdf = PDFEbookComFotos(titulo_guia=titulo)
+    pdf.set_auto_page_break(auto=True, margin=22)
+    pdf.set_margins(18, 20, 18)
+
+    # ---------------- CAPA PREMIUM COM FOTO DE FUNDO/DESTAQUE ----------------
+    pdf.add_page()
+    # Fundo moderno Dark Blue
+    pdf.set_fill_color(15, 23, 42)
+    pdf.rect(0, 0, 210, 297, "F")
+
+    # Linha dourada de destaque
+    pdf.set_fill_color(245, 158, 11)
+    pdf.rect(18, 30, 174, 3, "F")
+
+    pdf.set_y(38)
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.set_text_color(245, 158, 11)
+    pdf.cell(0, 8, "MATERIAL EXCLUSIVO - APLICAÇÃO PRÁTICA IMEDIATA", align="L", ln=True)
+
+    pdf.ln(4)
+    pdf.set_font("Helvetica", "B", 24)
+    pdf.set_text_color(255, 255, 255)
+    pdf.multi_cell(0, 11, sanitizar_pdf(titulo.upper()), align="L")
+
+    if subtitulo:
+        pdf.ln(3)
+        pdf.set_font("Helvetica", "", 12)
+        pdf.set_text_color(203, 213, 225)
+        pdf.multi_cell(0, 7, sanitizar_pdf(subtitulo), align="L")
+
+    # Foto temática de capa (Pexels)
+    termo_capa = dados.get("termo_capa") or "modern office corporate"
+    foto_capa = baixar_foto_nicho_pexels(termo_capa, pexels_key, "capa")
+    if foto_capa and os.path.exists(foto_capa):
+        pdf.ln(8)
+        y_foto_capa = pdf.get_y()
+        # Enquadramento proporcional da foto na capa
+        pdf.image(foto_capa, x=18, y=y_foto_capa, w=174, h=95)
+
+    # Rodapé da Capa
+    pdf.set_y(260)
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.set_text_color(255, 255, 255)
+    pdf.cell(0, 5, "SISTEMA DE EXECUÇÃO VALIDAÇÃO DIRETA", ln=True)
+    pdf.set_font("Helvetica", "", 8.5)
+    pdf.set_text_color(148, 163, 184)
+    pdf.cell(0, 5, f"Gerado em {datetime.now().strftime('%d/%m/%Y')} | Todos os direitos reservados", ln=True)
+
+    # ---------------- INTRODUÇÃO ESTRUTURADA ----------------
+    pdf.add_page()
+    pdf.set_text_color(15, 23, 42)
+    pdf.set_font("Helvetica", "B", 17)
+    pdf.cell(0, 10, "Visão Geral e Diagnóstico Estratégico", ln=True)
+    pdf.ln(2)
+
+    pdf.set_font("Helvetica", "", 10.5)
+    pdf.set_text_color(51, 65, 85)
+    for p in dados.get("introducao", "").split("\n"):
+        p_limpo = p.strip()
+        if p_limpo:
+            pdf.multi_cell(0, 6.5, sanitizar_pdf(p_limpo))
+            pdf.ln(3)
+
+    # ---------------- CAPÍTULOS COM FOTOS TEMÁTICAS DO NICHO ----------------
+    for idx_cap, cap in enumerate(dados.get("capitulos", [])):
+        pdf.add_page()
+        num = cap.get("numero", idx_cap + 1)
+        tit = cap.get("titulo", f"Módulo {num}")
+
+        # Caixa de Destaque para o Título do Módulo
+        pdf.set_fill_color(241, 245, 249)
+        pdf.set_draw_color(203, 213, 225)
+        pdf.rect(18, 25, 174, 16, "FD")
+        pdf.set_y(28)
+        pdf.set_font("Helvetica", "B", 12.5)
+        pdf.set_text_color(15, 23, 42)
+        pdf.cell(0, 10, sanitizar_pdf(f" MÓDULO {num}: {tit.upper()}"), ln=True)
+        pdf.ln(6)
+
+        # Baixar e Inserir Foto Contextual do Nicho
+        termo_cap = cap.get("termo_busca_foto") or "professional business strategy"
+        foto_cap = baixar_foto_nicho_pexels(termo_cap, pexels_key, f"cap_{num}")
+        if foto_cap and os.path.exists(foto_cap):
+            y_img = pdf.get_y()
+            pdf.image(foto_cap, x=18, y=y_img, w=174, h=78)
+            pdf.set_y(y_img + 84)
+
+        pdf.set_font("Helvetica", "", 10.5)
+        pdf.set_text_color(51, 65, 85)
+
+        for linha in cap.get("conteudo", "").split("\n"):
+            l_limpa = linha.strip()
+            if l_limpa:
+                if l_limpa.startswith(("-", "*", "1.", "2.", "3.", "4.", "•")):
+                    pdf.set_x(23)
+                    pdf.multi_cell(169, 6.2, sanitizar_pdf(l_limpa))
+                    pdf.ln(2)
+                else:
+                    pdf.multi_cell(0, 6.5, sanitizar_pdf(l_limpa))
+                    pdf.ln(3)
+
+    pdf.output(caminho_saida)
+    return caminho_saida
+
+# ==============================================================================
+# MOTOR FFMPEG RESILIENTE
+# ==============================================================================
 def obter_duracao_audio_ffmpeg(caminho_audio: str) -> float:
     try:
         cmd = [FFMPEG_BIN, "-nostdin", "-i", caminho_audio]
@@ -396,9 +610,6 @@ def sintetizar_voz_segura(texto: str, caminho_out: str, voz: str) -> str:
             time.sleep(1)
     raise RuntimeError("Falha ao sintetizar áudio via OpenAI Studio.")
 
-# ==============================================================================
-# MOTOR FFMPEG RESILIENTE
-# ==============================================================================
 def renderizar_vsl_completa(
     frases: list[str],
     vertical: bool,
@@ -417,7 +628,7 @@ def renderizar_vsl_completa(
 
     for i, frase in enumerate(frases):
         idx = i + 1
-        c_audio = os.path.join(DIR_AUDIOS, f"{job_id}_parte_{idx}.mp3")
+        c_audio = os.path.join(DIR_AUDIOS, f"{job_id}_p_{idx}.mp3")
         c_cena = os.path.join(DIR_TEMP, f"{job_id}_cena_{idx}.mp4")
 
         sintetizar_voz_segura(frase, c_audio, voz)
@@ -545,54 +756,6 @@ def renderizar_vsl_completa(
     return caminho_saida
 
 # ==============================================================================
-# MOTOR E-BOOK PDF
-# ==============================================================================
-def sanitizar_pdf(txt: str) -> str:
-    return txt.encode("latin-1", "replace").decode("latin-1") if txt else ""
-
-def compilar_pdf_ebook(dados: dict, caminho_saida: str):
-    pdf = FPDF()
-    pdf.set_auto_page_break(auto=True, margin=20)
-
-    pdf.add_page()
-    pdf.set_fill_color(22, 27, 34)
-    pdf.rect(0, 0, 210, 297, "F")
-    pdf.ln(50)
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.set_text_color(240, 180, 41)
-    pdf.cell(0, 10, "PROTOCOLO OFICIAL DE EXECUÇÃO PRÁTICA", align="C", ln=True)
-    pdf.ln(15)
-    pdf.set_font("Helvetica", "B", 22)
-    pdf.set_text_color(255, 255, 255)
-    pdf.multi_cell(0, 11, sanitizar_pdf(dados.get("titulo", "GUIA PRÁTICO").upper()), align="C")
-    pdf.ln(10)
-    pdf.set_font("Helvetica", "", 12)
-    pdf.set_text_color(200, 205, 215)
-    pdf.multi_cell(0, 8, sanitizar_pdf(dados.get("subtitulo", "")), align="C")
-
-    pdf.add_page()
-    pdf.set_text_color(20, 20, 20)
-    pdf.set_font("Helvetica", "B", 18)
-    pdf.cell(0, 12, "1. Introdução e Visão Geral", ln=True)
-    pdf.ln(4)
-    pdf.set_font("Helvetica", "", 11)
-    pdf.multi_cell(0, 7, sanitizar_pdf(dados.get("introducao", "")))
-
-    for cap in dados.get("capitulos", []):
-        pdf.add_page()
-        pdf.set_text_color(20, 20, 20)
-        pdf.set_font("Helvetica", "B", 16)
-        num = cap.get("numero", "")
-        tit = cap.get("titulo", "")
-        pdf.cell(0, 10, sanitizar_pdf(f"Módulo {num}: {tit}"), ln=True)
-        pdf.ln(4)
-        pdf.set_font("Helvetica", "", 11)
-        pdf.multi_cell(0, 7, sanitizar_pdf(cap.get("conteudo", "")))
-
-    pdf.output(caminho_saida)
-    return caminho_saida
-
-# ==============================================================================
 # BARRA LATERAL
 # ==============================================================================
 with st.sidebar:
@@ -610,7 +773,7 @@ with st.sidebar:
         st.rerun()
 
     st.markdown("---")
-    st.header("🎬 Configuração do Vídeo")
+    st.header("🎬 Configuração do Vídeo (VSL)")
     vozes = {
         "Onyx (Masculina - Impacto/Autoridade)": "onyx",
         "Nova (Feminina - Alta Conversão)": "nova",
@@ -630,7 +793,7 @@ with st.sidebar:
 # ==============================================================================
 aba_vsl, aba_ebook, aba_radar, aba_planos, aba_galeria, aba_admin = st.tabs([
     "🚀 Criar VSL",
-    "📚 Gerar E-book PDF",
+    "📚 Gerar E-book PDF com Fotos",
     "📡 Radar de Mercado",
     "💳 Planos & Recargas",
     "📂 Galeria",
@@ -730,80 +893,113 @@ with aba_vsl:
             st.download_button("⬇️ Baixar Vídeo MP4", f, file_name=os.path.basename(st.session_state["video_pronto"]), mime="video/mp4")
 
 # ------------------------------------------------------------------------------
-# ABA 2: E-BOOK (IA OU MANUAL)
+# ABA 2: E-BOOK PROFISSIONAL COM FOTOS REAIS DO NICHO
 # ------------------------------------------------------------------------------
 with aba_ebook:
-    st.subheader("📚 Diagramação e Criação de E-book em PDF")
+    st.subheader("📚 Criação e Diagramação de E-books Profissionais com Fotos")
 
     modo_ebook = st.radio(
         "Como deseja estruturar o conteúdo do E-book?",
-        ["✍ Escrever / Colar Manualmente (0 Créditos)", "🤖 Gerar Conteúdo Completo via IA (15 Créditos)"],
+        ["🤖 Gerar Conteúdo Completo e Enriquecido via IA (15 Créditos)", "✍ Escrever / Editar Manualmente (0 Créditos)"],
         horizontal=True
     )
 
     if "eb_dados_sessao" not in st.session_state:
         st.session_state["eb_dados_sessao"] = {
             "titulo": "Manual Prático de Execução Rápida",
-            "subtitulo": "Como implementar um sistema lucrativo em 48 horas",
-            "introducao": "Este material foi desenvolvido para eliminar o excesso de informação e direcionar sua energia para os pontos fundamentais que geram retorno financeiro sustentável.",
+            "subtitulo": "Como implementar um sistema lucrativo com passos validados",
+            "termo_capa": "modern executive workplace",
+            "introducao": "Este material foi desenvolvido para eliminar o excesso de teoria e direcionar sua energia para os pontos fundamentais que geram retorno consistente.",
             "capitulos": [
-                {"numero": 1, "titulo": "O Alinhamento dos Fundamentos", "conteudo": "Antes de avançar para a parte prática, é crucial entender por que a maioria das estratégias falha por pura falta de consistência inicial."},
-                {"numero": 2, "titulo": "O Mecanismo Único de Operação", "conteudo": "Apresentamos aqui o protocolo técnico exato para colocar as ferramentas certas trabalhando em sincronia sem esforço duplicado."},
-                {"numero": 3, "titulo": "Execução Passo a Passo", "conteudo": "Siga o cronograma direto de execução diária para finalizar a primeira entrega nas próximas 24 horas sem distrações."},
-                {"numero": 4, "titulo": "Escala e Sustentação", "conteudo": "Descubra como blindar seu processo, gerenciar contingências e multiplicar o volume de produção com segurança."}
+                {
+                    "numero": 1,
+                    "titulo": "O Alinhamento dos Fundamentos",
+                    "termo_busca_foto": "financial business plan",
+                    "conteudo": "Antes de avançar para a parte prática, é crucial entender por que a maioria das estratégias falha por pura falta de consistência inicial.\n\n1. Defina a métrica de validação prioritária.\n2. Elimine qualquer ferramenta redundante.\n3. Concentre o foco na oferta central."
+                },
+                {
+                    "numero": 2,
+                    "titulo": "O Mecanismo Único de Operação",
+                    "termo_busca_foto": "software engineering workstation",
+                    "conteudo": "Apresentamos aqui o protocolo técnico exato para colocar as ferramentas certas trabalhando em sincronia sem esforço duplicado.\n\n1. Estruturação do funil.\n2. Conexão do tráfego direto.\n3. Automação da entrega."
+                },
+                {
+                    "numero": 3,
+                    "titulo": "Execução Passo a Passo e Checklist",
+                    "termo_busca_foto": "strategy meeting team",
+                    "conteudo": "Siga o cronograma direto de execução diária para finalizar a primeira entrega nas próximas 24 horas sem distrações.\n\n- Checagem de links ativos.\n- Verificação de entregabilidade de e-mails.\n- Teste de checkout."
+                },
+                {
+                    "numero": 4,
+                    "titulo": "Escala e Sustentação dos Resultados",
+                    "termo_busca_foto": "modern skyscraper architecture",
+                    "conteudo": "Descubra como blindar seu processo, gerenciar contingências e multiplicar o volume de produção com segurança e previsibilidade."
+                }
             ]
         }
 
-    if modo_ebook == "🤖 Gerar Conteúdo Completo via IA (15 Créditos)":
+    if modo_ebook == "🤖 Gerar Conteúdo Completo e Enriquecido via IA (15 Créditos)":
         c_eb1, c_eb2 = st.columns(2)
         with c_eb1:
             nicho_eb = st.text_input("Nicho ou Nome do Produto:", value=st.session_state.get("prod_nome", "Manual da Renda Extra Digital"))
-            eb_pub = st.text_area("Público e Dores:", value=st.session_state.get("pub_nome", "Pessoas comuns sem tempo que buscam validação de renda online."))
+            eb_pub = st.text_area("Público e Dores:", value=st.session_state.get("pub_nome", "Pessoas comuns sem tempo que buscam validação de renda online."), height=90)
         with c_eb2:
-            eb_ang = st.text_area("Promessa e Solução:", value=st.session_state.get("ang_nome", "Método passo a passo baseado em automações simples sem aparecer."))
+            eb_ang = st.text_area("Promessa e Solução:", value=st.session_state.get("ang_nome", "Método passo a passo baseado em automações simples sem aparecer."), height=90)
 
-        if st.button("⚡ Redigir Rascunho com IA (15 Créditos)", type="primary", use_container_width=True):
+        if st.button("⚡ Redigir Rascunho Profundo com IA (15 Créditos)", type="primary", use_container_width=True):
             agora = time.time()
             if agora - st.session_state.get("_ultimo_click_eb", 0) < 12:
-                st.warning("⏳ Aguarde alguns segundos entre cada compilação para proteção do servidor.")
+                st.warning("⏳ Aguarde alguns segundos antes de solicitar nova compilação.")
                 st.stop()
             st.session_state["_ultimo_click_eb"] = agora
 
             if not debitar_creditos_cloud(email_usuario, "Geração de E-book IA", 15):
                 st.error("❌ Saldo insuficiente! Você precisa de 15 créditos.")
             else:
-                with st.spinner("🤖 A IA está redigindo o conteúdo completo..."):
+                with st.spinner("🤖 A IA está redigindo o conteúdo técnico e mapeando termos fotográficos..."):
                     try:
                         dados_gerados = gerar_conteudo_ebook_ia(nicho_eb, eb_pub, eb_ang)
                         st.session_state["eb_dados_sessao"] = dados_gerados
-                        st.success("✅ Conteúdo redigido pela IA com sucesso! Você pode revisar ou editar cada módulo abaixo antes de compilar o PDF.")
+                        st.success("✅ Conteúdo gerado com termos de fotos definidos! Revise e clique em compilar.")
                     except Exception as erro:
                         st.error(f"Erro na redação do infoproduto: {erro}")
 
-    st.markdown("---")
-    st.markdown("### 📝 Editor de Conteúdo do E-book")
+    st.divider()
+    st.markdown("### 📝 Editor e Configuração das Fotos por Módulo")
 
     eb_atual = st.session_state["eb_dados_sessao"]
     col_t1, col_t2 = st.columns([1, 1])
     with col_t1:
-        tit_edit = st.text_input("Título do Livro:", value=eb_atual.get("titulo", ""))
+        tit_edit = st.text_input("Título do Livro:", value=eb_atual.get("titulo", ""), key="in_eb_tit")
+        termo_capa_edit = st.text_input("Foto da Capa (Termo em Inglês no Pexels):", value=eb_atual.get("termo_capa", "business strategy"), key="in_eb_capa_term")
     with col_t2:
-        sub_edit = st.text_input("Subtítulo Persuasivo:", value=eb_atual.get("subtitulo", ""))
+        sub_edit = st.text_input("Subtítulo Persuasivo:", value=eb_atual.get("subtitulo", ""), key="in_eb_sub")
 
-    intro_edit = st.text_area("Introdução:", value=eb_atual.get("introducao", ""), height=120)
+    intro_edit = st.text_area("Introdução Estratégica:", value=eb_atual.get("introducao", ""), height=150, key="in_eb_intro")
 
     caps_editados = []
-    st.markdown("#### 📖 Capítulos / Módulos do Livro:")
+    st.markdown("#### 📖 Módulos e Fotos Temáticas:")
     for c_idx, cap in enumerate(eb_atual.get("capitulos", [])):
         with st.expander(f"Módulo {c_idx+1}: {cap.get('titulo', '')}", expanded=(c_idx == 0)):
-            t_cap = st.text_input(f"Título do Módulo {c_idx+1}:", value=cap.get("titulo", ""), key=f"t_cap_{c_idx}")
-            txt_cap = st.text_area(f"Conteúdo do Módulo {c_idx+1}:", value=cap.get("conteudo", ""), height=150, key=f"txt_cap_{c_idx}")
-            caps_editados.append({"numero": c_idx+1, "titulo": t_cap, "conteudo": txt_cap})
+            c_m1, c_m2 = st.columns([2, 1])
+            with c_m1:
+                t_cap = st.text_input(f"Título do Módulo {c_idx+1}:", value=cap.get("titulo", ""), key=f"t_cap_mod_{c_idx}")
+            with c_m2:
+                foto_term = st.text_input(f"Termo da Foto (Pexels):", value=cap.get("termo_busca_foto", "workplace success"), key=f"foto_cap_mod_{c_idx}")
+            txt_cap = st.text_area(f"Conteúdo do Módulo {c_idx+1}:", value=cap.get("conteudo", ""), height=180, key=f"txt_cap_mod_{c_idx}")
+            caps_editados.append({
+                "numero": c_idx+1,
+                "titulo": t_cap,
+                "termo_busca_foto": foto_term,
+                "conteudo": txt_cap
+            })
 
-    if st.button("📄 Compilar e Gerar PDF Diagramado", type="primary", use_container_width=True):
+    st.write("")
+    if st.button("📄 Compilar e Gerar PDF Diagramado com Fotos", type="primary", use_container_width=True):
         dados_compilacao = {
             "titulo": tit_edit,
             "subtitulo": sub_edit,
+            "termo_capa": termo_capa_edit,
             "introducao": intro_edit,
             "capitulos": caps_editados
         }
@@ -811,23 +1007,29 @@ with aba_ebook:
 
         nome_arquivo = f"ebook_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         caminho_pdf = os.path.join(DIR_EBOOKS, nome_arquivo)
-        compilar_pdf_ebook(dados_compilacao, caminho_pdf)
 
-        disparar_comemoracao()
-        st.success("✅ E-book diagramado e pronto para download!")
+        with st.spinner("📥 Baixando fotos do nicho no Pexels e diagramando páginas..."):
+            compilar_pdf_ebook_com_fotos(dados_compilacao, PEXELS_API_KEY, caminho_pdf)
+            st.session_state["pdf_pronto"] = caminho_pdf
+            st.session_state["pdf_nome"] = nome_arquivo
+            disparar_comemoracao()
+            st.rerun()
 
-        with open(caminho_pdf, "rb") as f:
+    # O botão de download permanece persistido fora de blocos efêmeros
+    if st.session_state.get("pdf_pronto") and os.path.exists(st.session_state["pdf_pronto"]):
+        st.success(f"✅ Arquivo compilado com fotos e diagramação completa: `{st.session_state.get('pdf_nome')}`")
+        with open(st.session_state["pdf_pronto"], "rb") as f:
             st.download_button(
-                label=f"⬇️ Baixar {tit_edit} (.pdf)",
+                label=f"⬇️ BAIXAR LIVRO EM PDF ({st.session_state.get('pdf_nome')})",
                 data=f,
-                file_name=nome_arquivo,
+                file_name=st.session_state.get("pdf_nome", "ebook.pdf"),
                 mime="application/pdf",
                 type="primary",
                 use_container_width=True
             )
 
 # ------------------------------------------------------------------------------
-# ABA 3: RADAR (IA OU MANUAL)
+# ABA 3: RADAR (MINERAÇÃO DE MERCADO)
 # ------------------------------------------------------------------------------
 with aba_radar:
     st.subheader("🔍 Espião de Tendências & Cadastro de Oportunidades")
@@ -889,39 +1091,43 @@ with aba_radar:
                 st.session_state["pub_nome"] = pub_manual.strip()
                 st.session_state["ang_nome"] = ang_manual.strip()
                 st.session_state["canal_sel"] = canal_manual
-                st.success("✅ Sua ideia foi definida como ativa! Ela já foi repassada para as abas '🚀 Criar VSL' e '📚 Gerar E-book PDF'.")
+                st.success("✅ Ideia carregada para as abas '🚀 Criar VSL' e '📚 Gerar E-book PDF com Fotos'.")
             else:
                 st.error("Informe pelo menos o nome do produto.")
 
 # ------------------------------------------------------------------------------
-# ABA 4: PLANOS
+# ABA 4: PLANOS & CHECKOUT DIRETO KIWIFY
 # ------------------------------------------------------------------------------
 with aba_planos:
     st.subheader("💎 Recargas Oficiais de Créditos")
     st.subheader("📦 Planos Regulares de Volume e Escala")
+
+    email_param = urllib.parse.quote(email_usuario.strip().lower())
+    checkout_kiwify_oficial = f"https://pay.kiwify.com.br/YkL0BlH?email={email_param}"
+
     c1, c2, c3 = st.columns(3)
     with c1:
         with st.container(border=True):
             st.markdown("### 🟢 Starter\n## R$ 57,00\n**(160 créditos)**")
             st.write("• 16 VSLs Curtas ou 8 Médias\n• 10 E-books diagramados\n• Suporte individual")
-            st.link_button("💳 COMPRAR STARTER", url="https://pay.kiwify.com.br", use_container_width=True)
+            st.link_button("💳 COMPRAR CRÉDITOS STARTER", url=checkout_kiwify_oficial, use_container_width=True)
     with c2:
         with st.container(border=True):
             st.markdown("### 🟡 Pro\n## R$ 87,00\n**(300 créditos)**")
-            st.write("• 30 VSLs Curtas ou 15 Médias\n• 20 E-books diagramados\n• Mineração em todos os canais")
-            st.link_button("🚀 COMPRAR PRO", url="https://pay.kiwify.com.br", use_container_width=True, type="primary")
+            st.write("• 30 VSLs Curtas ou 15 Médias\n• 20 E-books diagramados com fotos\n• Mineração em todos os canais")
+            st.link_button("🚀 COMPRAR CRÉDITOS PRO", url=checkout_kiwify_oficial, use_container_width=True, type="primary")
     with c3:
         with st.container(border=True):
             st.markdown("### 🔴 VIP Escala\n## R$ 117,00\n**(500 créditos)**")
-            st.write("• 50 VSLs Curtas ou 25 Médias\n• 33 E-books diagramados\n• Processamento prioritário")
-            st.link_button("👑 ASSINAR VIP", url="https://pay.kiwify.com.br", use_container_width=True)
+            st.write("• 50 VSLs Curtas ou 25 Médias\n• 33 E-books diagramados com fotos\n• Processamento prioritário")
+            st.link_button("👑 ASSINAR PACOTE VIP", url=checkout_kiwify_oficial, use_container_width=True)
 
 # ------------------------------------------------------------------------------
-# ABA 5: GALERIA
+# ABA 5: GALERIA LOCAL
 # ------------------------------------------------------------------------------
 with aba_galeria:
     st.subheader("📂 Ficheiros Armazenados Localmente")
-    tab_v, tab_e = st.tabs(["Vídeos (.mp4)", "E-books (.pdf)"])
+    tab_v, tab_e, tab_f = st.tabs(["Vídeos (.mp4)", "E-books (.pdf)", "Fotos do Nicho (.jpg)"])
     with tab_v:
         for v in sorted(os.listdir(DIR_OUTPUT), reverse=True):
             if v.endswith(".mp4"):
@@ -930,6 +1136,10 @@ with aba_galeria:
         for e in sorted(os.listdir(DIR_EBOOKS), reverse=True):
             if e.endswith(".pdf"):
                 st.write(f"📚 `{e}`")
+    with tab_f:
+        for f in sorted(os.listdir(DIR_FOTOS), reverse=True):
+            if f.endswith(".jpg"):
+                st.write(f"🖼️ `{f}`")
 
 # ------------------------------------------------------------------------------
 # ABA 6: PAINEL ADMIN
