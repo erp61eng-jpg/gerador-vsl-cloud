@@ -372,17 +372,17 @@ def extrair_termo_broll_ia(frase: str, perfil_personagem: str = "") -> str:
         return "business lifestyle"
 
 # ==============================================================================
-# NOVO MOTOR DE E-BOOK PROFUNDO VIA GOOGLE GEMINI 1.5 PRO
+# NOVO MOTOR DE E-BOOK PROFUNDO VIA GOOGLE GEMINI (COM TRATAMENTO RESILIENTE)
 # ==============================================================================
 def gerar_conteudo_ebook_gemini(nicho_produto: str, publico: str, promessa_angulo: str) -> dict:
-    if not GEMINI_API_KEY:
-        st.error("Chave GEMINI_API_KEY não configurada nos Secrets do Streamlit Cloud.")
-        st.stop()
+    chave_gemini = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY", "")).strip()
+    if not chave_gemini:
+        raise ValueError("Chave 'GEMINI_API_KEY' não encontrada na seção Secrets do Streamlit Cloud.")
 
-    client = genai.Client(api_key=GEMINI_API_KEY)
+    client = genai.Client(api_key=chave_gemini)
 
     prompt = f"""
-    Atue como autoridade sênior internacional em infoprodutos e estrategista de implementação técnica.
+    Atue como autoridade internacional em infoprodutos e estrategista de implementação técnica.
     Escreva um MANUAL OPERACIONAL DE EXECUÇÃO PRÁTICA denso, rigoroso e acionável.
 
     PARÂMETROS DA OFERTA:
@@ -391,7 +391,7 @@ def gerar_conteudo_ebook_gemini(nicho_produto: str, publico: str, promessa_angul
     - Mecanismo e Promessa: {promessa_angulo}
 
     DIRETRIZES DE QUALIDADE FUNDAMENTAIS (SEM ENROLAÇÃO):
-    1. PROIBIDO qualquer tipo de clichê corporativo, conselhos genéricos ("mantenha o foco", "a consistência é a chave") ou introduções motivacionais de autoajuda.
+    1. PROIBIDO qualquer tipo de clichê corporativo, conselhos genéricos ("mantenha o foco") ou introduções motivacionais vazias.
     2. Cada capítulo DEVE ser profundo (mínimo de 350 a 500 palavras cada), estruturado com passos operacionais, checklists numéricos, comandos executáveis e roteiros copia-e-cola.
     3. Indique termos em INGLÊS precisos (2 a 4 palavras) para fotos reais do nicho no Pexels (ambientes, ferramentas, computadores de alta produtividade, reuniões estratégicas).
 
@@ -430,19 +430,34 @@ def gerar_conteudo_ebook_gemini(nicho_produto: str, publico: str, promessa_angul
     }}
     """
 
+    modelos_tentativa = ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-2.5-flash"]
+    resposta_obj = None
+    erros_capturados = []
+
+    for mod in modelos_tentativa:
+        try:
+            resposta_obj = client.models.generate_content(
+                model=mod,
+                contents=prompt,
+                config={"response_mime_type": "application/json"}
+            )
+            if resposta_obj and getattr(resposta_obj, "text", None):
+                break
+        except Exception as e:
+            erros_capturados.append(f"{mod}: {str(e)}")
+            continue
+
+    if not resposta_obj or not getattr(resposta_obj, "text", None):
+        detalhes = " | ".join(erros_capturados)
+        raise RuntimeError(f"Falha de comunicação com a API do Gemini. Detalhes: {detalhes}")
+
+    texto_bruto = resposta_obj.text.strip()
     try:
-        resposta = client.models.generate_content(
-            model="gemini-1.5-pro",
-            contents=prompt,
-            config={"response_mime_type": "application/json"}
-        )
-        return json.loads(resposta.text)
-    except Exception:
-        # Fallback de higienização de fences de código
-        txt = getattr(resposta, "text", "")
-        txt_limpo = re.sub(r"^```json\s*", "", txt.strip())
-        txt_limpo = re.sub(r"\s*```$", "", txt_limpo)
-        return json.loads(txt_limpo)
+        return json.loads(texto_bruto)
+    except json.JSONDecodeError:
+        texto_limpo = re.sub(r"^```(?:json)?\s*", "", texto_bruto, flags=re.MULTILINE)
+        texto_limpo = re.sub(r"\s*```$", "", texto_limpo, flags=re.MULTILINE).strip()
+        return json.loads(texto_limpo)
 
 # ==============================================================================
 # MOTOR DE DIAGRAMAÇÃO DE PDF COM FOTOS INTEGRADAS
