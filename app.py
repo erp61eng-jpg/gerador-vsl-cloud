@@ -921,16 +921,33 @@ with st.sidebar:
     logo_up = st.file_uploader("Logótipo (.png):", type=["png"])
 
 # ==============================================================================
-# ABAS PRINCIPAIS
+# ABAS DINÂMICAS: INCORPORAÇÃO DUBFYAI & BLINDAGEM DO ADMIN
 # ==============================================================================
-aba_vsl, aba_ebook, aba_radar, aba_planos, aba_galeria, aba_admin = st.tabs([
+is_master_admin = email_usuario in ["ricardopintoedson@gmail.com", "erp61eng@gmail.com"]
+
+titulos_abas = [
     "🚀 Criar VSL",
     "📚 Gerar E-book PDF com Fotos",
     "📡 Radar de Mercado",
+    "🎙️ DubfyAi Dublagem",
     "💳 Planos & Recargas",
-    "📂 Galeria",
-    "🔒 Painel Admin (Restrito)"
-])
+    "📂 Galeria"
+]
+
+if is_master_admin:
+    titulos_abas.append("🔒 Gestão Master")
+
+abas = st.tabs(titulos_abas)
+
+aba_vsl     = abas[0]
+aba_ebook   = abas[1]
+aba_radar   = abas[2]
+aba_dubfy   = abas[3]
+aba_planos  = abas[4]
+aba_galeria = abas[5]
+
+if is_master_admin:
+    aba_admin = abas[6]
 
 # ------------------------------------------------------------------------------
 # ABA 1: VSL (IA OU MANUAL)
@@ -1022,7 +1039,7 @@ with aba_vsl:
     if st.session_state.get("video_pronto") and os.path.exists(st.session_state["video_pronto"]):
         st.video(st.session_state["video_pronto"])
         with open(st.session_state["video_pronto"], "rb") as f:
-            st.download_button("⬇️ Baixar Vídeo MP4", f, file_name=os.path.basename(st.session_state["video_pronto"]), mime="video/mp4")
+            st.download_button("⬇️️ Baixar Vídeo MP4", f, file_name=os.path.basename(st.session_state["video_pronto"]), mime="video/mp4")
 
 # ------------------------------------------------------------------------------
 # ABA 2: E-BOOK PROFISSIONAL COM FOTOS REAIS DO NICHO (MOTOR GEMINI PIPELINE)
@@ -1206,72 +1223,75 @@ with aba_radar:
                 st.error("Informe pelo menos o nome do produto.")
 
 # ------------------------------------------------------------------------------
-# ABA 4: PLANOS & CHECKOUT DIRETO KIWIFY (LINKS ESPECÍFICOS POR PRODUTO)
+# ABA 4: DUBFYAI - CENTRAL DE DUBLAGEM & TRADUÇÃO DE VÍDEOS
 # ------------------------------------------------------------------------------
-with aba_planos:
-    st.subheader("💎 Recargas Oficiais de Créditos")
+with aba_dubfy:
+    st.subheader("🎙️ DubfyAi - Dublagem e Tradução de Vídeos com IA")
+    st.markdown("""
+    Traduza e sincronize seus vídeos para múltiplos idiomas com **clonagem vocal e ritmo natural**.
+    Escale canais dark, campanhas no mercado internacional e multiplique o alcance das suas ofertas sem gravar novamente.
+    """)
 
     email_param = urllib.parse.quote(email_usuario.strip().lower())
+    link_dub_starter  = f"https://pay.kiwify.com.br/LjmQ4tP?email={email_param}"
+    link_dub_business = f"https://pay.kiwify.com.br/YkL0BlH?email={email_param}"
+    link_dub_pro      = f"https://pay.kiwify.com.br/0KDE74Q?email={email_param}"
 
-    tab_planos_vsl, tab_planos_dub = st.tabs([
-        "⚡ Planos de Créditos (VSL & E-books)",
-        "🎙️ Planos de Dublagem de Vídeos"
-    ])
+    st.markdown("#### 📦 Assinaturas Oficiais DubfyAi")
+    col_d1, col_d2, col_d3 = st.columns(3)
 
-    with tab_planos_vsl:
-        st.markdown("#### Pacotes de Créditos para VSLs, Infoprodutos e Radar")
-        col_v1, col_v2, col_v3 = st.columns(3)
+    with col_d1:
+        with st.container(border=True):
+            st.markdown("### 🟢 Starter Dublagem\n## R$ 45,00")
+            st.write("• Dublagem de vídeos curtos\n• Tradução sincronizada\n• Exportação em alta qualidade")
+            st.link_button("💳 ASSINAR STARTER (R$ 45)", url=link_dub_starter, use_container_width=True)
 
-        link_vsl_starter = f"https://pay.kiwify.com.br/8kCGDA3?email={email_param}"
-        link_vsl_pro     = f"https://pay.kiwify.com.br/PkPTG8J?email={email_param}"
-        link_vsl_vip     = f"https://pay.kiwify.com.br/4bqIXRN?email={email_param}"
+    with col_d2:
+        with st.container(border=True):
+            st.markdown("### 🔵 Business Dublagem\n## R$ 119,00")
+            st.write("• Alto volume de minutos\n• Clonagem vocal e timing profissional\n• Uso comercial liberado")
+            st.link_button("🚀 ASSINAR BUSINESS (R$ 119)", url=link_dub_business, use_container_width=True, type="primary")
 
-        with col_v1:
-            with st.container(border=True):
-                st.markdown("### 🟢 Starter VSL\n## R$ 57,00\n**(160 créditos)**")
-                st.write("• 16 VSLs Curtas ou 8 Médias\n• 10 E-books operacionais com fotos\n• Mineração de Radar")
-                st.link_button("💳 COMPRAR STARTER (R$ 57)", url=link_vsl_starter, use_container_width=True)
-
-        with col_v2:
-            with st.container(border=True):
-                st.markdown("### 🟡 Pro VSL\n## R$ 87,00\n**(300 créditos)**")
-                st.write("• 30 VSLs Curtas ou 15 Médias\n• 20 E-books operacionais com fotos\n• Suporte e prioridade na fila")
-                st.link_button("🚀 COMPRAR PRO (R$ 87)", url=link_vsl_pro, use_container_width=True, type="primary")
-
-        with col_v3:
-            with st.container(border=True):
-                st.markdown("### 🔴 VIP Escala\n## R$ 117,00\n**(500 créditos)**")
-                st.write("• 50 VSLs Curtas ou 25 Médias\n• 33 E-books operacionais com fotos\n• Renderização e IA ultrarrápidas")
-                st.link_button("👑 ASSINAR VIP (R$ 117)", url=link_vsl_vip, use_container_width=True)
-
-    with tab_planos_dub:
-        st.markdown("#### Planos Oficiais de Dublagem de Vídeos com IA")
-        col_d1, col_d2, col_d3 = st.columns(3)
-
-        link_dub_starter  = f"https://pay.kiwify.com.br/LjmQ4tP?email={email_param}"
-        link_dub_business = f"https://pay.kiwify.com.br/YkL0BlH?email={email_param}"
-        link_dub_pro      = f"https://pay.kiwify.com.br/0KDE74Q?email={email_param}"
-
-        with col_d1:
-            with st.container(border=True):
-                st.markdown("### 🟢 Starter Dublagem\n## R$ 45,00")
-                st.write("• Dublagem de vídeos curtos\n• Tradução sincronizada\n• Exportação em alta qualidade")
-                st.link_button("💳 ASSINAR STARTER (R$ 45)", url=link_dub_starter, use_container_width=True)
-
-        with col_d2:
-            with st.container(border=True):
-                st.markdown("### 🔵 Business Dublagem\n## R$ 119,00")
-                st.write("• Alto volume de minutos\n• Clonagem vocal e timing profissional\n• Uso comercial liberado")
-                st.link_button("🚀 ASSINAR BUSINESS (R$ 119)", url=link_dub_business, use_container_width=True, type="primary")
-
-        with col_d3:
-            with st.container(border=True):
-                st.markdown("### 👑 Pro Dublagem\n## R$ 219,00")
-                st.write("• Escala máxima para canais dark e agências\n• Renderização prioritária\n• Suporte VIP dedicado")
-                st.link_button("👑 ASSINAR PRO (R$ 219)", url=link_dub_pro, use_container_width=True)
+    with col_d3:
+        with st.container(border=True):
+            st.markdown("### 👑 Pro Dublagem\n## R$ 219,00")
+            st.write("• Escala máxima para agências e canais dark\n• Renderização prioritária\n• Suporte VIP dedicado")
+            st.link_button("👑 ASSINAR PRO (R$ 219)", url=link_dub_pro, use_container_width=True)
 
 # ------------------------------------------------------------------------------
-# ABA 5: GALERIA LOCAL
+# ABA 5: PLANOS & CHECKOUT DIRETO KIWIFY (RECARGAS VSL & E-BOOKS)
+# ------------------------------------------------------------------------------
+with aba_planos:
+    st.subheader("💎 Recargas Oficiais de Créditos (VSL & E-books)")
+    st.markdown("Adquira créditos para renderizar vídeos com FFmpeg, minerar o Radar e gerar e-books completos com o Gemini.")
+
+    email_param = urllib.parse.quote(email_usuario.strip().lower())
+    link_vsl_starter = f"https://pay.kiwify.com.br/8kCGDA3?email={email_param}"
+    link_vsl_pro     = f"https://pay.kiwify.com.br/PkPTG8J?email={email_param}"
+    link_vsl_vip     = f"https://pay.kiwify.com.br/4bqIXRN?email={email_param}"
+
+    col_v1, col_v2, col_v3 = st.columns(3)
+
+    with col_v1:
+        with st.container(border=True):
+            st.markdown("### 🟢 Starter VSL\n## R$ 57,00\n**(160 créditos)**")
+            st.write("• 16 VSLs Curtas ou 8 Médias\n• 10 E-books operacionais com fotos\n• Mineração de Radar")
+            st.link_button("💳 COMPRAR STARTER (R$ 57)", url=link_vsl_starter, use_container_width=True)
+
+    with col_v2:
+        with st.container(border=True):
+            st.markdown("### 🟡 Pro VSL\n## R$ 87,00\n**(300 créditos)**")
+            st.write("• 30 VSLs Curtas ou 15 Médias\n• 20 E-books operacionais com fotos\n• Suporte e prioridade na fila")
+            st.link_button("🚀 COMPRAR PRO (R$ 87)", url=link_vsl_pro, use_container_width=True, type="primary")
+
+    with col_v3:
+        with st.container(border=True):
+            st.markdown("### 🔴 VIP Escala\n## R$ 117,00\n**(500 créditos)**")
+            st.write("• 50 VSLs Curtas ou 25 Médias\n• 33 E-books operacionais com fotos\n• Renderização e IA ultrarrápidas")
+            st.link_button("👑 ASSINAR VIP (R$ 117)", url=link_vsl_vip, use_container_width=True)
+
+# ------------------------------------------------------------------------------
+# ABA 6: GALERIA LOCAL
 # ------------------------------------------------------------------------------
 with aba_galeria:
     st.subheader("📂 Ficheiros Armazenados Localmente")
@@ -1290,23 +1310,21 @@ with aba_galeria:
                 st.write(f"🖼️ `{f}`")
 
 # ------------------------------------------------------------------------------
-# ABA 6: PAINEL ADMIN
+# ABA 7: GESTÃO MASTER (EXCLUSIVA PARA O SEU E-MAIL)
 # ------------------------------------------------------------------------------
-with aba_admin:
-    st.subheader("🔒 Central de Gestão & Injeção de Créditos")
-    senha_adm_digitada = st.text_input("Digite a Senha Mestra de Administrador:", type="password", key="in_senha_adm")
-
-    if senha_adm_digitada == SENHA_MESTRE_ADMIN:
-        st.success("✅ Acesso Administrativo Autorizado.")
+if is_master_admin:
+    with aba_admin:
+        st.subheader("🔒 Central de Gestão Master")
+        st.caption("Aba oculta para clientes regulares - visível apenas para os administradores autorizados.")
         st.write("---")
 
         col_ad1, col_ad2 = st.columns([2, 1])
         with col_ad1:
-            email_alvo = st.text_input("E-mail do Cliente:", placeholder="cliente@exemplo.com")
+            email_alvo = st.text_input("E-mail do Cliente para Injeção:", placeholder="cliente@exemplo.com")
         with col_ad2:
             qtd_creditos_adm = st.number_input("Créditos a Injetar:", min_value=1, max_value=10000, value=300, step=50)
 
-        if st.button("⚡ Injetar Créditos", type="primary"):
+        if st.button("⚡ Injetar Créditos Manualmente", type="primary"):
             if not email_alvo:
                 st.error("Informe o e-mail do cliente.")
             else:
@@ -1328,5 +1346,3 @@ with aba_admin:
                     st.rerun()
                 except Exception as err:
                     st.error(f"Erro ao injetar créditos: {err}")
-    elif senha_adm_digitada:
-        st.error("Senha mestra incorreta.")
