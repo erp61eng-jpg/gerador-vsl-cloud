@@ -1206,31 +1206,69 @@ with aba_radar:
                 st.error("Informe pelo menos o nome do produto.")
 
 # ------------------------------------------------------------------------------
-# ABA 4: PLANOS & CHECKOUT DIRETO KIWIFY
+# ABA 4: PLANOS & CHECKOUT DIRETO KIWIFY (LINKS ESPECÍFICOS POR PRODUTO)
 # ------------------------------------------------------------------------------
 with aba_planos:
     st.subheader("💎 Recargas Oficiais de Créditos")
-    st.subheader("📦 Planos Regulares de Volume e Escala")
 
     email_param = urllib.parse.quote(email_usuario.strip().lower())
-    checkout_kiwify_oficial = f"https://pay.kiwify.com.br/YkL0BlH?email={email_param}"
 
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        with st.container(border=True):
-            st.markdown("### 🟢 Starter\n## R$ 57,00\n**(160 créditos)**")
-            st.write("• 16 VSLs Curtas ou 8 Médias\n• 10 E-books diagramados\n• Suporte individual")
-            st.link_button("💳 COMPRAR CRÉDITOS STARTER", url=checkout_kiwify_oficial, use_container_width=True)
-    with c2:
-        with st.container(border=True):
-            st.markdown("### 🟡 Pro\n## R$ 87,00\n**(300 créditos)**")
-            st.write("• 30 VSLs Curtas ou 15 Médias\n• 20 E-books diagramados com fotos\n• Mineração em todos os canais")
-            st.link_button("🚀 COMPRAR CRÉDITOS PRO", url=checkout_kiwify_oficial, use_container_width=True, type="primary")
-    with c3:
-        with st.container(border=True):
-            st.markdown("### 🔴 VIP Escala\n## R$ 117,00\n**(500 créditos)**")
-            st.write("• 50 VSLs Curtas ou 25 Médias\n• 33 E-books diagramados com fotos\n• Processamento prioritário")
-            st.link_button("👑 ASSINAR PACOTE VIP", url=checkout_kiwify_oficial, use_container_width=True)
+    tab_planos_vsl, tab_planos_dub = st.tabs([
+        "⚡ Planos de Créditos (VSL & E-books)",
+        "🎙️ Planos de Dublagem de Vídeos"
+    ])
+
+    with tab_planos_vsl:
+        st.markdown("#### Pacotes de Créditos para VSLs, Infoprodutos e Radar")
+        col_v1, col_v2, col_v3 = st.columns(3)
+
+        link_vsl_starter = f"https://pay.kiwify.com.br/8kCGDA3?email={email_param}"
+        link_vsl_pro     = f"https://pay.kiwify.com.br/PkPTG8J?email={email_param}"
+        link_vsl_vip     = f"https://pay.kiwify.com.br/4bqIXRN?email={email_param}"
+
+        with col_v1:
+            with st.container(border=True):
+                st.markdown("### 🟢 Starter VSL\n## R$ 57,00\n**(160 créditos)**")
+                st.write("• 16 VSLs Curtas ou 8 Médias\n• 10 E-books operacionais com fotos\n• Mineração de Radar")
+                st.link_button("💳 COMPRAR STARTER (R$ 57)", url=link_vsl_starter, use_container_width=True)
+
+        with col_v2:
+            with st.container(border=True):
+                st.markdown("### 🟡 Pro VSL\n## R$ 87,00\n**(300 créditos)**")
+                st.write("• 30 VSLs Curtas ou 15 Médias\n• 20 E-books operacionais com fotos\n• Suporte e prioridade na fila")
+                st.link_button("🚀 COMPRAR PRO (R$ 87)", url=link_vsl_pro, use_container_width=True, type="primary")
+
+        with col_v3:
+            with st.container(border=True):
+                st.markdown("### 🔴 VIP Escala\n## R$ 117,00\n**(500 créditos)**")
+                st.write("• 50 VSLs Curtas ou 25 Médias\n• 33 E-books operacionais com fotos\n• Renderização e IA ultrarrápidas")
+                st.link_button("👑 ASSINAR VIP (R$ 117)", url=link_vsl_vip, use_container_width=True)
+
+    with tab_planos_dub:
+        st.markdown("#### Planos Oficiais de Dublagem de Vídeos com IA")
+        col_d1, col_d2, col_d3 = st.columns(3)
+
+        link_dub_starter  = f"https://pay.kiwify.com.br/LjmQ4tP?email={email_param}"
+        link_dub_business = f"https://pay.kiwify.com.br/YkL0BlH?email={email_param}"
+        link_dub_pro      = f"https://pay.kiwify.com.br/0KDE74Q?email={email_param}"
+
+        with col_d1:
+            with st.container(border=True):
+                st.markdown("### 🟢 Starter Dublagem\n## R$ 45,00")
+                st.write("• Dublagem de vídeos curtos\n• Tradução sincronizada\n• Exportação em alta qualidade")
+                st.link_button("💳 ASSINAR STARTER (R$ 45)", url=link_dub_starter, use_container_width=True)
+
+        with col_d2:
+            with st.container(border=True):
+                st.markdown("### 🔵 Business Dublagem\n## R$ 119,00")
+                st.write("• Alto volume de minutos\n• Clonagem vocal e timing profissional\n• Uso comercial liberado")
+                st.link_button("🚀 ASSINAR BUSINESS (R$ 119)", url=link_dub_business, use_container_width=True, type="primary")
+
+        with col_d3:
+            with st.container(border=True):
+                st.markdown("### 👑 Pro Dublagem\n## R$ 219,00")
+                st.write("• Escala máxima para canais dark e agências\n• Renderização prioritária\n• Suporte VIP dedicado")
+                st.link_button("👑 ASSINAR PRO (R$ 219)", url=link_dub_pro, use_container_width=True)
 
 # ------------------------------------------------------------------------------
 # ABA 5: GALERIA LOCAL
