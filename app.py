@@ -45,6 +45,7 @@ if not hasattr(Image, "ANTIALIAS"):
     Image.ANTIALIAS = Image.Resampling.LANCZOS
 
 from openai import OpenAI
+from google import genai
 from fpdf import FPDF
 from supabase import create_client, Client
 
@@ -59,6 +60,7 @@ def limpar_url_supabase(url_bruta: str) -> str:
     return f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
 
 OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY", "")).strip()
+GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY", "")).strip()
 PEXELS_API_KEY = st.secrets.get("PEXELS_API_KEY", os.getenv("PEXELS_API_KEY", "")).strip()
 
 _url_lida = st.secrets.get("SUPABASE_URL", os.getenv("SUPABASE_URL", "https://vzelyaubnynefsfumhtz.supabase.co"))
@@ -197,7 +199,10 @@ def debitar_creditos_cloud(email: str, operacao: str, custo: int) -> bool:
             try:
                 supabase.table("usuarios").update({"saldo_creditos": novo_saldo}).eq("email", email_limpo).execute()
             except Exception:
-                pass
+                try:
+                    supabase.table("usuarios").update({"creditos": novo_saldo}).eq("email", email_limpo).execute()
+                except Exception:
+                    pass
 
         try:
             supabase.table("historico").insert({"email": email_limpo, "operacao": operacao, "creditos": -custo}).execute()
@@ -232,10 +237,8 @@ def baixar_foto_nicho_pexels(termo_busca: str, pexels_key: str, identificador: s
                     if conteudo.status_code == 200 and len(conteudo.content) > 5000:
                         with open(caminho_local, "wb") as f:
                             f.write(conteudo.content)
-                        # Normalização com PIL para garantir JPEG RGB compatível com FPDF
                         with Image.open(caminho_local) as im:
                             rgb_im = im.convert("RGB")
-                            # Redimensionamento equilibrado (1280x720) para manter o PDF leve e nítido
                             rgb_im.thumbnail((1280, 720), Image.Resampling.LANCZOS)
                             rgb_im.save(caminho_local, "JPEG", quality=85)
                         return caminho_local
@@ -268,7 +271,7 @@ def baixar_video_pexels(termo: str, pexels_key: str, vertical: bool, prefixo_arq
     return None
 
 # ==============================================================================
-# MOTORES DE INTELIGÊNCIA ARTIFICIAL
+# MOTORES DE INTELIGÊNCIA ARTIFICIAL: RADAR E VSL (OPENAI)
 # ==============================================================================
 PLATAFORMAS_CONFIG = {
     "TikTok": {"icone": "📱", "ds": "", "modificador": "tiktok viral", "perfil": "Ganchos imediatos, ritmo acelerado e curiosidade instantânea."},
@@ -368,67 +371,78 @@ def extrair_termo_broll_ia(frase: str, perfil_personagem: str = "") -> str:
     except Exception:
         return "business lifestyle"
 
-def gerar_conteudo_ebook_ia(nicho_produto: str, publico: str, promessa_angulo: str) -> dict:
-    client = OpenAI(api_key=OPENAI_API_KEY)
+# ==============================================================================
+# NOVO MOTOR DE E-BOOK PROFUNDO VIA GOOGLE GEMINI 1.5 PRO
+# ==============================================================================
+def gerar_conteudo_ebook_gemini(nicho_produto: str, publico: str, promessa_angulo: str) -> dict:
+    if not GEMINI_API_KEY:
+        st.error("Chave GEMINI_API_KEY não configurada nos Secrets do Streamlit Cloud.")
+        st.stop()
+
+    client = genai.Client(api_key=GEMINI_API_KEY)
+
     prompt = f"""
-    Atue como autoridade sênior de infoprodutos, copywriter profissional e educador técnico.
-    Escreva um E-book / Manual Operacional de alto valor comercial, denso, persuasivo e didático.
+    Atue como autoridade sênior internacional em infoprodutos e estrategista de implementação técnica.
+    Escreva um MANUAL OPERACIONAL DE EXECUÇÃO PRÁTICA denso, rigoroso e acionável.
 
-    PARÂMETROS DO PRODUTO:
+    PARÂMETROS DA OFERTA:
     - Nicho: {nicho_produto}
-    - Público-Alvo e Dores: {publico}
-    - Promessa / Solução: {promessa_angulo}
+    - Público-Alvo e Dores Reais: {publico}
+    - Mecanismo e Promessa: {promessa_angulo}
 
-    EXIGÊNCIAS RÍGIDAS DE QUALIDADE:
-    1. A introdução deve ser profunda (mínimo 300 palavras), analisando a causa oculta do fracasso da concorrência e o método apresentado.
-    2. Cada um dos 4 capítulos DEVE ter entre 350 e 500 palavras, contendo:
-       - Fundamentação teórica sólida.
-       - Passo a passo numerado com ações executáveis.
-       - Exemplos práticos aplicados ao nicho.
-       - Alertas de erros comuns e checklist de verificação.
-    3. Para cada capítulo e para a capa, determine o melhor termo em INGLÊS (2 a 4 palavras) para buscar fotos reais de alta qualidade em bancos de imagem (locais, rotinas de trabalho, cenários do nicho, ferramentas).
+    DIRETRIZES DE QUALIDADE FUNDAMENTAIS (SEM ENROLAÇÃO):
+    1. PROIBIDO qualquer tipo de clichê corporativo, conselhos genéricos ("mantenha o foco", "a consistência é a chave") ou introduções motivacionais de autoajuda.
+    2. Cada capítulo DEVE ser profundo (mínimo de 350 a 500 palavras cada), estruturado com passos operacionais, checklists numéricos, comandos executáveis e roteiros copia-e-cola.
+    3. Indique termos em INGLÊS precisos (2 a 4 palavras) para fotos reais do nicho no Pexels (ambientes, ferramentas, computadores de alta produtividade, reuniões estratégicas).
 
     Retorne ESTRITAMENTE um JSON estruturado com o seguinte esquema:
     {{
       "titulo": "Título Comercial Magnético",
       "subtitulo": "Subtítulo Persuasivo Focado em Execução",
-      "termo_capa": "termo em ingles para foto de capa (ex: modern luxury office)",
-      "introducao": "Texto longo da introdução com múltiplos parágrafos...",
+      "termo_capa": "termo em ingles para foto de capa (ex: luxury executive boardroom)",
+      "introducao": "Texto longo da introdução com diagnóstico cru, quebra de crenças e a estratégia prática (mínimo 250 palavras)...",
       "capitulos": [
         {{
           "numero": 1,
-          "titulo": "Fundamentos Críticos e Desconstrução de Falhas",
-          "termo_busca_foto": "termo em ingles para foto (ex: financial analytics desk)",
-          "conteudo": "Texto completo denso e estruturado com passos..."
+          "titulo": "Setup de Inicialização e Infraestrutura Obrigatória",
+          "termo_busca_foto": "termo em ingles para foto profissional do nicho",
+          "conteudo": "Conteúdo minucioso com checklist dos primeiros 30 minutos, configurações e ferramentas..."
         }},
         {{
           "numero": 2,
-          "titulo": "O Mecanismo Operacional e Implementação",
-          "termo_busca_foto": "termo em ingles para foto (ex: programmer working setup)",
-          "conteudo": "Texto completo denso e estruturado com passos..."
+          "titulo": "O Protocolo Técnico de Execução Passo a Passo",
+          "termo_busca_foto": "termo em ingles para foto profissional do nicho",
+          "conteudo": "Passo a passo operacional completo, regras de execução, o que fazer e o que não fazer..."
         }},
         {{
           "numero": 3,
-          "titulo": "Plano de Execução Diária e Checklist",
-          "termo_busca_foto": "termo em ingles para foto (ex: business meeting strategy)",
-          "conteudo": "Texto completo denso e estruturado com passos..."
+          "titulo": "Scripts, Modelos e Templates Copia-e-Cola",
+          "termo_busca_foto": "termo em ingles para foto profissional do nicho",
+          "conteudo": "No mínimo 3 modelos, scripts ou roteiros completos prontos para uso imediato..."
         }},
         {{
           "numero": 4,
-          "titulo": "Blindagem, Métricas e Multiplicação de Resultados",
-          "termo_busca_foto": "termo em ingles para foto (ex: corporate skyscraper glass)",
-          "conteudo": "Texto completo denso e estruturado com passos..."
+          "titulo": "Cronograma de 7 Dias e Blindagem de Erros",
+          "termo_busca_foto": "termo em ingles para foto profissional do nicho",
+          "conteudo": "Cronograma dia a dia (Dia 1 ao Dia 7) com tarefas práticas e os 5 erros fatais a evitar..."
         }}
       ]
     }}
     """
-    resp = client.chat.completions.create(
-        model="gpt-4o-mini",
-        response_format={"type": "json_object"},
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.7
-    )
-    return json.loads(resp.choices[0].message.content)
+
+    try:
+        resposta = client.models.generate_content(
+            model="gemini-1.5-pro",
+            contents=prompt,
+            config={"response_mime_type": "application/json"}
+        )
+        return json.loads(resposta.text)
+    except Exception:
+        # Fallback de higienização de fences de código
+        txt = getattr(resposta, "text", "")
+        txt_limpo = re.sub(r"^```json\s*", "", txt.strip())
+        txt_limpo = re.sub(r"\s*```$", "", txt_limpo)
+        return json.loads(txt_limpo)
 
 # ==============================================================================
 # MOTOR DE DIAGRAMAÇÃO DE PDF COM FOTOS INTEGRADAS
@@ -480,11 +494,9 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_saida: st
 
     # ---------------- CAPA PREMIUM COM FOTO DE FUNDO/DESTAQUE ----------------
     pdf.add_page()
-    # Fundo moderno Dark Blue
     pdf.set_fill_color(15, 23, 42)
     pdf.rect(0, 0, 210, 297, "F")
 
-    # Linha dourada de destaque
     pdf.set_fill_color(245, 158, 11)
     pdf.rect(18, 30, 174, 3, "F")
 
@@ -504,16 +516,13 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_saida: st
         pdf.set_text_color(203, 213, 225)
         pdf.multi_cell(0, 7, sanitizar_pdf(subtitulo), align="L")
 
-    # Foto temática de capa (Pexels)
     termo_capa = dados.get("termo_capa") or "modern office corporate"
     foto_capa = baixar_foto_nicho_pexels(termo_capa, pexels_key, "capa")
     if foto_capa and os.path.exists(foto_capa):
         pdf.ln(8)
         y_foto_capa = pdf.get_y()
-        # Enquadramento proporcional da foto na capa
         pdf.image(foto_capa, x=18, y=y_foto_capa, w=174, h=95)
 
-    # Rodapé da Capa
     pdf.set_y(260)
     pdf.set_font("Helvetica", "B", 10)
     pdf.set_text_color(255, 255, 255)
@@ -543,7 +552,6 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_saida: st
         num = cap.get("numero", idx_cap + 1)
         tit = cap.get("titulo", f"Módulo {num}")
 
-        # Caixa de Destaque para o Título do Módulo
         pdf.set_fill_color(241, 245, 249)
         pdf.set_draw_color(203, 213, 225)
         pdf.rect(18, 25, 174, 16, "FD")
@@ -553,7 +561,6 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_saida: st
         pdf.cell(0, 10, sanitizar_pdf(f" MÓDULO {num}: {tit.upper()}"), ln=True)
         pdf.ln(6)
 
-        # Baixar e Inserir Foto Contextual do Nicho
         termo_cap = cap.get("termo_busca_foto") or "professional business strategy"
         foto_cap = baixar_foto_nicho_pexels(termo_cap, pexels_key, f"cap_{num}")
         if foto_cap and os.path.exists(foto_cap):
@@ -893,14 +900,14 @@ with aba_vsl:
             st.download_button("⬇️ Baixar Vídeo MP4", f, file_name=os.path.basename(st.session_state["video_pronto"]), mime="video/mp4")
 
 # ------------------------------------------------------------------------------
-# ABA 2: E-BOOK PROFISSIONAL COM FOTOS REAIS DO NICHO
+# ABA 2: E-BOOK PROFISSIONAL COM FOTOS REAIS DO NICHO (MOTOR GEMINI 1.5 PRO)
 # ------------------------------------------------------------------------------
 with aba_ebook:
     st.subheader("📚 Criação e Diagramação de E-books Profissionais com Fotos")
 
     modo_ebook = st.radio(
         "Como deseja estruturar o conteúdo do E-book?",
-        ["🤖 Gerar Conteúdo Completo e Enriquecido via IA (15 Créditos)", "✍ Escrever / Editar Manualmente (0 Créditos)"],
+        ["🤖 Gerar Conteúdo Completo e Enriquecido via Gemini (15 Créditos)", "✍️ Escrever / Editar Manualmente (0 Créditos)"],
         horizontal=True
     )
 
@@ -938,7 +945,7 @@ with aba_ebook:
             ]
         }
 
-    if modo_ebook == "🤖 Gerar Conteúdo Completo e Enriquecido via IA (15 Créditos)":
+    if modo_ebook == "🤖 Gerar Conteúdo Completo e Enriquecido via Gemini (15 Créditos)":
         c_eb1, c_eb2 = st.columns(2)
         with c_eb1:
             nicho_eb = st.text_input("Nicho ou Nome do Produto:", value=st.session_state.get("prod_nome", "Manual da Renda Extra Digital"))
@@ -946,23 +953,23 @@ with aba_ebook:
         with c_eb2:
             eb_ang = st.text_area("Promessa e Solução:", value=st.session_state.get("ang_nome", "Método passo a passo baseado em automações simples sem aparecer."), height=90)
 
-        if st.button("⚡ Redigir Rascunho Profundo com IA (15 Créditos)", type="primary", use_container_width=True):
+        if st.button("⚡ Redigir Manual Completo com Gemini (15 Créditos)", type="primary", use_container_width=True):
             agora = time.time()
             if agora - st.session_state.get("_ultimo_click_eb", 0) < 12:
                 st.warning("⏳ Aguarde alguns segundos antes de solicitar nova compilação.")
                 st.stop()
             st.session_state["_ultimo_click_eb"] = agora
 
-            if not debitar_creditos_cloud(email_usuario, "Geração de E-book IA", 15):
+            if not debitar_creditos_cloud(email_usuario, "Geração de E-book Gemini", 15):
                 st.error("❌ Saldo insuficiente! Você precisa de 15 créditos.")
             else:
-                with st.spinner("🤖 A IA está redigindo o conteúdo técnico e mapeando termos fotográficos..."):
+                with st.spinner("🤖 O Google Gemini 1.5 Pro está redigindo o conteúdo técnico e mapeando termos fotográficos..."):
                     try:
-                        dados_gerados = gerar_conteudo_ebook_ia(nicho_eb, eb_pub, eb_ang)
+                        dados_gerados = gerar_conteudo_ebook_gemini(nicho_eb, eb_pub, eb_ang)
                         st.session_state["eb_dados_sessao"] = dados_gerados
-                        st.success("✅ Conteúdo gerado com termos de fotos definidos! Revise e clique em compilar.")
+                        st.success("✅ Conteúdo gerado com o motor Gemini e termos fotográficos mapeados! Revise e clique em compilar.")
                     except Exception as erro:
-                        st.error(f"Erro na redação do infoproduto: {erro}")
+                        st.error(f"Erro na redação do infoproduto via Gemini: {erro}")
 
     st.divider()
     st.markdown("### 📝 Editor e Configuração das Fotos por Módulo")
@@ -1015,7 +1022,6 @@ with aba_ebook:
             disparar_comemoracao()
             st.rerun()
 
-    # O botão de download permanece persistido fora de blocos efêmeros
     if st.session_state.get("pdf_pronto") and os.path.exists(st.session_state["pdf_pronto"]):
         st.success(f"✅ Arquivo compilado com fotos e diagramação completa: `{st.session_state.get('pdf_nome')}`")
         with open(st.session_state["pdf_pronto"], "rb") as f:
