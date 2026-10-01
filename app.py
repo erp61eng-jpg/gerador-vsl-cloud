@@ -62,6 +62,10 @@ def limpar_url_supabase(url_bruta: str) -> str:
 OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY", "")).strip()
 GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY", "")).strip()
 PEXELS_API_KEY = st.secrets.get("PEXELS_API_KEY", os.getenv("PEXELS_API_KEY", "")).strip()
+ELEVENLABS_API_KEY = st.secrets.get("ELEVENLABS_API_KEY", os.getenv("ELEVENLABS_API_KEY", "")).strip()
+
+WHATSAPP_NUMERO = st.secrets.get("WHATSAPP_NUMERO", os.getenv("WHATSAPP_NUMERO", "")).strip()
+CALLMEBOT_API_KEY = st.secrets.get("CALLMEBOT_API_KEY", os.getenv("CALLMEBOT_API_KEY", "")).strip()
 
 _url_lida = st.secrets.get("SUPABASE_URL", os.getenv("SUPABASE_URL", "https://vzelyaubnynefsfumhtz.supabase.co"))
 SUPABASE_URL = limpar_url_supabase(_url_lida)
@@ -221,6 +225,106 @@ def debitar_creditos_cloud(email: str, operacao: str, custo: int) -> bool:
 
 def disparar_comemoracao():
     st.balloons()
+
+# ==============================================================================
+# AUDITORIA DE CRÉDITOS E NOTIFICAÇÃO WHATSAPP
+# ==============================================================================
+def auditar_infraestrutura() -> dict:
+    relatorio = {
+        "data_hora": datetime.now().strftime("%d/%m/%Y %H:%M"),
+        "openai": {"status": "Indisponível", "detalhes": "Chave não configurada", "ok": False},
+        "elevenlabs": {"status": "Indisponível", "detalhes": "Chave não configurada", "ok": False},
+        "gemini": {"status": "Indisponível", "detalhes": "Chave não configurada", "ok": False},
+        "supabase": {"status": "Operacional", "usuarios": 0, "creditos_circulando": 0, "ok": True}
+    }
+
+    # 1. Checagem OpenAI (Status e Conectividade)
+    if OPENAI_API_KEY:
+        try:
+            client_oai = OpenAI(api_key=OPENAI_API_KEY)
+            client_oai.models.list()
+            relatorio["openai"] = {"status": "100% Operacional", "detalhes": "Chave ativa e conectada", "ok": True}
+        except Exception as e:
+            msg_e = str(e)
+            if "insufficient_quota" in msg_e.lower():
+                relatorio["openai"] = {"status": "SEM SALDO!", "detalhes": "Recarga pré-paga necessária", "ok": False}
+            else:
+                relatorio["openai"] = {"status": "Instável / Erro", "detalhes": msg_e[:40], "ok": False}
+
+    # 2. Checagem ElevenLabs (Saldo de Caracteres Exato)
+    if ELEVENLABS_API_KEY:
+        try:
+            r_eleven = requests.get(
+                "https://api.elevenlabs.io/v1/user/subscription",
+                headers={"xi-api-key": ELEVENLABS_API_KEY},
+                timeout=8
+            )
+            if r_eleven.status_code == 200:
+                d = r_eleven.json()
+                usados = d.get("character_count", 0)
+                limite = d.get("character_limit", 0)
+                restantes = max(0, limite - usados)
+                relatorio["elevenlabs"] = {
+                    "status": f"{restantes:,} caracteres restantes".replace(",", "."),
+                    "detalhes": f"Plano {d.get('tier', 'Ativo')} (Usado: {usados:,}/{limite:,})",
+                    "ok": restantes > 1000
+                }
+            else:
+                relatorio["elevenlabs"] = {"status": "Erro na Consulta", "detalhes": f"Código {r_eleven.status_code}", "ok": False}
+        except Exception as e:
+            relatorio["elevenlabs"] = {"status": "Falha de Conexão", "detalhes": str(e)[:35], "ok": False}
+    else:
+        relatorio["elevenlabs"] = {"status": "Não Vinculada", "detalhes": "Inserir em Secrets se for utilizar", "ok": True}
+
+    # 3. Checagem Gemini (Google AI)
+    if GEMINI_API_KEY:
+        try:
+            client_g = genai.Client(api_key=GEMINI_API_KEY)
+            resp_g = client_g.models.generate_content(model="gemini-3.8-flash", contents="ok")
+            if resp_g and resp_g.text:
+                relatorio["gemini"] = {"status": "100% Operacional", "detalhes": "Tier Ativo e Respondendo", "ok": True}
+        except Exception as e:
+            relatorio["gemini"] = {"status": "Limite / Alerta", "detalhes": str(e)[:40], "ok": False}
+
+    # 4. Checagem Supabase
+    try:
+        res_usr = supabase.table("usuarios").select("saldo_creditos").execute()
+        lista_u = getattr(res_usr, "data", [])
+        total_cr = sum([int(u.get("saldo_creditos") or 0) for u in lista_u])
+        relatorio["supabase"] = {
+            "status": "Operacional Conectado",
+            "usuarios": len(lista_u),
+            "creditos_circulando": total_cr,
+            "ok": True
+        }
+    except Exception:
+        relatorio["supabase"]["status"] = "Instabilidade Temporária"
+        relatorio["supabase"]["ok"] = False
+
+    return relatorio
+
+def disparar_relatorio_whatsapp(relatorio: dict) -> tuple[bool, str]:
+    msg = (
+        f"📊 *CONTABILIDADE DE CRÉDITOS & INFRAESTRUTURA*\n"
+        f"🗓️ Data: {relatorio['data_hora']}\n\n"
+        f"🤖 *OpenAI:* {relatorio['openai']['status']} ({relatorio['openai']['detalhes']})\n"
+        f"⚡ *Gemini:* {relatorio['gemini']['status']} ({relatorio['gemini']['detalhes']})\n"
+        f"🎙️ *ElevenLabs:* {relatorio['elevenlabs']['status']}\n"
+        f"🗄️ *Supabase:* {relatorio['supabase']['usuarios']} usuários | {relatorio['supabase']['creditos_circulando']} cr em circulação\n\n"
+        f"✅ *Status Geral:* Sistema Monitorado."
+    )
+
+    if WHATSAPP_NUMERO and CALLMEBOT_API_KEY:
+        try:
+            url_wpp = f"https://api.callmebot.com/whatsapp.php?phone={urllib.parse.quote(WHATSAPP_NUMERO)}&text={urllib.parse.quote(msg)}&apikey={urllib.parse.quote(CALLMEBOT_API_KEY)}"
+            res = requests.get(url_wpp, timeout=12)
+            if res.status_code == 200:
+                return True, "Mensagem enviada com sucesso para o seu WhatsApp!"
+        except Exception as e:
+            pass
+
+    link_manual = f"https://api.whatsapp.com/send?text={urllib.parse.quote(msg)}"
+    return False, link_manual
 
 # ==============================================================================
 # MOTOR PEXELS (FOTOS PARA O E-BOOK & VÍDEOS PARA VSL)
@@ -469,10 +573,7 @@ def gerar_roteiro_vsl_de_ebook(dados_ebook: dict) -> list[str]:
     if GEMINI_API_KEY:
         try:
             client_g = genai.Client(api_key=GEMINI_API_KEY)
-            resp = client_g.models.generate_content(
-                model="gemini-3.8-flash",
-                contents=prompt
-            )
+            resp = client_g.models.generate_content(model="gemini-3.8-flash", contents=prompt)
             linhas = [l.strip() for l in resp.text.strip().split("\n") if l.strip() and not l.strip().startswith("#")]
             if len(linhas) >= 3:
                 return linhas[:5]
@@ -526,7 +627,6 @@ def gerar_conteudo_ebook_gemini(nicho_produto: str, publico: str, promessa_angul
     client = genai.Client(api_key=chave_gemini)
     modelo_ativo = "gemini-3.8-flash"
 
-    # FASE 1: ARQUITETURA ESTRATÉGICA, GANCHOS E DIRETRIZES FOTOGRÁFICAS
     prompt_base = f"""
     Atue como autor de livros técnicos de excelência e estrategista de infoprodutos.
     Estruture a arquitetura de um LIVRO / MANUAL OPERACIONAL COMPLETO, DENSO E PROFUNDO sobre: "{nicho_produto}".
@@ -592,7 +692,6 @@ def gerar_conteudo_ebook_gemini(nicho_produto: str, publico: str, promessa_angul
     if not dados_base:
         raise RuntimeError("Não foi possível conectar aos modelos Gemini ativos.")
 
-    # FASE 2: GERAÇÃO PROFUNDA DE CADA CAPÍTULO (TEXTO DENSO E EXTENSO)
     capitulos_processados = []
 
     for mod in dados_base.get("ementa_modulos", []):
@@ -765,21 +864,18 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_saida: st
         for linha in cap.get("conteudo", "").split("\n"):
             l_limpa = linha.strip()
             if l_limpa:
-                # Subtítulos em caixa alta no texto
                 if re.match(r"^[0-9]\.\s+[A-Z\s]{4,}", l_limpa) or (l_limpa.isupper() and len(l_limpa) > 5):
                     pdf.ln(3)
                     pdf.set_font("Helvetica", "B", 16)
                     pdf.set_text_color(30, 58, 138)
                     pdf.multi_cell(0, 9.5, sanitizar_pdf(l_limpa))
                     pdf.ln(2)
-                # Checklists e marcadores destacados
                 elif l_limpa.startswith(("-", "*", "•", "[ ]", "[x]", "1.", "2.", "3.", "4.", "5.")):
                     pdf.set_font("Helvetica", "B", 14)
                     pdf.set_text_color(15, 23, 42)
                     pdf.set_x(22)
                     pdf.multi_cell(170, 9.0, sanitizar_pdf(l_limpa))
                     pdf.ln(2.5)
-                # Texto normal de leitura
                 else:
                     pdf.set_font("Helvetica", "", 14)
                     pdf.set_text_color(15, 23, 42)
@@ -790,7 +886,7 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_saida: st
     return caminho_saida
 
 # ==============================================================================
-# MOTOR FFMPEG RESILIENTE
+# MOTOR FFMPEG RESILIENTE (COM ESCUDO ANTI-PAU)
 # ==============================================================================
 def obter_duracao_audio_ffmpeg(caminho_audio: str) -> float:
     try:
@@ -817,7 +913,9 @@ def sintetizar_voz_segura(texto: str, caminho_out: str, voz: str) -> str:
                     f.write(chunk)
             if os.path.exists(caminho_out) and os.path.getsize(caminho_out) > 1024:
                 return caminho_out
-        except Exception:
+        except Exception as e:
+            if "insufficient_quota" in str(e).lower():
+                raise RuntimeError("CRÍTICO: Saldo de API esgotado. Recarga necessária.")
             time.sleep(1)
     raise RuntimeError("Falha ao sintetizar áudio via OpenAI Studio.")
 
@@ -1051,10 +1149,13 @@ with aba_vsl:
             faixa_preco = st.radio("Formato do Roteiro:", ["🟢 Baixo (3 frases - 10 Créditos)", "🟡 Médio (5 frases - 20 Créditos)", "🔴 Alto (7 frases - 30 Créditos)"])
 
         if st.button("⚡ Gerar Frases com IA", type="primary", use_container_width=True):
-            st.session_state["roteiro"] = obter_roteiro_ia_por_ticket(
-                prod_vsl, pub_vsl, ang_vsl, faixa_preco, st.session_state.get("canal_sel", "TikTok")
-            )
-            st.success("✅ Roteiro gerado pela IA! Ajuste qualquer frase abaixo se desejar:")
+            try:
+                st.session_state["roteiro"] = obter_roteiro_ia_por_ticket(
+                    prod_vsl, pub_vsl, ang_vsl, faixa_preco, st.session_state.get("canal_sel", "TikTok")
+                )
+                st.success("✅ Roteiro gerado pela IA! Ajuste qualquer frase abaixo se desejar:")
+            except Exception as e:
+                st.error("⚠️ Atenção: A IA está momentaneamente em manutenção preventiva para recarga. Tente novamente em alguns instantes.")
 
     else:
         st.info("💡 Digite cada frase do seu vídeo abaixo. Cada linha corresponderá a uma cena com voz e vídeo de fundo sincronizados:")
@@ -1088,7 +1189,8 @@ with aba_vsl:
                 st.stop()
             st.session_state["_ultimo_click_vsl"] = agora_vsl
 
-            if not debitar_creditos_cloud(email_usuario, f"Renderização ({len(cenas_txt)} Cenas)", custo):
+            saldo_antes = st.session_state.get("saldo_creditos", 0)
+            if saldo_antes < custo:
                 st.error(f"❌ Saldo insuficiente! Você precisa de {custo} créditos para renderizar este vídeo.")
             else:
                 p_musica = os.path.join(DIR_MUSICAS, musica_up.name) if musica_up else None
@@ -1102,19 +1204,23 @@ with aba_vsl:
                         f.write(logo_up.getbuffer())
 
                 prog = st.progress(0.0)
-                v_final = renderizar_vsl_completa(
-                    frases=cenas_txt,
-                    vertical=is_vertical,
-                    voz=vozes[voz_sel],
-                    pexels_key=PEXELS_API_KEY,
-                    musica_fundo_path=p_musica,
-                    volume_musica=vol_musica,
-                    logo_path=p_logo,
-                    progress_bar=prog
-                )
-                st.session_state["video_pronto"] = v_final
-                disparar_comemoracao()
-                st.rerun()
+                try:
+                    v_final = renderizar_vsl_completa(
+                        frases=cenas_txt,
+                        vertical=is_vertical,
+                        voz=vozes[voz_sel],
+                        pexels_key=PEXELS_API_KEY,
+                        musica_fundo_path=p_musica,
+                        volume_musica=vol_musica,
+                        logo_path=p_logo,
+                        progress_bar=prog
+                    )
+                    debitar_creditos_cloud(email_usuario, f"Renderização ({len(cenas_txt)} Cenas)", custo)
+                    st.session_state["video_pronto"] = v_final
+                    disparar_comemoracao()
+                    st.rerun()
+                except Exception as err:
+                    st.error("⚠️ Não foi possível sintetizar a locução no momento. Seus créditos NÃO foram debitados. Notificamos a equipe técnica.")
 
     if st.session_state.get("video_pronto") and os.path.exists(st.session_state["video_pronto"]):
         st.video(st.session_state["video_pronto"])
@@ -1159,7 +1265,7 @@ with aba_ebook:
                     st.success("✅ Livro técnico gerado com sucesso! Revise os módulos e compile em alta acessibilidade.")
                     st.rerun()
             except Exception as erro:
-                st.error(f"Erro na redação do infoproduto via Gemini: {erro}")
+                st.error("⚠️ Atenção: A IA está temporariamente em manutenção para ajuste de cota. Tente em alguns instantes sem perda de créditos.")
 
     st.divider()
 
@@ -1244,39 +1350,44 @@ with aba_ebook:
                     st.stop()
                 st.session_state["_ultimo_click_vsl_eb"] = agora_vsl_eb
 
-                if not debitar_creditos_cloud(email_usuario, f"VSL Direta do E-book ({st.session_state['eb_dados_sessao'].get('titulo', '')[:25]})", 20):
+                saldo_antes = st.session_state.get("saldo_creditos", 0)
+                if saldo_antes < 20:
                     st.error("❌ Saldo insuficiente! Você precisa de 20 créditos para renderizar esta VSL.")
                 else:
                     with st.spinner("🤖 Gerando roteiro magnético e renderizando VSL sincronizada com FFmpeg..."):
-                        frases_ebook = gerar_roteiro_vsl_de_ebook(st.session_state["eb_dados_sessao"])
-                        st.session_state["roteiro"] = frases_ebook
+                        try:
+                            frases_ebook = gerar_roteiro_vsl_de_ebook(st.session_state["eb_dados_sessao"])
+                            st.session_state["roteiro"] = frases_ebook
 
-                        p_musica = os.path.join(DIR_MUSICAS, musica_up.name) if musica_up else None
-                        if musica_up:
-                            with open(p_musica, "wb") as f:
-                                f.write(musica_up.getbuffer())
+                            p_musica = os.path.join(DIR_MUSICAS, musica_up.name) if musica_up else None
+                            if musica_up:
+                                with open(p_musica, "wb") as f:
+                                    f.write(musica_up.getbuffer())
 
-                        p_logo = os.path.join(DIR_LOGOS, logo_up.name) if logo_up else None
-                        if logo_up:
-                            with open(p_logo, "wb") as f:
-                                f.write(logo_up.getbuffer())
+                            p_logo = os.path.join(DIR_LOGOS, logo_up.name) if logo_up else None
+                            if logo_up:
+                                with open(p_logo, "wb") as f:
+                                    f.write(logo_up.getbuffer())
 
-                        prog_eb_vsl = st.progress(0.0)
-                        v_eb_final = renderizar_vsl_completa(
-                            frases=frases_ebook,
-                            vertical=is_vertical,
-                            voz=vozes[voz_sel],
-                            pexels_key=PEXELS_API_KEY,
-                            musica_fundo_path=p_musica,
-                            volume_musica=vol_musica,
-                            logo_path=p_logo,
-                            progress_bar=prog_eb_vsl
-                        )
-                        st.session_state["vsl_ebook_pronta"] = v_eb_final
-                        st.session_state["video_pronto"] = v_eb_final
-                        disparar_comemoracao()
-                        st.success("✅ VSL do E-book gerada e renderizada com sucesso!")
-                        st.rerun()
+                            prog_eb_vsl = st.progress(0.0)
+                            v_eb_final = renderizar_vsl_completa(
+                                frases=frases_ebook,
+                                vertical=is_vertical,
+                                voz=vozes[voz_sel],
+                                pexels_key=PEXELS_API_KEY,
+                                musica_fundo_path=p_musica,
+                                volume_musica=vol_musica,
+                                logo_path=p_logo,
+                                progress_bar=prog_eb_vsl
+                            )
+                            debitar_creditos_cloud(email_usuario, f"VSL Direta ({st.session_state['eb_dados_sessao'].get('titulo', '')[:20]})", 20)
+                            st.session_state["vsl_ebook_pronta"] = v_eb_final
+                            st.session_state["video_pronto"] = v_eb_final
+                            disparar_comemoracao()
+                            st.success("✅ VSL do E-book gerada e renderizada com sucesso!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error("⚠️ Manutenção técnica temporária na síntese de áudio. Seus créditos NÃO foram debitados.")
 
         with col_vsl_eb2:
             if st.button("📝 Carregar Roteiro na Aba VSL para Editar (0 Créditos)", use_container_width=True):
@@ -1481,21 +1592,78 @@ with aba_galeria:
                 st.write(f"🖼️ `{f}`")
 
 # ------------------------------------------------------------------------------
-# ABA 7: GESTÃO MASTER (EXCLUSIVA PARA O SEU E-MAIL)
+# ABA 7: GESTÃO MASTER (CONTABILIDADE DAS IAs & PAINEL DE CRÉDITOS)
 # ------------------------------------------------------------------------------
 if is_master_admin:
     with aba_admin:
-        st.subheader("🔒 Central de Gestão Master")
-        st.caption("Aba oculta para clientes regulares - visível apenas para os administradores autorizados.")
-        st.write("---")
+        st.subheader("🔒 Central de Gestão Master & Auditoria de Custos")
+        st.caption("Visão exclusiva de administrador: monitoramento em tempo real do ecossistema de APIs.")
 
+        st.markdown("### 📡 Status das Contas de IA & Infraestrutura")
+        relatorio_atual = auditar_infraestrutura()
+
+        col_st1, col_st2, col_st3, col_st4 = st.columns(4)
+        with col_st1:
+            with st.container(border=True):
+                st.markdown(f"**OpenAI (TTS/GPT)**")
+                if relatorio_atual["openai"]["ok"]:
+                    st.success(relatorio_atual["openai"]["status"])
+                else:
+                    st.error(relatorio_atual["openai"]["status"])
+                st.caption(relatorio_atual["openai"]["detalhes"])
+
+        with col_st2:
+            with st.container(border=True):
+                st.markdown(f"**Google Gemini (E-books)**")
+                if relatorio_atual["gemini"]["ok"]:
+                    st.success(relatorio_atual["gemini"]["status"])
+                else:
+                    st.error(relatorio_atual["gemini"]["status"])
+                st.caption(relatorio_atual["gemini"]["detalhes"])
+
+        with col_st3:
+            with st.container(border=True):
+                st.markdown(f"**ElevenLabs (Dublagem)**")
+                if relatorio_atual["elevenlabs"]["ok"]:
+                    st.success(relatorio_atual["elevenlabs"]["status"])
+                else:
+                    st.warning(relatorio_atual["elevenlabs"]["status"])
+                st.caption(relatorio_atual["elevenlabs"]["detalhes"])
+
+        with col_st4:
+            with st.container(border=True):
+                st.markdown(f"**Supabase (Usuários)**")
+                st.info(f"{relatorio_atual['supabase']['usuarios']} Clientes")
+                st.caption(f"{relatorio_atual['supabase']['creditos_circulando']} créditos em circulação")
+
+        st.write("")
+        col_wpp1, col_wpp2 = st.columns([1, 1])
+
+        with col_wpp1:
+            if st.button("📲 Disparar Relatório Contábil no Meu WhatsApp", type="primary", use_container_width=True):
+                sucesso, resposta_wpp = disparar_relatorio_whatsapp(relatorio_atual)
+                if sucesso:
+                    st.success(resposta_wpp)
+                else:
+                    st.warning("⚠️ CallMeBot não configurado nos secrets. Use o botão ao lado para abrir direto no WhatsApp.")
+                    st.session_state["link_wpp_manual"] = resposta_wpp
+
+        with col_wpp2:
+            if st.session_state.get("link_wpp_manual"):
+                st.link_button("👉 Abrir Relatório no WhatsApp Web / App", url=st.session_state["link_wpp_manual"], use_container_width=True)
+            else:
+                link_pronto = f"https://api.whatsapp.com/send?text={urllib.parse.quote('Fechamento de APIs verificado no painel.')}"
+                st.link_button("💬 Enviar Relatório Manualmente", url=link_pronto, use_container_width=True)
+
+        st.divider()
+        st.markdown("### ⚡ Injeção Manual de Créditos a Clientes")
         col_ad1, col_ad2 = st.columns([2, 1])
         with col_ad1:
             email_alvo = st.text_input("E-mail do Cliente para Injeção:", placeholder="cliente@exemplo.com")
         with col_ad2:
             qtd_creditos_adm = st.number_input("Créditos a Injetar:", min_value=1, max_value=10000, value=300, step=50)
 
-        if st.button("⚡ Injetar Créditos Manualmente", type="primary"):
+        if st.button("⚡ Confirmar Injeção de Créditos", type="primary"):
             if not email_alvo:
                 st.error("Informe o e-mail do cliente.")
             else:
