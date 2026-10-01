@@ -277,7 +277,7 @@ def baixar_video_pexels(termo: str, pexels_key: str, vertical: bool, prefixo_arq
     return None
 
 # ==============================================================================
-# MOTORES DE INTELIGÊNCIA ARTIFICIAL: RADAR E VSL (RESILIENTE COM FALLBACK IA)
+# MOTORES DE INTELIGÊNCIA ARTIFICIAL: RADAR E VSL
 # ==============================================================================
 PLATAFORMAS_CONFIG = {
     "TikTok": {"icone": "📱", "ds": "", "modificador": "tiktok viral", "perfil": "Ganchos imediatos, ritmo acelerado e curiosidade instantânea."},
@@ -501,7 +501,7 @@ def gerar_roteiro_vsl_de_ebook(dados_ebook: dict) -> list[str]:
     ]
 
 # ==============================================================================
-# MOTOR DE E-BOOK EM PIPELINE MODULAR (MANUAL OPERACIONAL DE ALTA DENSIDADE)
+# MOTOR DE E-BOOK EM PIPELINE MODULAR (ALTA DENSIDADE E VOLUME REAL DE LIVRO)
 # ==============================================================================
 def gerar_conteudo_ebook_gemini(nicho_produto: str, publico: str, promessa_angulo: str) -> dict:
     chave_gemini = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY", "")).strip()
@@ -511,7 +511,7 @@ def gerar_conteudo_ebook_gemini(nicho_produto: str, publico: str, promessa_angul
             raise ValueError("Nenhuma chave válida configurada (GEMINI_API_KEY ou OPENAI_API_KEY).")
         client_oai = OpenAI(api_key=OPENAI_API_KEY)
         p_fallback = f"""
-        Escreva um Manual Operacional técnico completo sobre '{nicho_produto}'.
+        Escreva um Livro Operacional completo, detalhado e aprofundado sobre '{nicho_produto}'.
         Público: '{publico}'. Promessa: '{promessa_angulo}'.
         Retorne estritamente um JSON com 'titulo', 'subtitulo', 'termo_capa', 'introducao' e 'capitulos' (lista com 'numero', 'titulo', 'termo_busca_foto', 'conteudo').
         """
@@ -528,45 +528,45 @@ def gerar_conteudo_ebook_gemini(nicho_produto: str, publico: str, promessa_angul
 
     # FASE 1: ARQUITETURA ESTRATÉGICA, GANCHOS E DIRETRIZES FOTOGRÁFICAS
     prompt_base = f"""
-    Atue como estrategista sênior de infoprodutos e autoridade técnica internacional.
-    Estruture a arquitetura de um MANUAL OPERACIONAL DE EXECUÇÃO PRÁTICA sobre: "{nicho_produto}".
-    Público-Alvo: "{publico}".
-    Promessa / Mecanismo: "{promessa_angulo}".
+    Atue como autor de livros técnicos de excelência e estrategista de infoprodutos.
+    Estruture a arquitetura de um LIVRO / MANUAL OPERACIONAL COMPLETO, DENSO E PROFUNDO sobre: "{nicho_produto}".
+    Público-Alvo e Dores: "{publico}".
+    Promessa Central e Mecanismo: "{promessa_angulo}".
 
-    DIRETRIZES FOTOGRÁFICAS PARA O BANCO PEXELS:
-    - Se for culinária/comida, use termos vibrantes como: 'colorful gourmet plating', 'fresh vibrant ingredients flatlay', 'chef food styling close up'.
-    - Se for negócios/digital, use termos como: 'modern executive workplace', 'financial analytics workstation'.
+    DIRETRIZES DE IMAGEM (PEXELS):
+    - Se for comida/culinária, use descritores de fotografia gastronómica vibrante: 'vibrant colorful gourmet plating food styling', 'fresh ingredients flatlay close up', 'chef preparing colorful dish in kitchen'.
+    - Se for outro nicho, use termos profissionais de alta saturação visual.
 
     Retorne ESTRITAMENTE um JSON estruturado com o seguinte esquema:
     {{
       "titulo": "Título Comercial Magnético e Direto",
       "subtitulo": "Subtítulo Persuasivo Focado em Tempo e Resultado",
-      "termo_capa": "termo em ingles para foto de capa realista no Pexels (2 a 4 palavras)",
-      "introducao": "Texto longo da introdução com diagnóstico cru, quebra de mitos e a razão técnica de funcionamento (mínimo 250 palavras)...",
+      "termo_capa": "termo em ingles para foto de capa no Pexels (2 a 4 palavras)",
+      "introducao": "Texto longo da introdução com diagnóstico cru, quebra de crenças, ciência/técnica por trás do método e como usar o livro (mínimo 350 palavras)...",
       "ementa_modulos": [
         {{
           "numero": 1,
-          "titulo": "Setup de Inicialização e Infraestrutura Obrigatória",
+          "titulo": "Setup Obrigatório, Ingredientes Críticos e Equipamentos",
           "termo_foto": "termo em ingles para foto profissional no Pexels",
-          "foco_operacional": "Checklist dos primeiros 30 minutos, ferramentas necessárias e configurações iniciais"
+          "foco_operacional": "Ficha completa de ingredientes, proporções fundamentais, utensílios obrigatórios e preparação do ambiente"
         }},
         {{
           "numero": 2,
-          "titulo": "O Protocolo Técnico de Execução Passo a Passo",
+          "titulo": "O Método Técnico de Execução Passo a Passo Sem Erros",
           "termo_foto": "termo em ingles para foto profissional no Pexels",
-          "foco_operacional": "Passo a passo minucioso e sem teoria, parâmetros de operação e rotina diária"
+          "foco_operacional": "Procedimento técnico completo, pontos de textura/temperatura, tempos precisos e técnicas de controle"
         }},
         {{
           "numero": 3,
-          "titulo": "Scripts, Modelos e Templates Copia-e-Cola",
+          "titulo": "Fichas Técnicas Prontas, Receitas Mestras e Variações",
           "termo_foto": "termo em ingles para foto profissional no Pexels",
-          "foco_operacional": "Modelos prontos de scripts, mensagens de abordagem, ofertas ou receitas para preencher e usar"
+          "foco_operacional": "Fichas completas com gramaturas, modo de preparo detalhado e soluções para adaptações"
         }},
         {{
           "numero": 4,
-          "titulo": "Cronograma de 7 Dias e Blindagem de Erros",
+          "titulo": "Guia de Resolução de Problemas, Conservação e Checklist",
           "termo_foto": "termo em ingles para foto profissional no Pexels",
-          "foco_operacional": "Plano diário de execução do Dia 1 ao 7 e lista com os 5 erros fatais a evitar"
+          "foco_operacional": "Diagnóstico dos 5 erros mais comuns, tabela de armazenamento/validade e checklist diário de execução"
         }}
       ]
     }}
@@ -592,7 +592,7 @@ def gerar_conteudo_ebook_gemini(nicho_produto: str, publico: str, promessa_angul
     if not dados_base:
         raise RuntimeError("Não foi possível conectar aos modelos Gemini ativos.")
 
-    # FASE 2: GERAÇÃO PROFUNDA DE CADA MÓDULO (MANUAL OPERACIONAL COM SCRIPTS E CHECKLISTS)
+    # FASE 2: GERAÇÃO PROFUNDA DE CADA CAPÍTULO (TEXTO DENSO E EXTENSO)
     capitulos_processados = []
 
     for mod in dados_base.get("ementa_modulos", []):
@@ -601,16 +601,15 @@ def gerar_conteudo_ebook_gemini(nicho_produto: str, publico: str, promessa_angul
         foco = mod.get("foco_operacional", "")
 
         prompt_cap = f"""
-        Você está redigindo o conteúdo integral do Módulo {num}: "{tit}" do manual "{dados_base.get('titulo')}".
+        Você está redigindo o conteúdo integral do Módulo {num}: "{tit}" do livro "{dados_base.get('titulo')}".
         Público: {publico} | Mecanismo Central: {promessa_angulo}
         Foco Operacional Obrigatório: {foco}
 
-        DIRETRIZES DE QUALIDADE FUNDAMENTAIS:
-        - PROIBIDO clichês, conselhos abstratos ("mantenha o foco") ou introduções de autoajuda.
-        - Entregue o processo técnico como um Manual Operacional definitivo (Passo 1, Passo 2, Passo 3).
-        - OBRIGATÓRIO incluir pelo menos 2 modelos/scripts prontos para preencher e usar no dia a dia.
-        - OBRIGATÓRIO incluir ao final do texto uma seção: 'Checklist de Verificação Rápida' com caixas [ ] e itens objetivos.
-        - Mínimo de 450 a 600 palavras para este capítulo.
+        DIRETRIZES DE QUALIDADE E PROFUNDIDADE:
+        - PROIBIDO textos superficiais ou listas curtas. Escreva um material denso, minucioso e de alto valor prático (mínimo 600 a 850 palavras neste capítulo).
+        - Divida o texto com subtítulos claros em CAIXA ALTA (ex.: 1. OS FUNDAMENTOS TÉCNICOS, 2. PROCEDIMENTO PASSO A PASSO, 3. TABELA DE PROPORÇÕES, 4. PONTOS DE ATENÇÃO).
+        - OBRIGATÓRIO incluir dados exatos, gramaturas, temperaturas, tempos e especificações práticas.
+        - OBRIGATÓRIO incluir ao final a seção: 'CHECKLIST OPERACIONAL' com itens objetivos em formato [ ] para o leitor marcar.
         Retorne APENAS o texto corrido do módulo, sem tags de código ou títulos markdown (#).
         """
 
@@ -622,12 +621,12 @@ def gerar_conteudo_ebook_gemini(nicho_produto: str, publico: str, promessa_angul
             )
             conteudo_capitulo = res_cap.text.strip()
         except Exception:
-            conteudo_capitulo = f"Passo 1: Inicialização da infraestrutura operacional para {foco}.\nPasso 2: Configuração e validação dos parâmetros técnicos.\nPasso 3: Execução direta e controle de qualidade.\n\nChecklist de Verificação Rápida:\n[ ] Setup validado\n[ ] Parâmetros ajustados\n[ ] Ativo pronto para distribuição"
+            conteudo_capitulo = f"1. SETUP E FUNDAMENTOS TÉCNICOS\nInicialização e organização completa dos materiais para {foco}.\n\n2. PROCEDIMENTO PASSO A PASSO\nPasso 1: Verificação de insumos e pesagem exata.\nPasso 2: Processamento e execução da técnica.\nPasso 3: Controle térmico e finalização.\n\nCHECKLIST OPERACIONAL:\n[ ] Insumos validados e pesados\n[ ] Temperatura e ambiente controlados\n[ ] Produto final padronizado"
 
         capitulos_processados.append({
             "numero": num,
             "titulo": tit,
-            "termo_busca_foto": mod.get("termo_foto", "colorful gourmet food presentation"),
+            "termo_busca_foto": mod.get("termo_foto", "vibrant colorful gourmet food presentation"),
             "conteudo": conteudo_capitulo
         })
 
@@ -640,7 +639,7 @@ def gerar_conteudo_ebook_gemini(nicho_produto: str, publico: str, promessa_angul
     }
 
 # ==============================================================================
-# MOTOR DE DIAGRAMAÇÃO DE PDF COM FOTOS INTEGRADAS
+# MOTOR DE DIAGRAMAÇÃO DE PDF COM ACESSIBILIDADE E TIPOGRAFIA AMPLA (14pt)
 # ==============================================================================
 class PDFEbookComFotos(FPDF):
     def __init__(self, titulo_guia: str):
@@ -649,24 +648,24 @@ class PDFEbookComFotos(FPDF):
 
     def header(self):
         if self.page_no() > 1:
-            self.set_font("Helvetica", "I", 8)
-            self.set_text_color(130, 140, 150)
-            self.cell(0, 8, self.titulo_guia[:50].upper(), border=0, align="L")
-            self.cell(0, 8, "PROTOCOLO PRÁTICO OFICIAL", border=0, align="R")
-            self.ln(10)
-            self.set_draw_color(220, 225, 230)
-            self.set_line_width(0.3)
-            self.line(18, 18, 192, 18)
-            self.ln(4)
+            self.set_font("Helvetica", "B", 10)
+            self.set_text_color(70, 80, 95)
+            self.cell(0, 8, self.titulo_guia[:45].upper(), border=0, align="L")
+            self.cell(0, 8, "GUIA TÉCNICO OFICIAL", border=0, align="R")
+            self.ln(9)
+            self.set_draw_color(200, 210, 220)
+            self.set_line_width(0.4)
+            self.line(18, 17, 192, 17)
+            self.ln(6)
 
     def footer(self):
         if self.page_no() > 1:
-            self.set_y(-15)
-            self.set_draw_color(220, 225, 230)
-            self.set_line_width(0.3)
-            self.line(18, 282, 192, 282)
-            self.set_font("Helvetica", "", 9)
-            self.set_text_color(130, 140, 150)
+            self.set_y(-18)
+            self.set_draw_color(200, 210, 220)
+            self.set_line_width(0.4)
+            self.line(18, 279, 192, 279)
+            self.set_font("Helvetica", "B", 11)
+            self.set_text_color(70, 80, 95)
             self.cell(0, 10, f"Página {self.page_no()}", border=0, align="C")
 
 def sanitizar_pdf(txt: str) -> str:
@@ -684,98 +683,108 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_saida: st
     titulo = dados.get("titulo", "GUIA OPERACIONAL")
     subtitulo = dados.get("subtitulo", "")
     pdf = PDFEbookComFotos(titulo_guia=titulo)
-    pdf.set_auto_page_break(auto=True, margin=22)
-    pdf.set_margins(18, 20, 18)
+    pdf.set_auto_page_break(auto=True, margin=24)
+    pdf.set_margins(18, 22, 18)
 
-    # ---------------- CAPA PREMIUM COM FOTO DE FUNDO/DESTAQUE ----------------
+    # ---------------- CAPA PREMIUM COM DESTAQUE VISUAL ----------------
     pdf.add_page()
     pdf.set_fill_color(15, 23, 42)
     pdf.rect(0, 0, 210, 297, "F")
 
     pdf.set_fill_color(245, 158, 11)
-    pdf.rect(18, 30, 174, 3, "F")
+    pdf.rect(18, 28, 174, 4, "F")
 
     pdf.set_y(38)
-    pdf.set_font("Helvetica", "B", 10)
+    pdf.set_font("Helvetica", "B", 12)
     pdf.set_text_color(245, 158, 11)
-    pdf.cell(0, 8, "MATERIAL EXCLUSIVO - APLICAÇÃO PRÁTICA IMEDIATA", align="L", ln=True)
+    pdf.cell(0, 8, "MATERIAL EXCLUSIVO - EDIÇÃO COMPLETA", align="L", ln=True)
 
-    pdf.ln(4)
-    pdf.set_font("Helvetica", "B", 24)
+    pdf.ln(3)
+    pdf.set_font("Helvetica", "B", 26)
     pdf.set_text_color(255, 255, 255)
-    pdf.multi_cell(0, 11, sanitizar_pdf(titulo.upper()), align="L")
+    pdf.multi_cell(0, 12, sanitizar_pdf(titulo.upper()), align="L")
 
     if subtitulo:
-        pdf.ln(3)
-        pdf.set_font("Helvetica", "", 12)
-        pdf.set_text_color(203, 213, 225)
-        pdf.multi_cell(0, 7, sanitizar_pdf(subtitulo), align="L")
+        pdf.ln(4)
+        pdf.set_font("Helvetica", "B", 15)
+        pdf.set_text_color(226, 232, 240)
+        pdf.multi_cell(0, 8, sanitizar_pdf(subtitulo), align="L")
 
     termo_capa = dados.get("termo_capa") or "vibrant gourmet food presentation"
     foto_capa = baixar_foto_nicho_pexels(termo_capa, pexels_key, "capa")
     if foto_capa and os.path.exists(foto_capa):
-        pdf.ln(8)
+        pdf.ln(6)
         y_foto_capa = pdf.get_y()
-        pdf.image(foto_capa, x=18, y=y_foto_capa, w=174, h=95)
+        if y_foto_capa < 185:
+            pdf.image(foto_capa, x=18, y=y_foto_capa, w=174, h=92)
 
     pdf.set_y(260)
-    pdf.set_font("Helvetica", "B", 10)
+    pdf.set_font("Helvetica", "B", 11)
     pdf.set_text_color(255, 255, 255)
-    pdf.cell(0, 5, "SISTEMA DE EXECUÇÃO VALIDAÇÃO DIRETA", ln=True)
-    pdf.set_font("Helvetica", "", 8.5)
+    pdf.cell(0, 6, "SISTEMA DE EXECUÇÃO E IMPLEMENTAÇÃO DIRETA", ln=True)
+    pdf.set_font("Helvetica", "", 10)
     pdf.set_text_color(148, 163, 184)
-    pdf.cell(0, 5, f"Gerado em {datetime.now().strftime('%d/%m/%Y')} | Todos os direitos reservados", ln=True)
+    pdf.cell(0, 6, f"Gerado em {datetime.now().strftime('%d/%m/%Y')} | Todos os direitos reservados", ln=True)
 
-    # ---------------- INTRODUÇÃO ESTRUTURADA ----------------
+    # ---------------- INTRODUÇÃO ESTRUTURADA (LETRA GRANDE 14pt) ----------------
     pdf.add_page()
     pdf.set_text_color(15, 23, 42)
-    pdf.set_font("Helvetica", "B", 17)
-    pdf.cell(0, 10, "Visão Geral e Diagnóstico Estratégico", ln=True)
-    pdf.ln(2)
+    pdf.set_font("Helvetica", "B", 22)
+    pdf.cell(0, 12, "Visão Geral e Diagnóstico Estratégico", ln=True)
+    pdf.ln(4)
 
-    pdf.set_font("Helvetica", "", 10.5)
-    pdf.set_text_color(51, 65, 85)
+    pdf.set_font("Helvetica", "", 14)
+    pdf.set_text_color(15, 23, 42)
     for p in dados.get("introducao", "").split("\n"):
         p_limpo = p.strip()
         if p_limpo:
-            pdf.multi_cell(0, 6.5, sanitizar_pdf(p_limpo))
-            pdf.ln(3)
+            pdf.multi_cell(0, 9.0, sanitizar_pdf(p_limpo))
+            pdf.ln(4)
 
-    # ---------------- CAPÍTULOS COM FOTOS TEMÁTICAS DO NICHO ----------------
+    # ---------------- CAPÍTULOS AMPLOS COM FOTOS E ACESSIBILIDADE TOTAL ----------------
     for idx_cap, cap in enumerate(dados.get("capitulos", [])):
         pdf.add_page()
         num = cap.get("numero", idx_cap + 1)
         tit = cap.get("titulo", f"Módulo {num}")
 
-        pdf.set_fill_color(241, 245, 249)
-        pdf.set_draw_color(203, 213, 225)
-        pdf.rect(18, 25, 174, 16, "FD")
-        pdf.set_y(28)
-        pdf.set_font("Helvetica", "B", 12.5)
-        pdf.set_text_color(15, 23, 42)
-        pdf.cell(0, 10, sanitizar_pdf(f" MÓDULO {num}: {tit.upper()}"), ln=True)
+        pdf.set_fill_color(30, 58, 138)
+        pdf.rect(18, 22, 174, 18, "F")
+        pdf.set_y(24)
+        pdf.set_font("Helvetica", "B", 14)
+        pdf.set_text_color(255, 255, 255)
+        pdf.cell(0, 14, sanitizar_pdf(f" MÓDULO {num}: {tit.upper()}"), ln=True)
         pdf.ln(6)
 
         termo_cap = cap.get("termo_busca_foto") or "colorful culinary dish plating"
         foto_cap = baixar_foto_nicho_pexels(termo_cap, pexels_key, f"cap_{num}")
         if foto_cap and os.path.exists(foto_cap):
             y_img = pdf.get_y()
-            pdf.image(foto_cap, x=18, y=y_img, w=174, h=78)
-            pdf.set_y(y_img + 84)
-
-        pdf.set_font("Helvetica", "", 10.5)
-        pdf.set_text_color(51, 65, 85)
+            pdf.image(foto_cap, x=18, y=y_img, w=174, h=80)
+            pdf.set_y(y_img + 86)
 
         for linha in cap.get("conteudo", "").split("\n"):
             l_limpa = linha.strip()
             if l_limpa:
-                if l_limpa.startswith(("-", "*", "1.", "2.", "3.", "4.", "•", "[ ]", "[x]")):
-                    pdf.set_x(23)
-                    pdf.multi_cell(169, 6.2, sanitizar_pdf(l_limpa))
-                    pdf.ln(2)
-                else:
-                    pdf.multi_cell(0, 6.5, sanitizar_pdf(l_limpa))
+                # Subtítulos em caixa alta no texto
+                if re.match(r"^[0-9]\.\s+[A-Z\s]{4,}", l_limpa) or (l_limpa.isupper() and len(l_limpa) > 5):
                     pdf.ln(3)
+                    pdf.set_font("Helvetica", "B", 16)
+                    pdf.set_text_color(30, 58, 138)
+                    pdf.multi_cell(0, 9.5, sanitizar_pdf(l_limpa))
+                    pdf.ln(2)
+                # Checklists e marcadores destacados
+                elif l_limpa.startswith(("-", "*", "•", "[ ]", "[x]", "1.", "2.", "3.", "4.", "5.")):
+                    pdf.set_font("Helvetica", "B", 14)
+                    pdf.set_text_color(15, 23, 42)
+                    pdf.set_x(22)
+                    pdf.multi_cell(170, 9.0, sanitizar_pdf(l_limpa))
+                    pdf.ln(2.5)
+                # Texto normal de leitura
+                else:
+                    pdf.set_font("Helvetica", "", 14)
+                    pdf.set_text_color(15, 23, 42)
+                    pdf.multi_cell(0, 9.0, sanitizar_pdf(l_limpa))
+                    pdf.ln(3.5)
 
     pdf.output(caminho_saida)
     return caminho_saida
@@ -1120,10 +1129,10 @@ with aba_ebook:
 
     c_eb1, c_eb2 = st.columns(2)
     with c_eb1:
-        nicho_eb = st.text_input("Nicho ou Nome do Produto:", value=st.session_state.get("prod_nome", "Manual da Renda Extra Digital"))
-        eb_pub = st.text_area("Público e Dores:", value=st.session_state.get("pub_nome", "Pessoas comuns sem tempo que buscam validação de renda online."), height=90)
+        nicho_eb = st.text_input("Nicho ou Nome do Produto:", value=st.session_state.get("prod_nome", "Manual Prático dos Pães Sem Glúten"))
+        eb_pub = st.text_area("Público e Dores:", value=st.session_state.get("pub_nome", "Pessoas com intolerância ou em busca de alimentação saudável que sofrem com pães secos, duros e que esfarelam."), height=90)
     with c_eb2:
-        eb_ang = st.text_area("Promessa e Solução:", value=st.session_state.get("ang_nome", "Método passo a passo baseado em automações simples sem aparecer."), height=90)
+        eb_ang = st.text_area("Promessa e Solução:", value=st.session_state.get("ang_nome", "O segredo da combinação exata de farinhas e hidratação para pães macios, fofos e elásticos como os tradicionais."), height=90)
 
     if st.button("⚡ Redigir Manual Completo com Gemini (15 Créditos)", type="primary", use_container_width=True):
         agora = time.time()
@@ -1132,7 +1141,7 @@ with aba_ebook:
             st.stop()
         st.session_state["_ultimo_click_eb"] = agora
 
-        with st.spinner("🤖 O Google Gemini está redigindo o conteúdo técnico e mapeando termos fotográficos..."):
+        with st.spinner("🤖 O Google Gemini está aprofundando o conteúdo técnico e gerando fichas completas..."):
             try:
                 dados_gerados = gerar_conteudo_ebook_gemini(nicho_eb, eb_pub, eb_ang)
                 if not debitar_creditos_cloud(email_usuario, "Geração de E-book Gemini", 15):
@@ -1147,7 +1156,7 @@ with aba_ebook:
                         st.session_state[f"t_cap_mod_{idx_c}"] = cap_g.get("titulo", "")
                         st.session_state[f"foto_cap_mod_{idx_c}"] = cap_g.get("termo_busca_foto", "")
                         st.session_state[f"txt_cap_mod_{idx_c}"] = cap_g.get("conteudo", "")
-                    st.success("✅ Manual operacional gerado com sucesso! Revise os módulos e clique em compilar.")
+                    st.success("✅ Livro técnico gerado com sucesso! Revise os módulos e compile em alta acessibilidade.")
                     st.rerun()
             except Exception as erro:
                 st.error(f"Erro na redação do infoproduto via Gemini: {erro}")
@@ -1179,7 +1188,7 @@ with aba_ebook:
                     t_cap = st.text_input(f"Título do Módulo {c_idx+1}:", value=st.session_state.get(f"t_cap_mod_{c_idx}", cap.get("titulo", "")), key=f"t_cap_mod_{c_idx}")
                 with c_m2:
                     foto_term = st.text_input(f"Termo da Foto (Pexels):", value=st.session_state.get(f"foto_cap_mod_{c_idx}", cap.get("termo_busca_foto", "colorful culinary dish plating")), key=f"foto_cap_mod_{c_idx}")
-                txt_cap = st.text_area(f"Conteúdo do Módulo {c_idx+1}:", value=st.session_state.get(f"txt_cap_mod_{c_idx}", cap.get("conteudo", "")), height=220, key=f"txt_cap_mod_{c_idx}")
+                txt_cap = st.text_area(f"Conteúdo do Módulo {c_idx+1}:", value=st.session_state.get(f"txt_cap_mod_{c_idx}", cap.get("conteudo", "")), height=260, key=f"txt_cap_mod_{c_idx}")
                 caps_editados.append({
                     "numero": c_idx+1,
                     "titulo": t_cap,
@@ -1188,7 +1197,7 @@ with aba_ebook:
                 })
 
         st.write("")
-        if st.button("📄 Compilar e Gerar PDF Diagramado com Fotos", type="primary", use_container_width=True):
+        if st.button("📄 Compilar e Gerar PDF com Fonte Grande e Fotos", type="primary", use_container_width=True):
             dados_compilacao = {
                 "titulo": tit_edit,
                 "subtitulo": sub_edit,
@@ -1201,7 +1210,7 @@ with aba_ebook:
             nome_arquivo = f"manual_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
             caminho_pdf = os.path.join(DIR_EBOOKS, nome_arquivo)
 
-            with st.spinner("📥 Baixando fotos do nicho no Pexels e diagramando páginas..."):
+            with st.spinner("📥 Baixando fotos vibrantes no Pexels e diagramando em formato acessível..."):
                 compilar_pdf_ebook_com_fotos(dados_compilacao, PEXELS_API_KEY, caminho_pdf)
                 st.session_state["pdf_pronto"] = caminho_pdf
                 st.session_state["pdf_nome"] = nome_arquivo
@@ -1210,7 +1219,7 @@ with aba_ebook:
 
     # ÁREA DE DOWNLOAD DO PDF E GERAÇÃO DIRETA DE VSL COM OS MESMOS DADOS
     if st.session_state.get("pdf_pronto") and os.path.exists(st.session_state["pdf_pronto"]):
-        st.success(f"✅ Arquivo compilado com fotos e diagramação completa: `{st.session_state.get('pdf_nome')}`")
+        st.success(f"✅ Arquivo compilado em tipografia ampla e fotos de alta resolução: `{st.session_state.get('pdf_nome')}`")
         with open(st.session_state["pdf_pronto"], "rb") as f:
             st.download_button(
                 label=f"⬇️ BAIXAR LIVRO EM PDF ({st.session_state.get('pdf_nome')})",
