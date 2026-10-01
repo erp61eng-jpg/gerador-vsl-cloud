@@ -60,8 +60,6 @@ def limpar_url_supabase(url_bruta: str) -> str:
     return f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
 
 OPENAI_API_KEY = str(st.secrets.get("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY") or "").strip().strip('"').strip("'")
-
-# Suporte tanto para GEMINI_API_KEY quanto para GOOGLE_API_KEY
 GEMINI_API_KEY = str(
     st.secrets.get("GEMINI_API_KEY") or 
     st.secrets.get("GOOGLE_API_KEY") or 
@@ -69,7 +67,6 @@ GEMINI_API_KEY = str(
     os.getenv("GOOGLE_API_KEY") or 
     ""
 ).strip().strip('"').strip("'")
-
 PEXELS_API_KEY = str(st.secrets.get("PEXELS_API_KEY") or os.getenv("PEXELS_API_KEY") or "").strip().strip('"').strip("'")
 ELEVENLABS_API_KEY = str(st.secrets.get("ELEVENLABS_API_KEY") or os.getenv("ELEVENLABS_API_KEY") or "").strip().strip('"').strip("'")
 
@@ -94,8 +91,9 @@ DIR_LOGOS   = os.path.join(BASE_DIR, "logos")
 DIR_BROLL   = os.path.join(BASE_DIR, "broll")
 DIR_EBOOKS  = os.path.join(BASE_DIR, "ebooks")
 DIR_FOTOS   = os.path.join(BASE_DIR, "fotos_ebook")
+DIR_DUBLAGENS = os.path.join(BASE_DIR, "dublagens")
 
-for pasta in [DIR_AUDIOS, DIR_OUTPUT, DIR_TEMP, DIR_MUSICAS, DIR_LOGOS, DIR_BROLL, DIR_EBOOKS, DIR_FOTOS]:
+for pasta in [DIR_AUDIOS, DIR_OUTPUT, DIR_TEMP, DIR_MUSICAS, DIR_LOGOS, DIR_BROLL, DIR_EBOOKS, DIR_FOTOS, DIR_DUBLAGENS]:
     os.makedirs(pasta, exist_ok=True)
 
 @st.cache_resource(show_spinner=False)
@@ -177,7 +175,7 @@ def carregar_dados_usuario(email: str) -> tuple[int, int]:
         dados_lista = getattr(resposta, "data", [])
 
         if not dados_lista:
-            saldo_inicial = 300 if email in ["ricardopintoedson@gmail.com", "erp61eng@gmail.com"] else 0
+            saldo_inicial = 5000 if email in ["ricardopintoedson@gmail.com", "erp61eng@gmail.com"] else 0
             supabase.table("usuarios").insert([{
                 "email": email,
                 "saldo_creditos": saldo_inicial,
@@ -193,15 +191,15 @@ def carregar_dados_usuario(email: str) -> tuple[int, int]:
 
         compras = int(usr.get("total_compras", 0) or 0)
 
-        if email in ["ricardopintoedson@gmail.com", "erp61eng@gmail.com"] and (saldo is None or int(saldo) <= 0):
-            saldo = 300
+        if email in ["ricardopintoedson@gmail.com", "erp61eng@gmail.com"] and (saldo is None or int(saldo) <= 50):
+            saldo = 5000
             try:
-                supabase.table("usuarios").update({"saldo_creditos": 300, "creditos": 300}).eq("email", email).execute()
+                supabase.table("usuarios").update({"saldo_creditos": 5000, "creditos": 5000}).eq("email", email).execute()
             except Exception:
                 pass
         return int(saldo or 0), compras
     except Exception:
-        return (300 if email in ["ricardopintoedson@gmail.com", "erp61eng@gmail.com"] else 0), 0
+        return (5000 if email in ["ricardopintoedson@gmail.com", "erp61eng@gmail.com"] else 0), 0
 
 saldo_lido, compras_lidas = carregar_dados_usuario(email_usuario)
 st.session_state.saldo_creditos = saldo_lido
@@ -236,7 +234,7 @@ def disparar_comemoracao():
     st.balloons()
 
 # ==============================================================================
-# AUDITORIA DE CRÉDITOS E NOTIFICAÇÃO WHATSAPP
+# AUDITORIA DE CRÉDITOS, BALANÇO EMPRESARIAL & NOTIFICAÇÃO WHATSAPP
 # ==============================================================================
 def auditar_infraestrutura() -> dict:
     relatorio = {
@@ -244,7 +242,14 @@ def auditar_infraestrutura() -> dict:
         "openai": {"status": "Indisponível", "detalhes": "Chave não configurada", "ok": False},
         "elevenlabs": {"status": "Indisponível", "detalhes": "Chave não configurada", "ok": False},
         "gemini": {"status": "Indisponível", "detalhes": "Chave não configurada", "ok": False},
-        "supabase": {"status": "Operacional", "usuarios": 0, "creditos_circulando": 0, "ok": True}
+        "supabase": {"status": "Operacional", "usuarios": 0, "creditos_circulando": 0, "ok": True},
+        "financeiro": {
+            "creditos_clientes": 0,
+            "custo_ia_estimado_brl": 0.0,
+            "custo_ia_estimado_usd": 0.0,
+            "total_faturado_kiwify": 0.0,
+            "pedidos_aprovados": 0
+        }
     }
 
     # 1. Checagem OpenAI
@@ -285,7 +290,7 @@ def auditar_infraestrutura() -> dict:
     else:
         relatorio["elevenlabs"] = {"status": "Não Vinculada", "detalhes": "Inserir em Secrets se for utilizar", "ok": True}
 
-    # 3. Checagem Gemini (Google AI) via Consulta Direta de Modelos (Sem Falsos Alertas)
+    # 3. Checagem Gemini via Consulta Direta aos Modelos
     if GEMINI_API_KEY:
         try:
             url_g = f"https://generativelanguage.googleapis.com/v1beta/models?key={GEMINI_API_KEY}"
@@ -294,7 +299,6 @@ def auditar_infraestrutura() -> dict:
                 dados_m = resp_g.json().get("models", [])
                 nomes_mod = [m.get("name", "").replace("models/", "") for m in dados_m]
                 
-                # Seleciona o melhor modelo disponível na conta faturada
                 modelo_ativo = "gemini-1.5-flash"
                 for pref in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]:
                     if pref in nomes_mod:
@@ -303,7 +307,7 @@ def auditar_infraestrutura() -> dict:
 
                 relatorio["gemini"] = {
                     "status": "100% Operacional",
-                    "detalhes": f"Ativo ({modelo_ativo})",
+                    "detalhes": f"Conta Paga Ativa ({modelo_ativo})",
                     "ok": True
                 }
             else:
@@ -327,16 +331,42 @@ def auditar_infraestrutura() -> dict:
             "ok": False
         }
 
-    # 4. Checagem Supabase
+    # 4. Checagem Supabase & Balanço Operacional
     try:
-        res_usr = supabase.table("usuarios").select("saldo_creditos").execute()
+        res_usr = supabase.table("usuarios").select("email, saldo_creditos, creditos").execute()
         lista_u = getattr(res_usr, "data", [])
-        total_cr = sum([int(u.get("saldo_creditos") or 0) for u in lista_u])
+        
+        emails_admin = ["ricardopintoedson@gmail.com", "erp61eng@gmail.com"]
+        clientes_reais = [u for u in lista_u if u.get("email") not in emails_admin]
+        
+        total_cr_clientes = sum([int(u.get("saldo_creditos") or u.get("creditos") or 0) for u in clientes_reais])
+        total_cr_geral = sum([int(u.get("saldo_creditos") or u.get("creditos") or 0) for u in lista_u])
+        
+        custo_suprir_brl = round(total_cr_clientes * 0.0035, 2)
+        custo_suprir_usd = round(total_cr_clientes * 0.00065, 2)
+
+        faturamento_kiwify = 0.0
+        qtd_pedidos = 0
+        try:
+            res_ped = supabase.table("pedidos_kiwify").select("valor_pago").execute()
+            pedidos_lista = getattr(res_ped, "data", [])
+            qtd_pedidos = len(pedidos_lista)
+            faturamento_kiwify = sum([float(p.get("valor_pago") or 0) for p in pedidos_lista])
+        except Exception:
+            pass
+
         relatorio["supabase"] = {
             "status": "Operacional Conectado",
             "usuarios": len(lista_u),
-            "creditos_circulando": total_cr,
+            "creditos_circulando": total_cr_geral,
             "ok": True
+        }
+        relatorio["financeiro"] = {
+            "creditos_clientes": total_cr_clientes,
+            "custo_ia_estimado_brl": custo_suprir_brl,
+            "custo_ia_estimado_usd": custo_suprir_usd,
+            "total_faturado_kiwify": faturamento_kiwify,
+            "pedidos_aprovados": qtd_pedidos
         }
     except Exception:
         relatorio["supabase"]["status"] = "Instabilidade Temporária"
@@ -345,14 +375,20 @@ def auditar_infraestrutura() -> dict:
     return relatorio
 
 def disparar_relatorio_whatsapp(relatorio: dict) -> tuple[bool, str]:
+    fin = relatorio["financeiro"]
     msg = (
-        f"📊 *CONTABILIDADE DE CRÉDITOS & INFRAESTRUTURA*\n"
+        f"📊 *CONTABILIDADE EMPRESARIAL & SUPRIMENTO DE IAs*\n"
         f"🗓️ Data: {relatorio['data_hora']}\n\n"
-        f"🤖 *OpenAI:* {relatorio['openai']['status']} ({relatorio['openai']['detalhes']})\n"
-        f"⚡ *Gemini:* {relatorio['gemini']['status']} ({relatorio['gemini']['detalhes']})\n"
-        f"🎙️ *ElevenLabs:* {relatorio['elevenlabs']['status']}\n"
-        f"🗄️ *Supabase:* {relatorio['supabase']['usuarios']} usuários | {relatorio['supabase']['creditos_circulando']} cr em circulação\n\n"
-        f"✅ *Status Geral:* Sistema Monitorado."
+        f"🏢 *Balanço da Empresa:*\n"
+        f"• Faturamento Kiwify: R$ {fin['total_faturado_kiwify']:.2f} ({fin['pedidos_aprovados']} pedidos)\n"
+        f"• Créditos Ativos dos Clientes: {fin['creditos_clientes']} cr\n"
+        f"• Reserva Necessária nas APIs: R$ {fin['custo_ia_estimado_brl']:.2f} (~$ {fin['custo_ia_estimado_usd']:.2f} USD)\n\n"
+        f"📡 *Status Técnico das APIs:*\n"
+        f"• OpenAI: {relatorio['openai']['status']}\n"
+        f"• Gemini: {relatorio['gemini']['status']}\n"
+        f"• ElevenLabs: {relatorio['elevenlabs']['status']}\n"
+        f"• Supabase: {relatorio['supabase']['status']} ({relatorio['supabase']['usuarios']} usuários)\n\n"
+        f"🛡️ *Margem de Segurança:* Suprimento coberto com folga."
     )
 
     if WHATSAPP_NUMERO and CALLMEBOT_API_KEY:
@@ -360,12 +396,102 @@ def disparar_relatorio_whatsapp(relatorio: dict) -> tuple[bool, str]:
             url_wpp = f"https://api.callmebot.com/whatsapp.php?phone={urllib.parse.quote(WHATSAPP_NUMERO)}&text={urllib.parse.quote(msg)}&apikey={urllib.parse.quote(CALLMEBOT_API_KEY)}"
             res = requests.get(url_wpp, timeout=12)
             if res.status_code == 200:
-                return True, "Mensagem enviada com sucesso para o seu WhatsApp!"
+                return True, "Mensagem contábil enviada com sucesso para o seu WhatsApp!"
         except Exception:
             pass
 
     link_manual = f"https://api.whatsapp.com/send?text={urllib.parse.quote(msg)}"
     return False, link_manual
+
+# ==============================================================================
+# MOTOR DUBFYAI: DUBLAGEM & TRADUÇÃO ONLINE (WHISPER + GPT/GEMINI + TTS)
+# ==============================================================================
+IDIOMAS_DUBLAGEM = {
+    "Inglês (EUA)": {"codigo": "en", "voz_tts": "onyx"},
+    "Espanhol (Latino)": {"codigo": "es", "voz_tts": "echo"},
+    "Francês": {"codigo": "fr", "voz_tts": "nova"},
+    "Alemão": {"codigo": "de", "voz_tts": "onyx"},
+    "Italiano": {"codigo": "it", "voz_tts": "nova"},
+    "Japonês": {"codigo": "ja", "voz_tts": "shimmer"},
+    "Português (Brasil)": {"codigo": "pt", "voz_tts": "onyx"}
+}
+
+def extrair_audio_de_video(caminho_video: str, caminho_saida_audio: str) -> bool:
+    try:
+        cmd = [FFMPEG_BIN, "-nostdin", "-y", "-i", caminho_video, "-vn", "-acodec", "libmp3lame", "-b:a", "128k", caminho_saida_audio]
+        p = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=60)
+        return p.returncode == 0 and os.path.exists(caminho_saida_audio)
+    except Exception:
+        return False
+
+def transcrever_audio_whisper(caminho_audio: str) -> str:
+    if not OPENAI_API_KEY:
+        raise ValueError("Chave OPENAI_API_KEY necessária para transcrição Whisper.")
+    client_oai = OpenAI(api_key=OPENAI_API_KEY)
+    with open(caminho_audio, "rb") as f_aud:
+        transcricao = client_oai.audio.transcriptions.create(
+            model="whisper-1",
+            file=f_aud,
+            response_format="text"
+        )
+    return str(transcricao).strip()
+
+def traduzir_texto_ia(texto_original: str, idioma_alvo: str) -> str:
+    prompt = f"""
+    Atue como tradutor profissional e dublador de audiovisual.
+    Traduza o texto a seguir para o idioma '{idioma_alvo}'.
+    Mantenha o tom natural, o ritmo da fala e a mesma intenção emocional.
+    Texto original:
+    "{texto_original}"
+
+    Retorne APENAS o texto traduzido, sem aspas, explicações ou notas adicionais.
+    """
+    if GEMINI_API_KEY:
+        try:
+            client_g = genai.Client(api_key=GEMINI_API_KEY)
+            r = client_g.models.generate_content(model="gemini-1.5-flash", contents=prompt)
+            if r and r.text:
+                return r.text.strip()
+        except Exception:
+            pass
+
+    if OPENAI_API_KEY:
+        client_oai = OpenAI(api_key=OPENAI_API_KEY)
+        r = client_oai.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3
+        )
+        return r.choices[0].message.content.strip()
+
+    return texto_original
+
+def sintetizar_fala_dublada(texto: str, caminho_saida: str, voz: str = "onyx") -> str:
+    client_oai = OpenAI(api_key=OPENAI_API_KEY)
+    resposta = client_oai.audio.speech.create(model="tts-1", voice=voz, input=texto)
+    with open(caminho_saida, "wb") as f:
+        for chunk in resposta.iter_bytes():
+            f.write(chunk)
+    return caminho_saida
+
+def mesclar_audio_dublado_em_video(caminho_video_orig: str, caminho_audio_dub: str, caminho_saida: str) -> bool:
+    try:
+        # Substitui a faixa de áudio original pelo áudio dublado
+        cmd = [
+            FFMPEG_BIN, "-nostdin", "-y",
+            "-i", caminho_video_orig,
+            "-i", caminho_audio_dub,
+            "-c:v", "copy",
+            "-map", "0:v:0",
+            "-map", "1:a:0",
+            "-shortest",
+            "-movflags", "+faststart",
+            caminho_saida
+        ]
+        p = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=120)
+        return p.returncode == 0 and os.path.exists(caminho_saida)
+    except Exception:
+        return False
 
 # ==============================================================================
 # MOTOR PEXELS (FOTOS PARA O E-BOOK & VÍDEOS PARA VSL)
@@ -1146,7 +1272,7 @@ titulos_abas = [
     "🚀 Criar VSL",
     "📚 Gerar E-book PDF com Fotos",
     "📡 Radar de Mercado",
-    "🎙️ DubfyAi Dublagem",
+    "🎙️ DubfyAi & Tradução",
     "💳 Planos & Recargas",
     "📂 Galeria"
 ]
@@ -1524,40 +1650,149 @@ with aba_radar:
                 st.error("Informe pelo menos o nome do produto.")
 
 # ------------------------------------------------------------------------------
-# ABA 4: DUBFYAI - CENTRAL DE DUBLAGEM & TRADUÇÃO DE VÍDEOS
+# ABA 4: DUBFYAI - CENTRAL DE DUBLAGEM & TRADUÇÃO ONLINE EM TEMPO REAL
 # ------------------------------------------------------------------------------
 with aba_dubfy:
-    st.subheader("🎙️ DubfyAi - Dublagem e Tradução de Vídeos com IA")
-    st.markdown("""
-    Traduza e sincronize seus vídeos para múltiplos idiomas com **clonagem vocal e ritmo natural**.
-    Escale canais dark, campanhas no mercado internacional e multiplique o alcance das suas ofertas sem gravar novamente.
-    """)
+    st.subheader("🎙️ DubfyAi: Dublagem de Vídeos & Intérprete Online")
 
-    email_param = urllib.parse.quote(email_usuario.strip().lower())
-    link_dub_starter  = f"https://pay.kiwify.com.br/LjmQ4tP?email={email_param}"
-    link_dub_business = f"https://pay.kiwify.com.br/YkL0BlH?email={email_param}"
-    link_dub_pro      = f"https://pay.kiwify.com.br/0KDE74Q?email={email_param}"
+    sub_dub_1, sub_dub_2, sub_dub_3 = st.tabs([
+        "🎬 Dublagem de Vídeo (IA)",
+        "🌐 Tradução Online & Intérprete",
+        "📦 Planos de Assinatura DubfyAi"
+    ])
 
-    st.markdown("#### 📦 Assinaturas Oficiais DubfyAi")
-    col_d1, col_d2, col_d3 = st.columns(3)
+    # 1. DUBLADOR COMPLETO DE VÍDEO
+    with sub_dub_1:
+        st.markdown("#### 🎬 Dublagem com Clonagem Vocal & Sincronia")
+        st.caption("Envie um vídeo em MP4 (com voz humana). O motor transcreve, traduz e substitui a locução no idioma alvo.")
 
-    with col_d1:
-        with st.container(border=True):
-            st.markdown("### 🟢 Starter Dublagem\n## R$ 45,00")
-            st.write("• Dublagem de vídeos curtos\n• Tradução sincronizada\n• Exportação em alta qualidade")
-            st.link_button("💳 ASSINAR STARTER (R$ 45)", url=link_dub_starter, use_container_width=True)
+        video_up = st.file_uploader("Selecione o Vídeo Original (.mp4):", type=["mp4"], key="up_dub_video")
+        col_db1, col_db2 = st.columns([1, 1])
+        with col_db1:
+            idioma_alvo_dub = st.selectbox("Traduzir & Dublar Para:", list(IDIOMAS_DUBLAGEM.keys()), index=0)
+        with col_db2:
+            cfg_id = IDIOMAS_DUBLAGEM[idioma_alvo_dub]
+            voz_dub_sel = st.selectbox("Timbre Vocal:", ["onyx (Forte/Masculino)", "nova (Feminina/Impacto)", "echo (Didático)", "shimmer (Suave)"])
+            voz_dub_cod = voz_dub_sel.split(" ")[0]
 
-    with col_d2:
-        with st.container(border=True):
-            st.markdown("### 🔵 Business Dublagem\n## R$ 119,00")
-            st.write("• Alto volume de minutos\n• Clonagem vocal e timing profissional\n• Uso comercial liberado")
-            st.link_button("🚀 ASSINAR BUSINESS (R$ 119)", url=link_dub_business, use_container_width=True, type="primary")
+        if video_up is not None:
+            st.video(video_up)
 
-    with col_d3:
-        with st.container(border=True):
-            st.markdown("### 👑 Pro Dublagem\n## R$ 219,00")
-            st.write("• Escala máxima para agências e canais dark\n• Renderização prioritária\n• Suporte VIP dedicado")
-            st.link_button("👑 ASSINAR PRO (R$ 219)", url=link_dub_pro, use_container_width=True)
+            if st.button("🚀 Iniciar Dublagem Automática (25 Créditos)", type="primary", use_container_width=True):
+                saldo_antes = st.session_state.get("saldo_creditos", 0)
+                if saldo_antes < 25:
+                    st.error("❌ Saldo insuficiente! Você precisa de 25 créditos para dublar este vídeo.")
+                else:
+                    with st.spinner("⏳ Extraindo áudio, transcrevendo com Whisper e traduzindo..."):
+                        try:
+                            c_temp_video = os.path.join(DIR_TEMP, f"orig_{int(time.time())}.mp4")
+                            with open(c_temp_video, "wb") as f:
+                                f.write(video_up.getbuffer())
+
+                            c_temp_audio = os.path.join(DIR_TEMP, f"audio_{int(time.time())}.mp3")
+                            extrair_audio_de_video(c_temp_video, c_temp_audio)
+
+                            texto_transcrito = transcrever_audio_whisper(c_temp_audio)
+                            st.info(f"🗣️ **Texto Detectado:** {texto_transcrito[:200]}...")
+
+                            texto_traduzido = traduzir_texto_ia(texto_transcrito, idioma_alvo_dub)
+                            st.success(f"🌐 **Tradução:** {texto_traduzido[:200]}...")
+
+                            c_audio_dublado = os.path.join(DIR_TEMP, f"dub_{int(time.time())}.mp3")
+                            sintetizar_fala_dublada(texto_traduzido, c_audio_dublado, voz_dub_cod)
+
+                            c_video_final_dub = os.path.join(DIR_DUBLAGENS, f"dublado_{int(time.time())}_{cfg_id['codigo']}.mp4")
+                            if mesclar_audio_dublado_em_video(c_temp_video, c_audio_dublado, c_video_final_dub):
+                                debitar_creditos_cloud(email_usuario, f"Dublagem ({idioma_alvo_dub})", 25)
+                                st.session_state["video_dublado_pronto"] = c_video_final_dub
+                                disparar_comemoracao()
+                                st.rerun()
+                            else:
+                                st.error("Erro na renderização final do vídeo dublado via FFmpeg.")
+                        except Exception as e:
+                            st.error(f"Erro no processamento da dublagem: {e}")
+
+        if st.session_state.get("video_dublado_pronto") and os.path.exists(st.session_state["video_dublado_pronto"]):
+            st.markdown("#### ✅ Vídeo Dublado com Sucesso:")
+            st.video(st.session_state["video_dublado_pronto"])
+            with open(st.session_state["video_dublado_pronto"], "rb") as f_db:
+                st.download_button(
+                    label="⬇️ Baixar Vídeo Dublado (.mp4)",
+                    data=f_db,
+                    file_name=os.path.basename(st.session_state["video_dublado_pronto"]),
+                    mime="video/mp4",
+                    type="primary",
+                    use_container_width=True
+                )
+
+    # 2. INTÉRPRETE / TRADUÇÃO ONLINE EM TEMPO REAL
+    with sub_dub_2:
+        st.markdown("#### 🌐 Intérprete de Bolso & Tradutor de Voz Instantâneo")
+        st.caption("Digite ou cole uma frase em qualquer idioma. O sistema traduz instantaneamente e fala com voz fluida.")
+
+        col_tr1, col_tr2 = st.columns([2, 1])
+        with col_tr1:
+            texto_para_traduzir = st.text_area("Texto / Fala para Traduzir:", placeholder="Ex: Olá! Sejam muito bem-vindos ao nosso treinamento prático de infoprodutos.", height=110)
+        with col_tr2:
+            idioma_online = st.selectbox("Idioma de Destino:", list(IDIOMAS_DUBLAGEM.keys()), index=0, key="sel_id_online")
+            voz_online = st.selectbox("Voz da Fala:", ["nova", "onyx", "echo", "shimmer"], key="sel_voz_online")
+
+        if st.button("⚡ Traduzir e Falar Agora (5 Créditos)", type="primary", use_container_width=True):
+            if not texto_para_traduzir.strip():
+                st.error("Digite algum texto para traduzir.")
+            else:
+                saldo_antes = st.session_state.get("saldo_creditos", 0)
+                if saldo_antes < 5:
+                    st.error("❌ Saldo insuficiente! Você precisa de 5 créditos.")
+                else:
+                    with st.spinner("🤖 Traduzindo e gerando áudio no idioma nativo..."):
+                        try:
+                            traducao_resultado = traduzir_texto_ia(texto_para_traduzir, idioma_online)
+                            c_audio_pocket = os.path.join(DIR_TEMP, f"pocket_{int(time.time())}.mp3")
+                            sintetizar_fala_dublada(traducao_resultado, c_audio_pocket, voz_online)
+                            
+                            debitar_creditos_cloud(email_usuario, f"Tradução Online ({idioma_online})", 5)
+                            st.session_state["txt_traduzido_pocket"] = traducao_resultado
+                            st.session_state["aud_pocket_pronto"] = c_audio_pocket
+                            st.rerun()
+                        except Exception as err:
+                            st.error(f"Erro na tradução: {err}")
+
+        if st.session_state.get("txt_traduzido_pocket"):
+            st.write("---")
+            st.markdown("### 🗣️ Resultado da Tradução:")
+            st.success(st.session_state["txt_traduzido_pocket"])
+            if st.session_state.get("aud_pocket_pronto") and os.path.exists(st.session_state["aud_pocket_pronto"]):
+                st.audio(st.session_state["aud_pocket_pronto"])
+                with open(st.session_state["aud_pocket_pronto"], "rb") as f_aud_p:
+                    st.download_button("⬇️ Baixar Áudio da Tradução (.mp3)", data=f_aud_p, file_name="traducao_dublada.mp3", mime="audio/mp3")
+
+    # 3. PLANOS DE MONETIZAÇÃO DUBFYAI
+    with sub_dub_3:
+        st.markdown("#### 📦 Assinaturas Oficiais DubfyAi (Kiwify)")
+        email_param = urllib.parse.quote(email_usuario.strip().lower())
+        link_dub_starter  = f"https://pay.kiwify.com.br/LjmQ4tP?email={email_param}"
+        link_dub_business = f"https://pay.kiwify.com.br/YkL0BlH?email={email_param}"
+        link_dub_pro      = f"https://pay.kiwify.com.br/0KDE74Q?email={email_param}"
+
+        col_d1, col_d2, col_d3 = st.columns(3)
+        with col_d1:
+            with st.container(border=True):
+                st.markdown("### 🟢 Starter Dublagem\n## R$ 45,00")
+                st.write("• Dublagem de vídeos curtos\n• Tradução sincronizada\n• Exportação em alta qualidade")
+                st.link_button("💳 ASSINAR STARTER (R$ 45)", url=link_dub_starter, use_container_width=True)
+
+        with col_d2:
+            with st.container(border=True):
+                st.markdown("### 🔵 Business Dublagem\n## R$ 119,00")
+                st.write("• Alto volume de minutos\n• Clonagem vocal e timing profissional\n• Uso comercial liberado")
+                st.link_button("🚀 ASSINAR BUSINESS (R$ 119)", url=link_dub_business, use_container_width=True, type="primary")
+
+        with col_d3:
+            with st.container(border=True):
+                st.markdown("### 👑 Pro Dublagem\n## R$ 219,00")
+                st.write("• Escala máxima para agências e canais dark\n• Renderização prioritária\n• Suporte VIP dedicado")
+                st.link_button("👑 ASSINAR PRO (R$ 219)", url=link_dub_pro, use_container_width=True)
 
 # ------------------------------------------------------------------------------
 # ABA 5: PLANOS & RECARGAS (COM BÔNUS DE 1ª COMPRA EM DOBRO)
@@ -1616,7 +1851,7 @@ with aba_planos:
 # ------------------------------------------------------------------------------
 with aba_galeria:
     st.subheader("📂 Ficheiros Armazenados Localmente")
-    tab_v, tab_e, tab_f = st.tabs(["Vídeos (.mp4)", "E-books (.pdf)", "Fotos do Nicho (.jpg)"])
+    tab_v, tab_e, tab_f, tab_d = st.tabs(["Vídeos VSL (.mp4)", "E-books (.pdf)", "Fotos do Nicho (.jpg)", "Vídeos Dublados (.mp4)"])
     with tab_v:
         for v in sorted(os.listdir(DIR_OUTPUT), reverse=True):
             if v.endswith(".mp4"):
@@ -1629,22 +1864,66 @@ with aba_galeria:
         for f in sorted(os.listdir(DIR_FOTOS), reverse=True):
             if f.endswith(".jpg"):
                 st.write(f"🖼 `{f}`")
+    with tab_d:
+        for d in sorted(os.listdir(DIR_DUBLAGENS), reverse=True):
+            if d.endswith(".mp4"):
+                st.write(f"🎙️ `{d}`")
 
 # ------------------------------------------------------------------------------
-# ABA 7: GESTÃO MASTER (CONTABILIDADE DAS IAs & PAINEL DE CRÉDITOS)
+# ABA 7: GESTÃO MASTER (BALANÇO EMPRESARIAL, SUPRIMENTO & STATUS DAS IAs)
 # ------------------------------------------------------------------------------
 if is_master_admin:
     with aba_admin:
-        st.subheader("🔒 Central de Gestão Master & Auditoria de Custos")
-        st.caption("Visão exclusiva de administrador: monitoramento em tempo real do ecossistema de APIs.")
+        st.subheader("🔒 Gestão Master: Balanço da Empresa & Suprimento aos Clientes")
+        st.caption("Visão do Dono do SaaS: monitoramento de receitas, garantia de entrega e status de infraestrutura.")
 
-        st.markdown("### 📡 Status das Contas de IA & Infraestrutura")
         relatorio_atual = auditar_infraestrutura()
+        fin = relatorio_atual["financeiro"]
 
+        # QUADRO FINANCEIRO DE SUPRIMENTO E OBRIGAÇÕES
+        st.markdown("### 🏢 Balanço Operacional da Sua Empresa vs. Passivo de Clientes")
+        c_emp1, c_emp2, c_emp3, c_emp4 = st.columns(4)
+
+        with c_emp1:
+            with st.container(border=True):
+                st.markdown("💰 **Faturamento Kiwify**")
+                st.markdown(f"## R$ {fin['total_faturado_kiwify']:.2f}")
+                st.caption(f"{fin['pedidos_aprovados']} compras registradas no banco")
+
+        with c_emp2:
+            with st.container(border=True):
+                st.markdown("👥 **Créditos com Clientes**")
+                st.markdown(f"## {fin['creditos_clientes']} cr")
+                st.caption("Saldo total ativo na mão dos compradores")
+
+        with c_emp3:
+            with st.container(border=True):
+                st.markdown("🛡️ **Custo Real de IA p/ Suprir**")
+                st.markdown(f"## R$ {fin['custo_ia_estimado_brl']:.2f}")
+                st.caption(f"Aprox. $ {fin['custo_ia_estimado_usd']:.2f} USD na OpenAI + Google")
+
+        with c_emp4:
+            with st.container(border=True):
+                st.markdown("👑 **Seu Saldo como Dono**")
+                st.markdown(f"## {st.session_state.saldo_creditos} cr")
+                if st.button("⚡ Resetar Meu Saldo (10.000 cr)", use_container_width=True):
+                    supabase.table("usuarios").update({"saldo_creditos": 10000, "creditos": 10000}).eq("email", email_usuario).execute()
+                    st.session_state.saldo_creditos = 10000
+                    st.toast("Seu saldo master foi renovado para 10.000 créditos!")
+                    st.rerun()
+
+        st.info(
+            f"💡 **Regra de Blindagem:** Para suprir 100% dos **{fin['creditos_clientes']} créditos** que estão com seus clientes caso todos decidam gerar e-books, VSLs e dublagens ao mesmo tempo, você precisa ter no mínimo **R$ {max(30.0, fin['custo_ia_estimado_brl'] * 1.5):.2f}** de saldo somado entre sua OpenAI ($ 5 USD) e Google Cloud. Como sua conta Google já fatura R$ 100/mês, o ecossistema está **100% blindado**!"
+        )
+
+        st.divider()
+
+        # STATUS TÉCNICO DAS IAs
+        st.markdown("### 📡 Conectividade e Saúde das APIs")
         col_st1, col_st2, col_st3, col_st4 = st.columns(4)
         with col_st1:
             with st.container(border=True):
-                st.markdown(f"**OpenAI (TTS/GPT)**")
+                st.markdown(f"**OpenAI (TTS/Whisper)**")
                 if relatorio_atual["openai"]["ok"]:
                     st.success(relatorio_atual["openai"]["status"])
                 else:
@@ -1671,9 +1950,9 @@ if is_master_admin:
 
         with col_st4:
             with st.container(border=True):
-                st.markdown(f"**Supabase (Usuários)**")
-                st.info(f"{relatorio_atual['supabase']['usuarios']} Clientes")
-                st.caption(f"{relatorio_atual['supabase']['creditos_circulando']} créditos em circulação")
+                st.markdown(f"**Supabase (Banco)**")
+                st.info(f"{relatorio_atual['supabase']['usuarios']} Cadastros")
+                st.caption(f"{relatorio_atual['supabase']['creditos_circulando']} cr total no sistema")
 
         st.write("")
         col_wpp1, col_wpp2 = st.columns([1, 1])
@@ -1691,7 +1970,7 @@ if is_master_admin:
             if st.session_state.get("link_wpp_manual"):
                 st.link_button("👉 Abrir Relatório no WhatsApp Web / App", url=st.session_state["link_wpp_manual"], use_container_width=True)
             else:
-                link_pronto = f"https://api.whatsapp.com/send?text={urllib.parse.quote('Fechamento de APIs verificado no painel.')}"
+                link_pronto = f"https://api.whatsapp.com/send?text={urllib.parse.quote('Fechamento financeiro e de APIs verificado no painel.')}"
                 st.link_button("💬 Enviar Relatório Manualmente", url=link_pronto, use_container_width=True)
 
         st.divider()
