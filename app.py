@@ -435,6 +435,66 @@ def extrair_termo_broll_ia(frase: str, perfil_personagem: str = "") -> str:
         return "business lifestyle"
 
 # ==============================================================================
+# SÍNTESE DE VSL A PARTIR DOS DADOS DO E-BOOK APROVADO
+# ==============================================================================
+def gerar_roteiro_vsl_de_ebook(dados_ebook: dict) -> list[str]:
+    titulo = dados_ebook.get("titulo", "")
+    subtitulo = dados_ebook.get("subtitulo", "")
+    intro = dados_ebook.get("introducao", "")[:350]
+    modulos = [c.get("titulo", "") for c in dados_ebook.get("capitulos", [])]
+
+    prompt = f"""
+    Atue como copywriter de resposta direta de alta conversão.
+    Crie um roteiro de VSL de 5 frases magnéticas para vender o infoproduto:
+    - Título: {titulo}
+    - Subtítulo: {subtitulo}
+    - Problema / Diagnóstico: {intro}
+    - Conteúdo dos Módulos: {', '.join(modulos)}
+
+    ESTRUTURA DAS 5 FRASES DE ALTA RETENÇÃO:
+    Frase 1 (Quebra de Padrão): Pergunta ou afirmação chocante expondo o erro do público.
+    Frase 2 (Agitação do Problema): Mostra por que continuar no erro custa caro.
+    Frase 3 (Apresentação do Mecanismo): Revela que o método prático de '{titulo}' resolve isso sem enrolação.
+    Frase 4 (Entrega Prática): Cita que ele recebe checklists e passos prontos para executar imediatamente.
+    Frase 5 (Chamada para Ação): Convite direto para tocar no link abaixo e garantir o manual agora.
+
+    Retorne APENAS as 5 frases, exatamente uma por linha, sem títulos, numeração ou aspas.
+    """
+    if GEMINI_API_KEY:
+        try:
+            client_g = genai.Client(api_key=GEMINI_API_KEY)
+            resp = client_g.models.generate_content(
+                model="gemini-3.8-flash",
+                contents=prompt
+            )
+            linhas = [l.strip() for l in resp.text.strip().split("\n") if l.strip() and not l.strip().startswith("#")]
+            if len(linhas) >= 3:
+                return linhas[:5]
+        except Exception:
+            pass
+
+    if OPENAI_API_KEY:
+        try:
+            client_o = OpenAI(api_key=OPENAI_API_KEY)
+            resp = client_o.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.7
+            )
+            linhas = [l.strip() for l in resp.choices[0].message.content.strip().split("\n") if l.strip()]
+            return linhas[:5]
+        except Exception:
+            pass
+
+    return [
+        f"Você continua perdendo tempo tentando acertar no mercado sem um método validado?",
+        f"O grande erro da maioria é seguir dicas soltas que não ensinam o processo operacional.",
+        f"Por isso criamos o {titulo}, um manual prático focado em execução direta.",
+        f"Você terá em mãos checklists detalhados e o passo a passo exato para aplicar hoje.",
+        f"Toque no link abaixo agora mesmo e faça o download do material completo."
+    ]
+
+# ==============================================================================
 # MOTOR DE E-BOOK EM PIPELINE MODULAR (MANUAL OPERACIONAL DE ALTA DENSIDADE)
 # ==============================================================================
 def gerar_conteudo_ebook_gemini(nicho_produto: str, publico: str, promessa_angulo: str) -> dict:
@@ -460,18 +520,22 @@ def gerar_conteudo_ebook_gemini(nicho_produto: str, publico: str, promessa_angul
     client = genai.Client(api_key=chave_gemini)
     modelo_ativo = "gemini-3.8-flash"
 
-    # FASE 1: ARQUITETURA ESTRATÉGICA, GANCHOS E DIRETRIZES
+    # FASE 1: ARQUITETURA ESTRATÉGICA, GANCHOS E DIRETRIZES FOTOGRÁFICAS
     prompt_base = f"""
     Atue como estrategista sênior de infoprodutos e autoridade técnica internacional.
     Estruture a arquitetura de um MANUAL OPERACIONAL DE EXECUÇÃO PRÁTICA sobre: "{nicho_produto}".
     Público-Alvo: "{publico}".
     Promessa / Mecanismo: "{promessa_angulo}".
 
+    DIRETRIZES FOTOGRÁFICAS PARA O BANCO PEXELS:
+    - Se for culinária/comida, use termos vibrantes como: 'colorful gourmet plating', 'fresh vibrant ingredients flatlay', 'chef food styling close up'.
+    - Se for negócios/digital, use termos como: 'modern executive workplace', 'financial analytics workstation'.
+
     Retorne ESTRITAMENTE um JSON estruturado com o seguinte esquema:
     {{
       "titulo": "Título Comercial Magnético e Direto",
       "subtitulo": "Subtítulo Persuasivo Focado em Tempo e Resultado",
-      "termo_capa": "termo em ingles para foto realista de capa no Pexels (ex: modern financial office)",
+      "termo_capa": "termo em ingles para foto de capa realista no Pexels (2 a 4 palavras)",
       "introducao": "Texto longo da introdução com diagnóstico cru, quebra de mitos e a razão técnica de funcionamento (mínimo 250 palavras)...",
       "ementa_modulos": [
         {{
@@ -490,7 +554,7 @@ def gerar_conteudo_ebook_gemini(nicho_produto: str, publico: str, promessa_angul
           "numero": 3,
           "titulo": "Scripts, Modelos e Templates Copia-e-Cola",
           "termo_foto": "termo em ingles para foto profissional no Pexels",
-          "foco_operacional": "Modelos prontos de scripts, mensagens de abordagem, ofertas ou anúncios para preencher e usar"
+          "foco_operacional": "Modelos prontos de scripts, mensagens de abordagem, ofertas ou receitas para preencher e usar"
         }},
         {{
           "numero": 4,
@@ -557,14 +621,14 @@ def gerar_conteudo_ebook_gemini(nicho_produto: str, publico: str, promessa_angul
         capitulos_processados.append({
             "numero": num,
             "titulo": tit,
-            "termo_busca_foto": mod.get("termo_foto", "business technology office"),
+            "termo_busca_foto": mod.get("termo_foto", "colorful gourmet food presentation"),
             "conteudo": conteudo_capitulo
         })
 
     return {
         "titulo": dados_base.get("titulo", "MANUAL DE IMPLEMENTAÇÃO PRÁTICA"),
         "subtitulo": dados_base.get("subtitulo", "Guia Técnico Passo a Passo"),
-        "termo_capa": dados_base.get("termo_capa", "executive business meeting"),
+        "termo_capa": dados_base.get("termo_capa", "vibrant colorful culinary gourmet presentation"),
         "introducao": dados_base.get("introducao", ""),
         "capitulos": capitulos_processados
     }
@@ -641,7 +705,7 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_saida: st
         pdf.set_text_color(203, 213, 225)
         pdf.multi_cell(0, 7, sanitizar_pdf(subtitulo), align="L")
 
-    termo_capa = dados.get("termo_capa") or "modern office corporate"
+    termo_capa = dados.get("termo_capa") or "vibrant gourmet food presentation"
     foto_capa = baixar_foto_nicho_pexels(termo_capa, pexels_key, "capa")
     if foto_capa and os.path.exists(foto_capa):
         pdf.ln(8)
@@ -686,7 +750,7 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_saida: st
         pdf.cell(0, 10, sanitizar_pdf(f" MÓDULO {num}: {tit.upper()}"), ln=True)
         pdf.ln(6)
 
-        termo_cap = cap.get("termo_busca_foto") or "professional business strategy"
+        termo_cap = cap.get("termo_busca_foto") or "colorful culinary dish plating"
         foto_cap = baixar_foto_nicho_pexels(termo_cap, pexels_key, f"cap_{num}")
         if foto_cap and os.path.exists(foto_cap):
             y_img = pdf.get_y()
@@ -1039,7 +1103,7 @@ with aba_vsl:
     if st.session_state.get("video_pronto") and os.path.exists(st.session_state["video_pronto"]):
         st.video(st.session_state["video_pronto"])
         with open(st.session_state["video_pronto"], "rb") as f:
-            st.download_button("⬇️️ Baixar Vídeo MP4", f, file_name=os.path.basename(st.session_state["video_pronto"]), mime="video/mp4")
+            st.download_button("⬇ Baixar Vídeo MP4", f, file_name=os.path.basename(st.session_state["video_pronto"]), mime="video/mp4")
 
 # ------------------------------------------------------------------------------
 # ABA 2: E-BOOK PROFISSIONAL COM FOTOS REAIS DO NICHO (MOTOR GEMINI PIPELINE)
@@ -1093,7 +1157,7 @@ with aba_ebook:
         col_t1, col_t2 = st.columns([1, 1])
         with col_t1:
             tit_edit = st.text_input("Título do Livro:", value=st.session_state.get("in_eb_tit", eb_atual.get("titulo", "")), key="in_eb_tit")
-            termo_capa_edit = st.text_input("Foto da Capa (Termo em Inglês no Pexels):", value=st.session_state.get("in_eb_capa_term", eb_atual.get("termo_capa", "business strategy")), key="in_eb_capa_term")
+            termo_capa_edit = st.text_input("Foto da Capa (Termo em Inglês no Pexels):", value=st.session_state.get("in_eb_capa_term", eb_atual.get("termo_capa", "vibrant gourmet food presentation")), key="in_eb_capa_term")
         with col_t2:
             sub_edit = st.text_input("Subtítulo Persuasivo:", value=st.session_state.get("in_eb_sub", eb_atual.get("subtitulo", "")), key="in_eb_sub")
 
@@ -1107,7 +1171,7 @@ with aba_ebook:
                 with c_m1:
                     t_cap = st.text_input(f"Título do Módulo {c_idx+1}:", value=st.session_state.get(f"t_cap_mod_{c_idx}", cap.get("titulo", "")), key=f"t_cap_mod_{c_idx}")
                 with c_m2:
-                    foto_term = st.text_input(f"Termo da Foto (Pexels):", value=st.session_state.get(f"foto_cap_mod_{c_idx}", cap.get("termo_busca_foto", "workplace success")), key=f"foto_cap_mod_{c_idx}")
+                    foto_term = st.text_input(f"Termo da Foto (Pexels):", value=st.session_state.get(f"foto_cap_mod_{c_idx}", cap.get("termo_busca_foto", "colorful culinary dish plating")), key=f"foto_cap_mod_{c_idx}")
                 txt_cap = st.text_area(f"Conteúdo do Módulo {c_idx+1}:", value=st.session_state.get(f"txt_cap_mod_{c_idx}", cap.get("conteudo", "")), height=220, key=f"txt_cap_mod_{c_idx}")
                 caps_editados.append({
                     "numero": c_idx+1,
@@ -1137,6 +1201,7 @@ with aba_ebook:
                 disparar_comemoracao()
                 st.rerun()
 
+    # ÁREA DE DOWNLOAD DO PDF E GERAÇÃO DIRETA DE VSL COM OS MESMOS DADOS
     if st.session_state.get("pdf_pronto") and os.path.exists(st.session_state["pdf_pronto"]):
         st.success(f"✅ Arquivo compilado com fotos e diagramação completa: `{st.session_state.get('pdf_nome')}`")
         with open(st.session_state["pdf_pronto"], "rb") as f:
@@ -1148,6 +1213,76 @@ with aba_ebook:
                 type="primary",
                 use_container_width=True
             )
+
+        st.markdown("---")
+        st.markdown("### 🎬 Criar e Renderizar VSL de Vendas Deste E-book")
+        st.caption("Converta instantaneamente o conteúdo, promessa e ganchos deste e-book em um vídeo de alta conversão sincronizado com voz e cenas.")
+
+        col_vsl_eb1, col_vsl_eb2 = st.columns([1, 1])
+
+        with col_vsl_eb1:
+            if st.button("⚡ Gerar e Renderizar VSL Agora (20 Créditos)", type="primary", use_container_width=True):
+                agora_vsl_eb = time.time()
+                if agora_vsl_eb - st.session_state.get("_ultimo_click_vsl_eb", 0) < 15:
+                    st.warning("⏳ Renderização em processamento. Aguarde alguns instantes.")
+                    st.stop()
+                st.session_state["_ultimo_click_vsl_eb"] = agora_vsl_eb
+
+                if not debitar_creditos_cloud(email_usuario, f"VSL Direta do E-book ({st.session_state['eb_dados_sessao'].get('titulo', '')[:25]})", 20):
+                    st.error("❌ Saldo insuficiente! Você precisa de 20 créditos para renderizar esta VSL.")
+                else:
+                    with st.spinner("🤖 Gerando roteiro magnético e renderizando VSL sincronizada com FFmpeg..."):
+                        frases_ebook = gerar_roteiro_vsl_de_ebook(st.session_state["eb_dados_sessao"])
+                        st.session_state["roteiro"] = frases_ebook
+
+                        p_musica = os.path.join(DIR_MUSICAS, musica_up.name) if musica_up else None
+                        if musica_up:
+                            with open(p_musica, "wb") as f:
+                                f.write(musica_up.getbuffer())
+
+                        p_logo = os.path.join(DIR_LOGOS, logo_up.name) if logo_up else None
+                        if logo_up:
+                            with open(p_logo, "wb") as f:
+                                f.write(logo_up.getbuffer())
+
+                        prog_eb_vsl = st.progress(0.0)
+                        v_eb_final = renderizar_vsl_completa(
+                            frases=frases_ebook,
+                            vertical=is_vertical,
+                            voz=vozes[voz_sel],
+                            pexels_key=PEXELS_API_KEY,
+                            musica_fundo_path=p_musica,
+                            volume_musica=vol_musica,
+                            logo_path=p_logo,
+                            progress_bar=prog_eb_vsl
+                        )
+                        st.session_state["vsl_ebook_pronta"] = v_eb_final
+                        st.session_state["video_pronto"] = v_eb_final
+                        disparar_comemoracao()
+                        st.success("✅ VSL do E-book gerada e renderizada com sucesso!")
+                        st.rerun()
+
+        with col_vsl_eb2:
+            if st.button("📝 Carregar Roteiro na Aba VSL para Editar (0 Créditos)", use_container_width=True):
+                frases_ebook = gerar_roteiro_vsl_de_ebook(st.session_state["eb_dados_sessao"])
+                st.session_state["roteiro"] = frases_ebook
+                st.session_state["prod_nome"] = st.session_state["eb_dados_sessao"].get("titulo", "")
+                st.session_state["pub_nome"] = st.session_state["eb_dados_sessao"].get("subtitulo", "")
+                st.session_state["ang_nome"] = st.session_state["eb_dados_sessao"].get("introducao", "")[:100]
+                st.success("✅ Roteiro gerado e carregado na aba '🚀 Criar VSL'! Você pode revisá-lo lá agora.")
+
+        if st.session_state.get("vsl_ebook_pronta") and os.path.exists(st.session_state["vsl_ebook_pronta"]):
+            st.markdown("#### 🎥 VSL de Vendas Produzida:")
+            st.video(st.session_state["vsl_ebook_pronta"])
+            with open(st.session_state["vsl_ebook_pronta"], "rb") as f_vsl_eb:
+                st.download_button(
+                    label="⬇️ Baixar VSL do E-book (.mp4)",
+                    data=f_vsl_eb,
+                    file_name=os.path.basename(st.session_state["vsl_ebook_pronta"]),
+                    mime="video/mp4",
+                    type="primary",
+                    use_container_width=True
+                )
 
 # ------------------------------------------------------------------------------
 # ABA 3: RADAR (MINERAÇÃO DE MERCADO)
