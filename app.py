@@ -238,7 +238,7 @@ def auditar_infraestrutura() -> dict:
         "supabase": {"status": "Operacional", "usuarios": 0, "creditos_circulando": 0, "ok": True}
     }
 
-    # 1. Checagem OpenAI (Status e Conectividade)
+    # 1. Checagem OpenAI
     if OPENAI_API_KEY:
         try:
             client_oai = OpenAI(api_key=OPENAI_API_KEY)
@@ -251,7 +251,7 @@ def auditar_infraestrutura() -> dict:
             else:
                 relatorio["openai"] = {"status": "Instável / Erro", "detalhes": msg_e[:40], "ok": False}
 
-    # 2. Checagem ElevenLabs (Saldo de Caracteres Exato)
+    # 2. Checagem ElevenLabs
     if ELEVENLABS_API_KEY:
         try:
             r_eleven = requests.get(
@@ -276,15 +276,38 @@ def auditar_infraestrutura() -> dict:
     else:
         relatorio["elevenlabs"] = {"status": "Não Vinculada", "detalhes": "Inserir em Secrets se for utilizar", "ok": True}
 
-    # 3. Checagem Gemini (Google AI)
+    # 3. Checagem Gemini (Google AI) com Modelos Oficiais e Conta Faturada
     if GEMINI_API_KEY:
         try:
             client_g = genai.Client(api_key=GEMINI_API_KEY)
-            resp_g = client_g.models.generate_content(model="gemini-3.8-flash", contents="ok")
-            if resp_g and resp_g.text:
-                relatorio["gemini"] = {"status": "100% Operacional", "detalhes": "Tier Ativo e Respondendo", "ok": True}
+            modelo_sucesso = None
+            for m in ["gemini-2.5-flash", "gemini-1.5-flash"]:
+                try:
+                    resp_g = client_g.models.generate_content(model=m, contents="ping")
+                    if resp_g and resp_g.text:
+                        modelo_sucesso = m
+                        break
+                except Exception:
+                    continue
+
+            if modelo_sucesso:
+                relatorio["gemini"] = {
+                    "status": "100% Operacional",
+                    "detalhes": f"Ativo ({modelo_sucesso})",
+                    "ok": True
+                }
+            else:
+                relatorio["gemini"] = {
+                    "status": "Limite / Alerta",
+                    "detalhes": "Cota excedida ou endpoint instável",
+                    "ok": False
+                }
         except Exception as e:
-            relatorio["gemini"] = {"status": "Limite / Alerta", "detalhes": str(e)[:40], "ok": False}
+            relatorio["gemini"] = {
+                "status": "Erro de Autenticação",
+                "detalhes": str(e)[:35],
+                "ok": False
+            }
 
     # 4. Checagem Supabase
     try:
@@ -320,7 +343,7 @@ def disparar_relatorio_whatsapp(relatorio: dict) -> tuple[bool, str]:
             res = requests.get(url_wpp, timeout=12)
             if res.status_code == 200:
                 return True, "Mensagem enviada com sucesso para o seu WhatsApp!"
-        except Exception as e:
+        except Exception:
             pass
 
     link_manual = f"https://api.whatsapp.com/send?text={urllib.parse.quote(msg)}"
@@ -402,7 +425,7 @@ def minerar_buscas_fallback_ia(termo_semente: str, plataforma: str) -> list[str]
         try:
             client_g = genai.Client(api_key=GEMINI_API_KEY)
             resp = client_g.models.generate_content(
-                model="gemini-3.8-flash",
+                model="gemini-2.5-flash",
                 contents=prompt,
                 config={"response_mime_type": "application/json"}
             )
@@ -475,7 +498,7 @@ def analisar_oportunidades_ia(buscas: list[str], plataforma: str) -> list[dict]:
         try:
             client_g = genai.Client(api_key=GEMINI_API_KEY)
             resp = client_g.models.generate_content(
-                model="gemini-3.8-flash",
+                model="gemini-2.5-flash",
                 contents=prompt,
                 config={"response_mime_type": "application/json"}
             )
@@ -573,7 +596,7 @@ def gerar_roteiro_vsl_de_ebook(dados_ebook: dict) -> list[str]:
     if GEMINI_API_KEY:
         try:
             client_g = genai.Client(api_key=GEMINI_API_KEY)
-            resp = client_g.models.generate_content(model="gemini-3.8-flash", contents=prompt)
+            resp = client_g.models.generate_content(model="gemini-2.5-flash", contents=prompt)
             linhas = [l.strip() for l in resp.text.strip().split("\n") if l.strip() and not l.strip().startswith("#")]
             if len(linhas) >= 3:
                 return linhas[:5]
@@ -625,7 +648,7 @@ def gerar_conteudo_ebook_gemini(nicho_produto: str, publico: str, promessa_angul
         return json.loads(r_oai.choices[0].message.content)
 
     client = genai.Client(api_key=chave_gemini)
-    modelo_ativo = "gemini-3.8-flash"
+    modelo_ativo = "gemini-2.5-flash"
 
     prompt_base = f"""
     Atue como autor de livros técnicos de excelência e estrategista de infoprodutos.
@@ -673,7 +696,7 @@ def gerar_conteudo_ebook_gemini(nicho_produto: str, publico: str, promessa_angul
     """
 
     dados_base = None
-    modelos_disponiveis = ["gemini-3.8-flash", "gemini-3.1-pro", "gemini-3.5-flash-lite"]
+    modelos_disponiveis = ["gemini-2.5-flash", "gemini-1.5-flash"]
 
     for mod in modelos_disponiveis:
         try:
@@ -1589,7 +1612,7 @@ with aba_galeria:
     with tab_f:
         for f in sorted(os.listdir(DIR_FOTOS), reverse=True):
             if f.endswith(".jpg"):
-                st.write(f"🖼️ `{f}`")
+                st.write(f"🖼️️ `{f}`")
 
 # ------------------------------------------------------------------------------
 # ABA 7: GESTÃO MASTER (CONTABILIDADE DAS IAs & PAINEL DE CRÉDITOS)
