@@ -59,17 +59,26 @@ def limpar_url_supabase(url_bruta: str) -> str:
     parsed = urllib.parse.urlparse(u)
     return f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
 
-OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY", "")).strip()
-GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY", "")).strip()
-PEXELS_API_KEY = st.secrets.get("PEXELS_API_KEY", os.getenv("PEXELS_API_KEY", "")).strip()
-ELEVENLABS_API_KEY = st.secrets.get("ELEVENLABS_API_KEY", os.getenv("ELEVENLABS_API_KEY", "")).strip()
+OPENAI_API_KEY = str(st.secrets.get("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY") or "").strip().strip('"').strip("'")
 
-WHATSAPP_NUMERO = st.secrets.get("WHATSAPP_NUMERO", os.getenv("WHATSAPP_NUMERO", "")).strip()
-CALLMEBOT_API_KEY = st.secrets.get("CALLMEBOT_API_KEY", os.getenv("CALLMEBOT_API_KEY", "")).strip()
+# Suporte tanto para GEMINI_API_KEY quanto para GOOGLE_API_KEY
+GEMINI_API_KEY = str(
+    st.secrets.get("GEMINI_API_KEY") or 
+    st.secrets.get("GOOGLE_API_KEY") or 
+    os.getenv("GEMINI_API_KEY") or 
+    os.getenv("GOOGLE_API_KEY") or 
+    ""
+).strip().strip('"').strip("'")
+
+PEXELS_API_KEY = str(st.secrets.get("PEXELS_API_KEY") or os.getenv("PEXELS_API_KEY") or "").strip().strip('"').strip("'")
+ELEVENLABS_API_KEY = str(st.secrets.get("ELEVENLABS_API_KEY") or os.getenv("ELEVENLABS_API_KEY") or "").strip().strip('"').strip("'")
+
+WHATSAPP_NUMERO = str(st.secrets.get("WHATSAPP_NUMERO") or os.getenv("WHATSAPP_NUMERO") or "").strip()
+CALLMEBOT_API_KEY = str(st.secrets.get("CALLMEBOT_API_KEY") or os.getenv("CALLMEBOT_API_KEY") or "").strip()
 
 _url_lida = st.secrets.get("SUPABASE_URL", os.getenv("SUPABASE_URL", "https://vzelyaubnynefsfumhtz.supabase.co"))
 SUPABASE_URL = limpar_url_supabase(_url_lida)
-SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", os.getenv("SUPABASE_KEY", "")).strip()
+SUPABASE_KEY = str(st.secrets.get("SUPABASE_KEY") or os.getenv("SUPABASE_KEY") or "").strip()
 
 SENHA_MESTRE_ADMIN = st.secrets.get("ADMIN_KEY", "admin2026vsl")
 
@@ -276,38 +285,47 @@ def auditar_infraestrutura() -> dict:
     else:
         relatorio["elevenlabs"] = {"status": "Não Vinculada", "detalhes": "Inserir em Secrets se for utilizar", "ok": True}
 
-    # 3. Checagem Gemini (Google AI) com Modelos Oficiais e Conta Faturada
+    # 3. Checagem Gemini (Google AI) via Consulta Direta de Modelos (Sem Falsos Alertas)
     if GEMINI_API_KEY:
         try:
-            client_g = genai.Client(api_key=GEMINI_API_KEY)
-            modelo_sucesso = None
-            for m in ["gemini-2.5-flash", "gemini-1.5-flash"]:
-                try:
-                    resp_g = client_g.models.generate_content(model=m, contents="ping")
-                    if resp_g and resp_g.text:
-                        modelo_sucesso = m
+            url_g = f"https://generativelanguage.googleapis.com/v1beta/models?key={GEMINI_API_KEY}"
+            resp_g = requests.get(url_g, timeout=8)
+            if resp_g.status_code == 200:
+                dados_m = resp_g.json().get("models", [])
+                nomes_mod = [m.get("name", "").replace("models/", "") for m in dados_m]
+                
+                # Seleciona o melhor modelo disponível na conta faturada
+                modelo_ativo = "gemini-1.5-flash"
+                for pref in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]:
+                    if pref in nomes_mod:
+                        modelo_ativo = pref
                         break
-                except Exception:
-                    continue
 
-            if modelo_sucesso:
                 relatorio["gemini"] = {
                     "status": "100% Operacional",
-                    "detalhes": f"Ativo ({modelo_sucesso})",
+                    "detalhes": f"Ativo ({modelo_ativo})",
                     "ok": True
                 }
             else:
+                err_data = resp_g.json().get("error", {})
+                msg_err = err_data.get("message") or f"HTTP {resp_g.status_code}"
                 relatorio["gemini"] = {
-                    "status": "Limite / Alerta",
-                    "detalhes": "Cota excedida ou endpoint instável",
+                    "status": "Erro na API",
+                    "detalhes": msg_err[:40],
                     "ok": False
                 }
         except Exception as e:
             relatorio["gemini"] = {
-                "status": "Erro de Autenticação",
+                "status": "Falha de Rede",
                 "detalhes": str(e)[:35],
                 "ok": False
             }
+    else:
+        relatorio["gemini"] = {
+            "status": "Chave Ausente",
+            "detalhes": "Configure GEMINI_API_KEY nos Secrets",
+            "ok": False
+        }
 
     # 4. Checagem Supabase
     try:
@@ -425,7 +443,7 @@ def minerar_buscas_fallback_ia(termo_semente: str, plataforma: str) -> list[str]
         try:
             client_g = genai.Client(api_key=GEMINI_API_KEY)
             resp = client_g.models.generate_content(
-                model="gemini-2.5-flash",
+                model="gemini-1.5-flash",
                 contents=prompt,
                 config={"response_mime_type": "application/json"}
             )
@@ -498,7 +516,7 @@ def analisar_oportunidades_ia(buscas: list[str], plataforma: str) -> list[dict]:
         try:
             client_g = genai.Client(api_key=GEMINI_API_KEY)
             resp = client_g.models.generate_content(
-                model="gemini-2.5-flash",
+                model="gemini-1.5-flash",
                 contents=prompt,
                 config={"response_mime_type": "application/json"}
             )
@@ -596,7 +614,7 @@ def gerar_roteiro_vsl_de_ebook(dados_ebook: dict) -> list[str]:
     if GEMINI_API_KEY:
         try:
             client_g = genai.Client(api_key=GEMINI_API_KEY)
-            resp = client_g.models.generate_content(model="gemini-2.5-flash", contents=prompt)
+            resp = client_g.models.generate_content(model="gemini-1.5-flash", contents=prompt)
             linhas = [l.strip() for l in resp.text.strip().split("\n") if l.strip() and not l.strip().startswith("#")]
             if len(linhas) >= 3:
                 return linhas[:5]
@@ -628,9 +646,7 @@ def gerar_roteiro_vsl_de_ebook(dados_ebook: dict) -> list[str]:
 # MOTOR DE E-BOOK EM PIPELINE MODULAR (ALTA DENSIDADE E VOLUME REAL DE LIVRO)
 # ==============================================================================
 def gerar_conteudo_ebook_gemini(nicho_produto: str, publico: str, promessa_angulo: str) -> dict:
-    chave_gemini = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY", "")).strip()
-
-    if not chave_gemini:
+    if not GEMINI_API_KEY:
         if not OPENAI_API_KEY:
             raise ValueError("Nenhuma chave válida configurada (GEMINI_API_KEY ou OPENAI_API_KEY).")
         client_oai = OpenAI(api_key=OPENAI_API_KEY)
@@ -647,8 +663,8 @@ def gerar_conteudo_ebook_gemini(nicho_produto: str, publico: str, promessa_angul
         )
         return json.loads(r_oai.choices[0].message.content)
 
-    client = genai.Client(api_key=chave_gemini)
-    modelo_ativo = "gemini-2.5-flash"
+    client = genai.Client(api_key=GEMINI_API_KEY)
+    modelo_ativo = "gemini-1.5-flash"
 
     prompt_base = f"""
     Atue como autor de livros técnicos de excelência e estrategista de infoprodutos.
@@ -696,7 +712,7 @@ def gerar_conteudo_ebook_gemini(nicho_produto: str, publico: str, promessa_angul
     """
 
     dados_base = None
-    modelos_disponiveis = ["gemini-2.5-flash", "gemini-1.5-flash"]
+    modelos_disponiveis = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-pro"]
 
     for mod in modelos_disponiveis:
         try:
@@ -713,7 +729,7 @@ def gerar_conteudo_ebook_gemini(nicho_produto: str, publico: str, promessa_angul
             continue
 
     if not dados_base:
-        raise RuntimeError("Não foi possível conectar aos modelos Gemini ativos.")
+        raise RuntimeError("Não foi possível gerar conteúdo via Gemini. Verifique a chave nos Secrets.")
 
     capitulos_processados = []
 
@@ -1612,7 +1628,7 @@ with aba_galeria:
     with tab_f:
         for f in sorted(os.listdir(DIR_FOTOS), reverse=True):
             if f.endswith(".jpg"):
-                st.write(f"🖼️️ `{f}`")
+                st.write(f"🖼 `{f}`")
 
 # ------------------------------------------------------------------------------
 # ABA 7: GESTÃO MASTER (CONTABILIDADE DAS IAs & PAINEL DE CRÉDITOS)
