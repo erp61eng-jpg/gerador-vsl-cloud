@@ -103,6 +103,8 @@ if "saved_email" not in st.session_state:
     st.session_state.saved_email = "ricardopintoedson@gmail.com"
 if "saldo_creditos" not in st.session_state:
     st.session_state.saldo_creditos = 0
+if "total_compras" not in st.session_state:
+    st.session_state.total_compras = 0
 
 # ==============================================================================
 # TELA DE ENTRADA / LOGIN
@@ -154,9 +156,9 @@ else:
     email_usuario = st.session_state.saved_email
 
 # ==============================================================================
-# SINCRONIZAÇÃO DE SALDO COM SUPABASE
+# SINCRONIZAÇÃO DE SALDO E HISTÓRICO COM SUPABASE
 # ==============================================================================
-def carregar_saldo(email: str) -> int:
+def carregar_dados_usuario(email: str) -> tuple[int, int]:
     try:
         resposta = supabase.table("usuarios").select("*").eq("email", email).execute()
         dados_lista = getattr(resposta, "data", [])
@@ -167,14 +169,16 @@ def carregar_saldo(email: str) -> int:
                 "email": email,
                 "saldo_creditos": saldo_inicial,
                 "creditos": saldo_inicial,
-                "total_compras": 1
+                "total_compras": 0
             }]).execute()
-            return saldo_inicial
+            return saldo_inicial, 0
 
         usr = dados_lista[0]
         saldo = usr.get("saldo_creditos")
         if saldo is None:
             saldo = usr.get("creditos", 0)
+
+        compras = int(usr.get("total_compras", 0) or 0)
 
         if email in ["ricardopintoedson@gmail.com", "erp61eng@gmail.com"] and (saldo is None or int(saldo) <= 0):
             saldo = 300
@@ -182,11 +186,13 @@ def carregar_saldo(email: str) -> int:
                 supabase.table("usuarios").update({"saldo_creditos": 300, "creditos": 300}).eq("email", email).execute()
             except Exception:
                 pass
-        return int(saldo or 0)
+        return int(saldo or 0), compras
     except Exception:
-        return 300 if email in ["ricardopintoedson@gmail.com", "erp61eng@gmail.com"] else 0
+        return (300 if email in ["ricardopintoedson@gmail.com", "erp61eng@gmail.com"] else 0), 0
 
-st.session_state.saldo_creditos = carregar_saldo(email_usuario)
+saldo_lido, compras_lidas = carregar_dados_usuario(email_usuario)
+st.session_state.saldo_creditos = saldo_lido
+st.session_state.total_compras = compras_lidas
 
 def debitar_creditos_cloud(email: str, operacao: str, custo: int) -> bool:
     email_limpo = str(email or "").strip().lower()
@@ -966,6 +972,7 @@ with st.sidebar:
         st.session_state.login_concluido = False
         st.session_state.saved_email = ""
         st.session_state.saldo_creditos = 0
+        st.session_state.total_compras = 0
         st.rerun()
 
     st.markdown("---")
@@ -1394,35 +1401,55 @@ with aba_dubfy:
             st.link_button("👑 ASSINAR PRO (R$ 219)", url=link_dub_pro, use_container_width=True)
 
 # ------------------------------------------------------------------------------
-# ABA 5: PLANOS & CHECKOUT DIRETO KIWIFY (RECARGAS VSL & E-BOOKS)
+# ABA 5: PLANOS & RECARGAS (COM BÔNUS DE 1ª COMPRA EM DOBRO)
 # ------------------------------------------------------------------------------
 with aba_planos:
     st.subheader("💎 Recargas Oficiais de Créditos (VSL & E-books)")
-    st.markdown("Adquira créditos para renderizar vídeos com FFmpeg, minerar o Radar e gerar e-books completos com o Gemini.")
 
     email_param = urllib.parse.quote(email_usuario.strip().lower())
     link_vsl_starter = f"https://pay.kiwify.com.br/8kCGDA3?email={email_param}"
     link_vsl_pro     = f"https://pay.kiwify.com.br/PkPTG8J?email={email_param}"
     link_vsl_vip     = f"https://pay.kiwify.com.br/4bqIXRN?email={email_param}"
 
+    eh_novato = st.session_state.get("total_compras", 0) == 0
+
+    if eh_novato:
+        st.markdown("""
+            <div style="background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); padding: 18px; border-radius: 12px; border: 2px solid #f59e0b; text-align: center; margin-bottom: 22px;">
+                <h3 style="color: #fbbf24; margin: 0; font-size: 22px; font-weight: 900;">🎁 BÔNUS DE BOAS-VINDAS: CRÉDITOS EM DOBRO NA 1ª COMPRA!</h3>
+                <p style="color: #ffffff; margin: 6px 0 0 0; font-size: 15px;">
+                    Identificamos que você ainda não realizou compras nesta conta. Qualquer pacote que escolher agora entregará automaticamente o <b>DOBRO DE CRÉDITOS</b>!
+                </p>
+            </div>
+        """, unsafe_allow_html=True)
+
     col_v1, col_v2, col_v3 = st.columns(3)
 
     with col_v1:
         with st.container(border=True):
-            st.markdown("### 🟢 Starter VSL\n## R$ 57,00\n**(160 créditos)**")
-            st.write("• 16 VSLs Curtas ou 8 Médias\n• 10 E-books operacionais com fotos\n• Mineração de Radar")
+            if eh_novato:
+                st.markdown("### 🟢 Starter VSL\n## R$ 57,00\n🔥 **320 CRÉDITOS** *(160 + 160 Bônus)*")
+            else:
+                st.markdown("### 🟢 Starter VSL\n## R$ 57,00\n**(160 créditos)**")
+            st.write("• VSLs Curtas e Médias\n• E-books operacionais com fotos\n• Mineração de Radar")
             st.link_button("💳 COMPRAR STARTER (R$ 57)", url=link_vsl_starter, use_container_width=True)
 
     with col_v2:
         with st.container(border=True):
-            st.markdown("### 🟡 Pro VSL\n## R$ 87,00\n**(300 créditos)**")
-            st.write("• 30 VSLs Curtas ou 15 Médias\n• 20 E-books operacionais com fotos\n• Suporte e prioridade na fila")
+            if eh_novato:
+                st.markdown("### 🟡 Pro VSL\n## R$ 87,00\n🔥 **600 CRÉDITOS** *(300 + 300 Bônus)*")
+            else:
+                st.markdown("### 🟡 Pro VSL\n## R$ 87,00\n**(300 créditos)**")
+            st.write("• Volume ideal para testes e validação\n• E-books com scripts e checklists\n• Fila prioritária de renderização")
             st.link_button("🚀 COMPRAR PRO (R$ 87)", url=link_vsl_pro, use_container_width=True, type="primary")
 
     with col_v3:
         with st.container(border=True):
-            st.markdown("### 🔴 VIP Escala\n## R$ 117,00\n**(500 créditos)**")
-            st.write("• 50 VSLs Curtas ou 25 Médias\n• 33 E-books operacionais com fotos\n• Renderização e IA ultrarrápidas")
+            if eh_novato:
+                st.markdown("### 🔴 VIP Escala\n## R$ 117,00\n🔥 **1.000 CRÉDITOS** *(500 + 500 Bônus)*")
+            else:
+                st.markdown("### 🔴 VIP Escala\n## R$ 117,00\n**(500 créditos)**")
+            st.write("• Escala máxima para infoprodutores\n• Produção em massa de VSLs e manuais\n• Processamento prioritário com IA")
             st.link_button("👑 ASSINAR VIP (R$ 117)", url=link_vsl_vip, use_container_width=True)
 
 # ------------------------------------------------------------------------------
