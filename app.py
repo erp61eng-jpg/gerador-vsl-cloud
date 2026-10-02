@@ -261,110 +261,119 @@ def gerar_roteiro_vsl_ia(nicho: str, promessa: str, publico: str, num_cenas: int
         ]
 
 def gerar_conteudo_ebook_ia(tema: str, publico: str) -> dict:
-    """Gera um manual técnico aprofundado, com receitas completas, medidas exatas e resolução de problemas."""
+    """Gera um manual técnico de alta autoridade, com densidade científica, receitas em gramas e resolução de falhas."""
     prompt = f"""
-    Atue como Mestre Padeiro Internacional, Engenheiro de Alimentos e Autor de Livros Gastronómicos Comerciais.
-    Crie um Guia Prático, Técnico e Profissional de Alta Autoridade sobre:
+    Atue como Engenheiro de Alimentos Sênior, Mestre Padeiro e Consultor de Panificação Artesanal Sem Glúten.
+    Escreva um MANUAL TÉCNICO E COMERCIAL AVANÇADO, DENSO E APROFUNDADO sobre:
     - TEMA: {tema}
-    - PÚBLICO-ALVO: {publico}
+    - PÚBLICO: {publico}
 
-    EXIGÊNCIAS DE CONTEÚDO (PADRÃO LIVRO COMERCIAL PAGO):
-    1. Não escreva textos rasos ou clichês teóricos. Cada capítulo deve entregar valor prático imediato.
-    2. Forneça RECEITAS COMPLETAS com lista de ingredientes em GRAMAS e XÍCARAS, proporções exatas de hidratação, substitutos de glúten (psyllium, goma xantana, féculas) e modo de preparo passo a passo (tempos, temperaturas de forno e ponto de massa).
-    3. Inclua um capítulo dedicado a "Diagnóstico de Erros Comuns": por que a massa embatuma, racha, esfarela ou seca, com a solução técnica exata.
-    4. Inclua orientações financeiras: rendimento de cada receita, custo médio de insumos e cálculo do preço de venda com margem de lucro.
+    DIRETRIZES DE EXTREMO RIGOR (PRODUTO COMERCIAL DE ALTO VALOR PERCEBIDO):
+    1. PROIBIDO TEXTO SUPERFICIAL OU RESUMINHOS. Escreva como um livro profissional de gastronomia.
+    2. Cada módulo deve ter uma base teórica sólida (ciência da retrogradação do amido, retenção de gases sem glúten, ação do psyllium e da goma xantana, umidade relativa da massa entre 85% e 105%).
+    3. RECEITAS COMPLETAS: Devem conter tabela com ingredientes em GRAMAS exatas, percentuais e função de cada ingrediente, tempo de hidratação, ponto da massa ao toque, temperatura do forno (ºC) e injeção de vapor.
+    4. RESOLUÇÃO DE ERROS (TROUBLESHOOTING): Diagnósticos detalhados para massa gomosa, pão que esfarela, pão que afunda no centro e crosta pálida.
+    5. CUSTO E PRECIFICAÇÃO: Cálculo de CMV, tempo de forno e precificação para obter de 80% a 150% de lucro real.
 
-    Retorne estritamente um JSON estruturado com a seguinte arquitetura:
+    Retorne ESTRITAMENTE um JSON estruturado com o seguinte esquema:
     {{
-        "titulo": "Título Comercial Magnético",
-        "subtitulo": "Subtítulo de Promessa Concreta e Transformação",
-        "termo_capa": "Termo em inglês para foto de alta qualidade no Pexels (ex: artisan rustic sourdough loaf)",
-        "introducao": "Texto robusto de introdução técnica, desmistificando o processo e alinhando as bases...",
+        "titulo": "Manual Definitivo da Panificação Sem Glúten Profissional",
+        "subtitulo": "Ciência, Fórmulas de Balança e Técnicas de Padaria para Pães Estruturados e Lucrativos",
+        "termo_capa": "artisan rustic sourdough loaf baking",
+        "introducao": "Texto denso e detalhado de introdução desmistificando o glúten, explicando o comportamento físico-químico dos amidos, a importância da água e o novo paradigma da panificação inclusiva...",
         "capitulos": [
             {{
                 "numero": 1,
-                "titulo": "Fundamentos dos Ingredientes Estruturais e Hidratação",
+                "titulo": "A Engenharia das Farinhas Sem Glúten & Estruturação de Redes",
                 "termo_busca_foto": "flour blend bowls baking kitchen",
-                "dica_mestre": "Regra de ouro sobre a proporção correta de psyllium e retenção de água...",
-                "conteudo": "Explicação técnica detalhada sobre bases de farinhas sem glúten, ação das gomas e controle de humidade...",
-                "receita_nome": "Mix Base Universal de Farinhas para Pães Estruturados",
-                "ingredientes": [
-                    "200g de farinha de arroz branco fino",
-                    "150g de polvilho doce",
-                    "100g de fécula de batata",
-                    "15g de psyllium puro em pó",
-                    "5g de goma xantana"
+                "alerta_tecnico": "O maior erro do iniciante é tentar usar farinhas isoladas. Sem a trindade de Estrutura + Amido + Aglutinante Hidrofílico, o pão inevitavelmente vira um tijolo embatumado.",
+                "conteudo": "Aprofundamento sobre as 3 classes essenciais de insumos: 1) Farinhas Estruturais (Arroz, Aveia SG, Sarraceno) que dão corpo e sabor; 2) Amidos e Féculas (Polvilho Doce, Fécula de Batata, Fécula de Mandioca) responsáveis pela leveza, aeração e formação da casca; 3) Aglutinantes e Hidrocoloides (Psyllium e Goma Xantana), que agem criando uma malha viscoelástica capaz de aprisionar as bolhas de CO2 geradas pelo fermento. Detalhe sobre hidratação: enquanto o trigo aguenta 60% a 70% de água, farinhas sem glúten ricas em psyllium exigem entre 85% e 105% de líquido para não ressecarem no forno.",
+                "receita_nome": "Fórmula do Mix Universal para Pães de Estrutura Firme",
+                "tabela_ingredientes": [
+                    {{"ingrediente": "Farinha de Arroz Branco Fina", "quantidade": "400g", "funcao": "Base estrutural neutra e miolo firme"}},
+                    {{"ingrediente": "Polvilho Doce", "quantidade": "300g", "funcao": "Elasticidade, expansão e maciez"}},
+                    {{"ingrediente": "Fécula de Batata", "quantidade": "200g", "funcao": "Retenção de umidade e aeração do miolo"}},
+                    {{"ingrediente": "Farinha de Grão-de-Bico ou Sarraceno", "quantidade": "100g", "funcao": "Aporte de proteínas para suporte mecânico"}},
+                    {{"ingrediente": "Psyllium Puro em Pó (Casca Moída)", "quantidade": "25g", "funcao": "Formador de gel, retenção hídrica e flexibilidade"}},
+                    {{"ingrediente": "Goma Xantana", "quantidade": "8g", "funcao": "Agente estabilizante e retenção de gases"}}
                 ],
-                "preparo_passos": [
-                    "Peneire todas as farinhas e amidos numa tigela ampla para homogeneização uniforme.",
-                    "Incorpore o psyllium e a goma xantana a seco antes de adicionar qualquer líquido.",
-                    "Armazene em recipiente hermético protegido de calor e humidade por até 60 dias."
+                "passos_preparo": [
+                    "Pese rigorosamente cada item em balança de precisão; variações de 3g de xantana ou psyllium alteram radicalmente o resultado.",
+                    "Peneire as farinhas em tigela ampla três vezes sucessivas para garantir dispersão homogênea dos hidrocoloides.",
+                    "Armazene a mistura em pote de vidro esterilizado e fechamento hermético em local seco e escuro por até 90 dias."
                 ]
             }},
             {{
                 "numero": 2,
-                "titulo": "Pão Francês & Pão Rústico de Crosta Crocante",
+                "titulo": "Pão Francês de Pestana Aberta & Pães Rústicos de Crosta Estalada",
                 "termo_busca_foto": "crusty artisan bread oven fresh",
-                "dica_mestre": "O segredo do vapor inicial no forno para garantir pestana aberta e crosta crocante...",
-                "conteudo": "Metodologia prática para fermentação controlada e criação de vapor caseiro...",
-                "receita_nome": "Pão Rústico Artesanal de Fermentação Lenta",
-                "ingredientes": [
-                    "300g do Mix Base Universal",
-                    "280ml de água morna (35°C)",
-                    "7g de fermento biológico seco",
-                    "12g de açúcar mascavado ou mel",
-                    "8g de sal marinho fino",
-                    "25ml de azeite de oliva extravirgem"
+                "alerta_tecnico": "Sem vapor abundante nos primeiros 15 minutos de forno, a casca seca precocemente, o pão perde a capacidade de expansão e a pestana nunca abre.",
+                "conteudo": "A dinâmica da fermentação biológica e o salto de forno (oven spring). Como criar uma atmosfera saturada de vapor em fornos residenciais utilizando pedras refratárias e formas de ferro fundido com pedras vulcânicas ou gelo. O controle da temperatura interna da massa ao sair do forno: o miolo continua cozinhando internamente até atingir 95°C no núcleo.",
+                "receita_nome": "Baguette e Pão Rústico de Casca Crocante",
+                "tabela_ingredientes": [
+                    {{"ingrediente": "Mix Universal de Farinhas", "quantidade": "350g", "funcao": "Base balanceada"}},
+                    {{"ingrediente": "Água Mineral Morna (36°C)", "quantidade": "320ml", "funcao": "Ativação do gel de psyllium"}},
+                    {{"ingrediente": "Fermento Biológico Seco", "quantidade": "8g", "funcao": "Geração vigorosa de dióxido de carbono"}},
+                    {{"ingrediente": "Açúcar Mascavo ou Mel", "quantidade": "12g", "funcao": "Alimento inicial para as leveduras e reação de Maillard"}},
+                    {{"ingrediente": "Sal Marinho Moído", "quantidade": "7g", "funcao": "Sabor e controle da taxa de fermentação"}},
+                    {{"ingrediente": "Azeite de Oliva Extravirgem", "quantidade": "20ml", "funcao": "Extensibilidade da massa e crocância da crosta"}}
                 ],
-                "preparo_passos": [
-                    "Hidrate o fermento na água morna com o açúcar e aguarde espumar por 10 minutos.",
-                    "Agregue a mistura líquida aos secos e bata vigorosamente com espátula até obter massa lisa e pegajosa.",
-                    "Modele com as mãos untadas em azeite e deixe fermentar em cesto com pano enfarinhado por 50 minutos.",
-                    "Asse a 220°C em forno pré-aquecido com bandeja de água no fundo durante os primeiros 20 minutos."
+                "passos_preparo": [
+                    "Dissolva o fermento na água morna com o açúcar e aguarde 10 minutos até formar uma esponja espumosa ativa.",
+                    "Verta os líquidos sobre o mix de secos e misture vigorosamente por 5 minutos com espátula até atingir aspecto viscoso e homogêneo.",
+                    "Deixe a massa descansar coberta por 20 minutos para que o psyllium atinja o pico de hidratação e permita modelagem.",
+                    "Com as mãos untadas em azeite, modele os pães em formato ovalado ou baguete e coloque sobre tapete de silicone enfarinhado.",
+                    "Deixe fermentar em ambiente fechado e sem correntes de ar por 45 a 55 minutos até crescer 60% a 70% do volume inicial.",
+                    "Faça um corte longitudinal firme de 1 cm de profundidade com lâmina afiada inclinada a 45 graus.",
+                    "Asse a 230°C em forno pré-aquecido por 40 minutos, despejando 80ml de água fervente na bandeja do fundo para gerar vapor imediato."
                 ]
             }},
             {{
                 "numero": 3,
-                "titulo": "Pão de Forma Macio para Sanduíches e Torradas",
+                "titulo": "Pão de Forma Super Macio & Conservação de Longa Duração",
                 "termo_busca_foto": "sliced sandwich bread loaf table",
-                "dica_mestre": "Como manter o miolo húmido por até 5 dias sem endurecer nem esfarelar...",
-                "conteudo": "Técnicas de emulsão e uso de gorduras saudáveis para conservação natural da humidade...",
-                "receita_nome": "Pão de Forma Branco Tradicional Super Macio",
-                "ingredientes": [
-                    "250g de farinha de arroz",
-                    "100g de amido de milho ou fécula de mandioca",
-                    "10g de psyllium em pó",
-                    "4g de goma xantana",
-                    "2 ovos inteiros médios",
-                    "40ml de óleo de girassol ou coco derretido",
-                    "240ml de água morna",
-                    "20g de açúcar",
-                    "6g de sal"
+                "alerta_tecnico": "Pães sem glúten envelhecem 3 vezes mais rápido por retrogradação do amido. O segredo da maciez duradoura é a adição de emulsificantes naturais e gordura boa.",
+                "conteudo": "Métodos práticos para impedir que a fatia se esfarele ao passar manteiga ou montar sanduíches. A utilização do método Tangzhong (pré-cozimento de uma fração do amido em água a 65°C para gelatinização prévia) e o papel dos ovos e gorduras no aprisionamento da umidade molecular por dias.",
+                "receita_nome": "Pão de Forma Tradicional Macio Tipo Brioche",
+                "tabela_ingredientes": [
+                    {{"ingrediente": "Farinha de Arroz Branco", "quantidade": "220g", "funcao": "Corpo macio"}},
+                    {{"ingrediente": "Polvilho Doce", "quantidade": "100g", "funcao": "Elasticidade da fatia"}},
+                    {{"ingrediente": "Amido de Milho ou Fécula de Mandioca", "quantidade": "60g", "funcao": "Esponjosidade"}},
+                    {{"ingrediente": "Psyllium em Pó", "quantidade": "15g", "funcao": "Gel estruturante anti-esfarelamento"}},
+                    {{"ingrediente": "Goma Xantana", "quantidade": "4g", "funcao": "Ligação molecular contínua"}},
+                    {{"ingrediente": "Ovos Médios Inteiros", "quantidade": "2 unidades (100g)", "funcao": "Lecitina natural para emulsão e aeração"}},
+                    {{"ingrediente": "Manteiga Ghee ou Óleo de Girassol", "quantidade": "45ml", "funcao": "Maciez do miolo e conservação"}},
+                    {{"ingrediente": "Água Morna", "quantidade": "220ml", "funcao": "Hidratação"}},
+                    {{"ingrediente": "Açúcar Demerara", "quantidade": "20g", "funcao": "Fermentação e caramelização suave"}},
+                    {{"ingrediente": "Sal", "quantidade": "6g", "funcao": "Equilíbrio de sabor"}}
                 ],
-                "preparo_passos": [
-                    "Bata os ovos com a água, óleo, açúcar e sal até formar emulsão homogénea.",
-                    "Adicione os secos previamente peneirados e misture em batedeira ou à mão por 4 minutos.",
-                    "Verta a massa para forma de pão de forma untada, nivele com espátula húmida e deixe crescer até dobrar de volume.",
-                    "Asse a 190°C por 35 a 40 minutos até dourar a superfície."
+                "passos_preparo": [
+                    "Bata os ovos, a água, a gordura, o sal e o açúcar com batedor de arame até formar uma emulsão espumosa e homogênea.",
+                    "Adicione os secos peneirados e sove com batedeira orbital ou colher pesada por 4 minutos até a massa ficar brilhante e cremosa.",
+                    "Transfira a massa para forma de pão de forma inglesa (22x10cm) untada, alisando a superfície com as costas de uma colher molhada.",
+                    "Deixe crescer em local morno (como dentro do forno desligado com uma tigela de água quente) por 50 minutos até quase atingir a borda.",
+                    "Asse a 190°C por 35 a 40 minutos até dourar uniformemente. Deixe esfriar sobre grade aramada por no mínimo 2 horas antes de fatiar."
                 ]
             }},
             {{
                 "numero": 4,
-                "titulo": "Guia de Diagnóstico de Erros & Precificação Comercial",
+                "titulo": "Dossiê Clínico de Resolução de Falhas & Engenharia de Custos",
                 "termo_busca_foto": "baker weighing ingredients scale bakery",
-                "dica_mestre": "Nunca corte o pão sem glúten enquanto estiver quente; o vapor interno completa a estrutura do miolo...",
-                "conteudo": "Checklist prático de resolução de falhas: massa que afunda no centro (excesso de água ou fermentação prolongada), miolo esfarelado (falta de aglutinante ou hidratação insuficiente). Inclui método passo a passo para calcular o custo unitário e estipular margem de lucro de 60% a 150% na venda direta.",
-                "receita_nome": "Planilha Prática de Custo e Margem por Fornada",
-                "ingredientes": [
-                    "Insumos secos pesados",
-                    "Custos de energia/gás por ciclo de forno",
-                    "Embalagem própria microperfurada para conservação de crosta",
-                    "Margem de lucro sugerida (mínimo 100% sobre custo de insumo)"
+                "alerta_tecnico": "Jamais corte um pão sem glúten recém-saído do forno. A estrutura do miolo só se completa termicamente quando o vapor interno dissipa e a temperatura atinge o ambiente.",
+                "conteudo": "Diagnóstico cirúrgico dos erros mais comuns de produção: 1) Pão com miolo grudento/solado: excesso de água ou tempo de forno insuficiente; 2) Pão que afunda no centro: excesso de fermento ou fermentação prolongada que causou colapso das paredes celulares; 3) Pão pálido e ressecado: forno com temperatura baixa que secou a massa antes da reação de Maillard; 4) Miolo quebradiço: falta de psyllium ou xantana insuficiente. Inclui método de cálculo de CMV (Custo de Mercadoria Vendida), energia, embalagem microperfurada e estratégia para posicionar cada unidade no mercado por R$ 28 a R$ 42 com margens superiores a 120%.",
+                "receita_nome": "Tabela de Precificação e Ficha de Custo Unitário",
+                "tabela_ingredientes": [
+                    {{"ingrediente": "Insumos Secos Pesados (Farinhas e Aglutinantes)", "quantidade": "R$ 6,20", "funcao": "Base de ingredientes premium"}},
+                    {{"ingrediente": "Insumos Úmidos (Ovos, Azeite, Fermento)", "quantidade": "R$ 3,10", "funcao": "Enriquecedores de massa"}},
+                    {{"ingrediente": "Energia / Gás de Forno por Ciclo", "quantidade": "R$ 1,80", "funcao": "Custo operacional de cozimento"}},
+                    {{"ingrediente": "Embalagem Kraft com Janela Visor & Selo", "quantidade": "R$ 1,50", "funcao": "Apresentação e barreira de umidade"}},
+                    {{"ingrediente": "Custo Total de Produção por Pão", "quantidade": "R$ 12,60", "funcao": "Custo Base Real"}},
+                    {{"ingrediente": "Preço de Venda Sugerido (Margem 140%)", "quantidade": "R$ 30,00 a R$ 35,00", "funcao": "Lucro Líquido de R$ 17,40 a R$ 22,40 por unidade"}}
                 ],
-                "preparo_passos": [
-                    "Pese com precisão todos os ingredientes para estabelecer o Custo da Mercadoria Vendida (CMV).",
-                    "Adicione 25% sobre o custo para despesas operacionais e perdas.",
-                    "Multiplique o subtotal por 2,2 para obter o preço de venda final com lucro sustentável."
+                "passos_preparo": [
+                    "Mantenha uma planilha de compras registrando o valor do quilo de cada insumo para atualizar o CMV mensalmente.",
+                    "Agrupe as fornadas para assar no mínimo 3 pães simultâneos, reduzindo o custo proporcional de gás/eletricidade.",
+                    "Embale os pães totalmente frios em sacos próprios com microporos para preservar a crocância da casca por até 3 dias ou congele fatiado."
                 ]
             }}
         ]
@@ -392,21 +401,28 @@ def traduzir_ebook_completo_ia(dados_ebook: dict, idioma_destino: str, progress_
     for cap in dados_ebook.get("capitulos", []):
         t_cap_tr = traduzir_texto_ia(cap.get("titulo", ""), idioma_destino)
         c_cap_tr = traduzir_texto_ia(cap.get("conteudo", ""), idioma_destino)
-        dica_tr = traduzir_texto_ia(cap.get("dica_mestre", ""), idioma_destino)
+        alerta_tr = traduzir_texto_ia(cap.get("alerta_tecnico", ""), idioma_destino)
         r_nome_tr = traduzir_texto_ia(cap.get("receita_nome", ""), idioma_destino)
-        
-        ing_tr = [traduzir_texto_ia(i, idioma_destino) for i in cap.get("ingredientes", [])]
-        passos_tr = [traduzir_texto_ia(p, idioma_destino) for p in cap.get("preparo_passos", [])]
+
+        tabela_tr = []
+        for item in cap.get("tabela_ingredientes", []):
+            tabela_tr.append({
+                "ingrediente": traduzir_texto_ia(item.get("ingrediente", ""), idioma_destino),
+                "quantidade": item.get("quantidade", ""),
+                "funcao": traduzir_texto_ia(item.get("funcao", ""), idioma_destino)
+            })
+
+        passos_tr = [traduzir_texto_ia(p, idioma_destino) for p in cap.get("passos_preparo", [])]
 
         capitulos_tr.append({
             "numero": cap.get("numero", 1),
             "titulo": t_cap_tr,
             "termo_busca_foto": cap.get("termo_busca_foto", ""),
-            "dica_mestre": dica_tr,
+            "alerta_tecnico": alerta_tr,
             "conteudo": c_cap_tr,
             "receita_nome": r_nome_tr,
-            "ingredientes": ing_tr,
-            "preparo_passos": passos_tr
+            "tabela_ingredientes": tabela_tr,
+            "passos_preparo": passos_tr
         })
         etapa_atual += 1
         if progress_bar:
@@ -421,7 +437,7 @@ def traduzir_ebook_completo_ia(dados_ebook: dict, idioma_destino: str, progress_
     }
 
 # ==============================================================================
-# 4. PROCESSAMENTO GRÁFICO (PDF REPORTLAB COM DIAGRAMAÇÃO EDITORIAL)
+# 4. PROCESSAMENTO GRÁFICO (REPORTLAB COM TABELAS REAIS E CAIXAS TÉCNICAS)
 # ==============================================================================
 class NumeradorPaginas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
@@ -443,14 +459,14 @@ class NumeradorPaginas(canvas.Canvas):
     def draw_footer(self, page_count):
         if self._pageNumber > 1:
             self.saveState()
-            self.setFont("Helvetica", 9)
+            self.setFont("Helvetica-Bold", 8)
             self.setFillColor(colors.HexColor("#64748B"))
+            self.drawString(45, 26, "MANUAL TÉCNICO PROFISSIONAL | DIREITOS RESERVADOS")
             texto_pag = f"Página {self._pageNumber} de {page_count}"
-            self.drawRightString(567, 30, texto_pag)
-            self.drawString(45, 30, "Guia Prático e Comercial - Todos os direitos reservados.")
+            self.drawRightString(567, 26, texto_pag)
             self.setStrokeColor(colors.HexColor("#CBD5E1"))
-            self.setLineWidth(0.5)
-            self.line(45, 42, 567, 42)
+            self.setLineWidth(0.6)
+            self.line(45, 36, 567, 36)
             self.restoreState()
 
 def buscar_foto_pexels(query: str, pexels_key: str, dest_path: str) -> bool:
@@ -479,51 +495,51 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_pdf: str)
         rightMargin=45,
         leftMargin=45,
         topMargin=45,
-        bottomMargin=55
+        bottomMargin=50
     )
     styles = getSampleStyleSheet()
 
     cor_primaria = colors.HexColor("#0F172A")
     cor_azul = colors.HexColor("#1D4ED8")
-    cor_azul_claro = colors.HexColor("#EFF6FF")
-    cor_borda = colors.HexColor("#BFDBFE")
+    cor_azul_claro = colors.HexColor("#F0F7FF")
+    cor_borda = colors.HexColor("#93C5FD")
 
     estilo_capa_tit = ParagraphStyle(
         'CapaTitulo',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=26,
-        leading=32,
+        fontSize=24,
+        leading=30,
         textColor=cor_azul,
         alignment=1,
-        spaceAfter=12
+        spaceAfter=10
     )
     estilo_capa_sub = ParagraphStyle(
         'CapaSub',
         parent=styles['Normal'],
-        fontName='Helvetica-Oblique',
-        fontSize=14,
-        leading=19,
+        fontName='Helvetica',
+        fontSize=12,
+        leading=17,
         textColor=cor_primaria,
         alignment=1,
-        spaceAfter=25
+        spaceAfter=20
     )
     estilo_h1 = ParagraphStyle(
         'TitCap',
         parent=styles['Heading1'],
         fontName='Helvetica-Bold',
-        fontSize=18,
-        leading=24,
+        fontSize=16,
+        leading=22,
         textColor=cor_azul,
-        spaceBefore=12,
-        spaceAfter=10
+        spaceBefore=10,
+        spaceAfter=8
     )
     estilo_h2 = ParagraphStyle(
         'TitSec',
         parent=styles['Heading2'],
         fontName='Helvetica-Bold',
-        fontSize=13,
-        leading=18,
+        fontSize=12,
+        leading=16,
         textColor=cor_primaria,
         spaceBefore=10,
         spaceAfter=6
@@ -532,35 +548,51 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_pdf: str)
         'CorpoTexto',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=10,
-        leading=16,
+        fontSize=9.5,
+        leading=15.5,
         textColor=cor_primaria,
         spaceAfter=8
     )
     estilo_item = ParagraphStyle(
-        'ItemLista',
+        'ItemPasso',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=9.5,
-        leading=15,
+        fontSize=9,
+        leading=14.5,
         textColor=cor_primaria,
-        spaceAfter=4
+        spaceAfter=5
     )
-    estilo_box = ParagraphStyle(
-        'BoxDica',
+    estilo_alerta = ParagraphStyle(
+        'BoxAlerta',
         parent=styles['Normal'],
-        fontName='Helvetica-Oblique',
-        fontSize=9.5,
-        leading=14,
+        fontName='Helvetica-Bold',
+        fontSize=9,
+        leading=13.5,
         textColor=colors.HexColor("#1E3A8A")
+    )
+    estilo_celula = ParagraphStyle(
+        'CelulaTab',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=8.5,
+        leading=12,
+        textColor=cor_primaria
+    )
+    estilo_celula_header = ParagraphStyle(
+        'CelulaHeader',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=8.5,
+        leading=12,
+        textColor=colors.white
     )
 
     flowables = []
 
     # CAPA
-    flowables.append(Spacer(1, 30))
-    flowables.append(Paragraph(dados.get("titulo", "Manual Técnico"), estilo_capa_tit))
-    flowables.append(Paragraph(dados.get("subtitulo", "Guia Prático e Comercial"), estilo_capa_sub))
+    flowables.append(Spacer(1, 20))
+    flowables.append(Paragraph(dados.get("titulo", "Manual Técnico Profissional"), estilo_capa_tit))
+    flowables.append(Paragraph(dados.get("subtitulo", "Guia Técnico & Comercial"), estilo_capa_sub))
 
     termo_capa = dados.get("termo_capa", "artisan bread")
     capa_img_path = os.path.join(DIR_PEXELS, f"capa_{int(time.time())}.jpg")
@@ -573,7 +605,7 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_pdf: str)
     flowables.append(PageBreak())
 
     # INTRODUÇÃO
-    flowables.append(Paragraph("Introdução Técnica & Fundamentos Comerciais", estilo_h1))
+    flowables.append(Paragraph("Introdução Técnica & Fundamentos da Panificação", estilo_h1))
     flowables.append(Spacer(1, 6))
     for p in dados.get("introducao", "").split("\n"):
         if p.strip():
@@ -584,55 +616,74 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_pdf: str)
     # CAPÍTULOS TÉCNICOS
     for cap in dados.get("capitulos", []):
         flowables.append(Paragraph(f"Módulo {cap.get('numero')}: {cap.get('titulo')}", estilo_h1))
-        flowables.append(Spacer(1, 6))
+        flowables.append(Spacer(1, 4))
 
         termo_cap = cap.get("termo_busca_foto", "")
         if termo_cap:
             cap_img_path = os.path.join(DIR_PEXELS, f"cap_{cap.get('numero')}_{int(time.time())}.jpg")
             if buscar_foto_pexels(termo_cap, pexels_key, cap_img_path):
                 try:
-                    flowables.append(RLImage(cap_img_path, width=480, height=210))
-                    flowables.append(Spacer(1, 8))
+                    flowables.append(RLImage(cap_img_path, width=490, height=190))
+                    flowables.append(Spacer(1, 6))
                 except Exception:
                     pass
 
-        # Caixa de Dica de Ouro / Mestre
-        dica = cap.get("dica_mestre", "")
-        if dica:
-            tabela_dica = Table(
-                [[Paragraph(f"<b>💡 Dica de Ouro do Mestre:</b> {dica}", estilo_box)]],
+        # Caixa de Alerta Técnico
+        alerta = cap.get("alerta_tecnico", "")
+        if alerta:
+            tabela_alerta = Table(
+                [[Paragraph(f"<b>⚠️ ALERTA TÉCNICO DO ESPECIALISTA:</b> {alerta}", estilo_alerta)]],
                 colWidths=[500]
             )
-            tabela_dica.setStyle(TableStyle([
+            tabela_alerta.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, -1), cor_azul_claro),
-                ('BOX', (0, 0), (-1, -1), 1, cor_borda),
+                ('BOX', (0, 0), (-1, -1), 1.2, cor_borda),
                 ('PADDING', (0, 0), (-1, -1), 8),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
             ]))
-            flowables.append(tabela_dica)
-            flowables.append(Spacer(1, 10))
+            flowables.append(tabela_alerta)
+            flowables.append(Spacer(1, 8))
 
-        # Texto do Capítulo
+        # Texto Explicativo Denso
         for p_cap in cap.get("conteudo", "").split("\n"):
             if p_cap.strip():
                 flowables.append(Paragraph(p_cap.strip(), estilo_corpo))
 
-        # Seção de Receita Prática Estruturada
+        # Ficha Técnica / Receita com Tabela Estruturada
         receita_nome = cap.get("receita_nome", "")
         if receita_nome:
-            flowables.append(Spacer(1, 6))
             flowables.append(Paragraph(f"📋 Ficha Técnica: {receita_nome}", estilo_h2))
 
-            ingredientes = cap.get("ingredientes", [])
-            if ingredientes:
-                flowables.append(Paragraph("<b>Ingredientes & Proporções:</b>", estilo_item))
-                for ing in ingredientes:
-                    flowables.append(Paragraph(f"• {ing}", estilo_item))
-                flowables.append(Spacer(1, 6))
+            itens_tabela = cap.get("tabela_ingredientes", [])
+            if itens_tabela:
+                dados_tabela = [
+                    [
+                        Paragraph("<b>Ingrediente / Insumo</b>", estilo_celula_header),
+                        Paragraph("<b>Peso / Medida</b>", estilo_celula_header),
+                        Paragraph("<b>Função Mecânica / Química</b>", estilo_celula_header)
+                    ]
+                ]
+                for item in itens_tabela:
+                    dados_tabela.append([
+                        Paragraph(item.get("ingrediente", ""), estilo_celula),
+                        Paragraph(item.get("quantidade", ""), estilo_celula),
+                        Paragraph(item.get("funcao", ""), estilo_celula)
+                    ])
 
-            passos = cap.get("preparo_passos", [])
+                tabela_receita = Table(dados_tabela, colWidths=[180, 90, 230])
+                tabela_receita.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), cor_azul),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                    ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+                    ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
+                    ('PADDING', (0, 0), (-1, -1), 5),
+                ]))
+                flowables.append(tabela_receita)
+                flowables.append(Spacer(1, 8))
+
+            passos = cap.get("passos_preparo", [])
             if passos:
-                flowables.append(Paragraph("<b>Modo de Preparo Passo a Passo:</b>", estilo_item))
+                flowables.append(Paragraph("<b>Procedimento Operacional Padrão (Passo a Passo):</b>", estilo_h2))
                 for idx_p, passo in enumerate(passos, 1):
                     flowables.append(Paragraph(f"<b>{idx_p}.</b> {passo}", estilo_item))
 
@@ -962,7 +1013,7 @@ with tab_minerador:
         "🛠️ Manutenção Residencial & Marido de Aluguel",
         "💅 Estética, Cílios & Sobrancelhas",
         "🧘 Saúde Natural, Chás Medicinais & Sono",
-        "✍️️ Digitar Nicho Personalizado (Manual)..."
+        "✍️ Digitar Nicho Personalizado (Manual)..."
     ]
 
     col_m1, col_m2 = st.columns([2, 1])
@@ -1010,7 +1061,7 @@ with tab_minerador:
             )
             nome_arq_txt = f"campanha_google_ads_{re.sub(r'[^a-zA-Z0-9]', '_', st.session_state.get('nicho_pesquisado_nome', 'nicho').lower())}.txt"
             st.download_button(
-                "⬇️ Baixar Kit de Campanha (.txt)",
+                "⬇️️ Baixar Kit de Campanha (.txt)",
                 data=st.session_state["resultado_pesquisa_nicho"],
                 file_name=nome_arq_txt,
                 mime="text/plain",
@@ -1143,11 +1194,11 @@ with tab_vsl:
                 )
 
 # ------------------------------------------------------------------------------
-# ABA 3: CRIAR E-BOOK & TRADUÇÃO GLOBAL (PROFISSIONAL & DENSO)
+# ABA 3: CRIAR E-BOOK & TRADUÇÃO GLOBAL (PROFISSIONAL COM TABELAS REAIS)
 # ------------------------------------------------------------------------------
 with tab_ebook:
-    st.markdown("## 📚 Criador de E-book Comercial & Diagramação Editorial")
-    st.caption("Gere manuais práticos com fichas técnicas, gramagens exatas, guia de erros e precificação para venda imediata.")
+    st.markdown("## 📚 Criador de E-book Técnico & Comercial (Densidade Máxima)")
+    st.caption("Gere manuais práticos com tabelas completas em gramas, avisos de controle de fermentação e resolução de erros.")
 
     col_e1, col_e2 = st.columns(2)
     with col_e1:
@@ -1155,16 +1206,16 @@ with tab_ebook:
     with col_e2:
         publico_ebook = st.text_input("Público-Alvo:", "Pessoas com restrição alimentar e empreendedoras de confeitaria")
 
-    if st.button("📖 Gerar E-book Profissional Completo (.PDF) (10 cr)", type="primary"):
+    if st.button("📖 Gerar E-book Técnico Profissional (.PDF) (10 cr)", type="primary"):
         if saldo_atual < 10:
-            st.error("❌ Saldo insuficiente! Precisa de 10 créditos.")
+            st.error("❌ Saldo insuficiente! Você precisa de 10 créditos.")
         else:
-            with st.spinner("Construindo receitas completas, guias de diagnóstico e compilando PDF editorial..."):
+            with st.spinner("Construindo tabelas de ingredientes em gramas, ciência de hidratação e diagramando PDF..."):
                 try:
                     dados_eb = gerar_conteudo_ebook_ia(tema_ebook, publico_ebook)
                     st.session_state["dados_ebook_sessao"] = dados_eb
 
-                    nome_pdf = f"manual_comercial_{int(time.time())}.pdf"
+                    nome_pdf = f"manual_tecnico_{int(time.time())}.pdf"
                     caminho_pdf = os.path.join(DIR_EBOOKS, nome_pdf)
                     compilar_pdf_ebook_com_fotos(dados_eb, PEXELS_API_KEY, caminho_pdf)
 
@@ -1178,7 +1229,7 @@ with tab_ebook:
 
     if st.session_state.get("pdf_ebook_pronto") and os.path.exists(st.session_state["pdf_ebook_pronto"]):
         st.markdown("---")
-        st.markdown("### 📥 Seu E-book Original em Português:")
+        st.markdown("### 📥 Seu E-book Técnico Original em Português:")
         with open(st.session_state["pdf_ebook_pronto"], "rb") as f_eb:
             st.download_button(
                 "⬇️ Baixar E-book Original (.PDF)",
@@ -1191,7 +1242,7 @@ with tab_ebook:
         st.markdown("---")
         with st.container(border=True):
             st.markdown("### 🌐 Tradução Global do E-book (36 Idiomas)")
-            st.caption("Internacionalize mantendo receitas em gramas, caixas de destaque e paginação.")
+            st.caption("Internacionalize mantendo tabelas com medidas em gramas, caixas de destaque e paginação.")
 
             col_tr1, col_tr2 = st.columns([2, 1])
             with col_tr1:
@@ -1209,7 +1260,7 @@ with tab_ebook:
                 else:
                     nome_lingua_eb = IDIOMAS_SISTEMA_36[idioma_eb_sel]
                     barra_eb_tr = st.progress(0.0)
-                    with st.spinner(f"Traduzindo receitas, caixas de destaque e módulos para {idioma_eb_sel}..."):
+                    with st.spinner(f"Traduzindo tabelas em gramas, avisos de forno e módulos para {idioma_eb_sel}..."):
                         try:
                             dados_tr = traduzir_ebook_completo_ia(
                                 st.session_state["dados_ebook_sessao"],
@@ -1248,7 +1299,7 @@ with tab_ebook:
 # ------------------------------------------------------------------------------
 with tab_master:
     st.markdown("## 👑 Painel de Gestão Master")
-    st.caption("Visão geral de faturação, volume de utilizadores e integridade do sistema.")
+    st.caption("Visão geral de faturamento, volume de usuários e integridade do sistema.")
 
     if not supabase_client:
         st.warning("Conexão com o Supabase inativa ou chaves não configuradas.")
@@ -1266,7 +1317,7 @@ with tab_master:
 
             cm1, cm2, cm3 = st.columns(3)
             with cm1:
-                st.metric("Faturação Kiwify", f"R$ {faturamento_total:,.2f}")
+                st.metric("Faturamento Kiwify", f"R$ {faturamento_total:,.2f}")
             with cm2:
                 st.metric("Total de Clientes", total_clientes)
             with cm3:
@@ -1277,7 +1328,7 @@ with tab_master:
             if pedidos_lista:
                 st.dataframe(pedidos_lista, use_container_width=True)
             else:
-                st.info("Nenhum pedido registado até ao momento.")
+                st.info("Nenhum pedido registrado até o momento.")
 
         except Exception as e_master:
             st.error(f"Erro ao carregar dados administrativos: {e_master}")
