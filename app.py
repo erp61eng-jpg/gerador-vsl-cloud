@@ -14,8 +14,11 @@ from supabase import create_client, Client
 
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as RLImage, PageBreak
+from reportlab.platypus import (
+    SimpleDocTemplate, Paragraph, Spacer, Image as RLImage, PageBreak, Table, TableStyle
+)
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.pdfgen import canvas
 
 # Tentativa de importação compatível do SDK do Google Gemini
 try:
@@ -62,7 +65,6 @@ OPENAI_API_KEY = obter_credencial("OPENAI_API_KEY")
 GEMINI_API_KEY = obter_credencial("GEMINI_API_KEY")
 PEXELS_API_KEY = obter_credencial("PEXELS_API_KEY")
 
-# Inicialização do Supabase
 supabase_client: Optional[Client] = None
 if SUPABASE_URL and SUPABASE_KEY:
     try:
@@ -70,7 +72,6 @@ if SUPABASE_URL and SUPABASE_KEY:
     except Exception as e:
         st.sidebar.error(f"Erro ao ligar ao Supabase: {e}")
 
-# 36 Idiomas Oficiais do Sistema
 IDIOMAS_SISTEMA_36 = {
     "🇺🇸 Inglês (EUA)": "English (US)",
     "🇬🇧 Inglês (Reino Unido)": "English (UK)",
@@ -146,7 +147,7 @@ def debitar_creditos_cloud(email: str, operacao: str, quantidade: int) -> bool:
 # ==============================================================================
 # 3. MOTORES DE IA: GERAÇÃO, TRANSCIAÇÃO & MINERAÇÃO
 # ==============================================================================
-def executar_prompt_ia(prompt: str, formato_json: bool = False, temperatura: float = 0.4) -> str:
+def executar_prompt_ia(prompt: str, formato_json: bool = False, temperatura: float = 0.3) -> str:
     if GEMINI_API_KEY:
         try:
             if HAS_GENAI_NEW:
@@ -173,103 +174,70 @@ def executar_prompt_ia(prompt: str, formato_json: bool = False, temperatura: flo
     raise ValueError("Nenhuma chave válida configurada para Gemini ou OpenAI.")
 
 def traduzir_texto_ia(texto: str, idioma_destino: str) -> str:
-    """Traduz e localiza a copy adaptando valores financeiros para a realidade cultural de cada país."""
     if not texto.strip():
         return ""
     prompt = f"""
-    Atue como tradutor nativo de elite, especialista em localização cultural e copywriter sênior no idioma '{idioma_destino}'.
-    Traduza e faça a TRANSCIAÇÃO do texto abaixo, mantendo a métrica de vendas, persuasão visceral, fluidez nativa e ritmo comercial.
+    Atue como tradutor nativo de elite e copywriter sênior no idioma '{idioma_destino}'.
+    Traduza e faça a TRANSCIAÇÃO do texto abaixo, mantendo a métrica comercial, persuasão e rigor técnico.
 
-    REGRA DE OURO - LOCALIZAÇÃO FINANCEIRA & MOEDA (CRÍTICO):
-    1. NUNCA mantenha valores em 'Reais' ou 'R$' em textos para o exterior.
-    2. NUNCA faça conversão cega 1 para 1 (exemplo: JAMAIS transforme R$ 3.000 em 3.000 Euros ou 3.000 Dólares! Na Europa ou EUA, 3.000 em renda extra caseira soa como fraude e gera bloqueio imediato no Google/Meta Ads).
-    3. Adapte promessas financeiras para valores realistas e críveis na moeda do país de destino (Paridade de Poder de Compra):
-       - Se o idioma for Espanhol ou europeu (Espanhol, Francês, Alemão, Italiano): R$ 3.000 de renda extra deve ser adaptado para "entre 600€ e 1.000€" (ex: "generar entre 600 y 1.000 euros extra al mes desde tu cocina").
-       - Se o idioma for Inglês / Dólar: R$ 3.000 deve ser adaptado para "$600 a $1.200 USD".
-       - Para outros países, adapte para uma renda extra mensal proporcional, crível e que respeite as diretrizes de compliance de tráfego pago.
-    4. O texto deve soar 100% natural para um habitante nativo de '{idioma_destino}', eliminando gírias ou vícios linguísticos brasileiros.
+    REGRA DE OURO - LOCALIZAÇÃO FINANCEIRA & MOEDA:
+    1. NUNCA mantenha valores em 'Reais' ou 'R$' para outros idiomas.
+    2. NUNCA faça conversão 1 para 1 cega (ex: NÃO transforme R$ 3.000 em 3.000 Euros ou Dólares).
+    3. Adapte valores para paridade crível de mercado:
+       - Espanhol/Europeu: R$ 3.000 vira "entre 600€ e 1.000€ mensais de renda extra".
+       - Inglês/Dólar: R$ 3.000 vira "$600 a $1.200 USD de renda extra".
+    4. Elimine gírias ou expressões locais brasileiras.
 
-    Texto original para tradução/transcriação:
+    Texto:
     "{texto}"
 
-    Retorne estritamente o texto final adaptado, sem aspas, sem explicações e sem preâmbulos.
+    Retorne estritamente o texto traduzido, sem aspas e sem explicações.
     """
     try:
-        return executar_prompt_ia(prompt, formato_json=False, temperatura=0.3).strip()
+        return executar_prompt_ia(prompt, formato_json=False, temperatura=0.25).strip()
     except Exception:
         return texto
 
 def minerar_nicho_profundo_ia(nicho: str, profundidade: str) -> str:
     prompt = f"""
     Atue como Diretor de Aquisição e Especialista Sênior em Tráfego Pago, Copywriting e Validação de Produtos Digitais.
-    Domínio absoluto de: Google Ads (Search, YouTube Ads, PMax), Meta Ads, Kiwify e plataformas internacionais.
+    Domínio absoluto de: Google Ads, Meta Ads, Kiwify e plataformas internacionais.
     
-    Analise a fundo o seguinte nicho:
+    Analise o seguinte nicho:
     NICHO: "{nicho}"
     NÍVEL DE PROFUNDIDADE: {profundidade}
     
     Gere um dossiê executivo completo formatado em Markdown com as seguintes seções estruturadas:
     
     ### 1. 🎯 PÚBLICO-ALVO & NÍVEL DE CONSCIÊNCIA
-    - Perfil do comprador real (faixa etária, motivação urgente de compra).
-    - Nível de consciência e temperatura média de tráfego.
-    
     ### 2. ⚡ AS 3 MAIORES DORES OCULTAS & AS 3 PRINCIPAIS OBJEÇÕES
-    - Dores profundas que aceleram a decisão de compra.
-    - Objeções reais e contra-argumentos de resposta imediata na copy.
-    
     ### 3. 💎 ARQUITETURA DO PRODUTO & MECANISMO ÚNICO
-    - **Nome Sugerido do E-book / Treinamento:** (Comercial, magnético e de alto valor percebido).
-    - **A Grande Promessa (Big Idea):** (1 frase direta e de impacto visceral).
-    - **Mecanismo Único:** Qual o método exclusivo por trás da solução?
-    
     ### 4. 👑 O PATRÃO GOOGLE ADS (KIT COMPLETO DE CAMPANHA)
-    #### A) Palavras-Chave de Fundo de Funil (Compradores Reais):
-    - Liste 6 a 8 palavras-chave com alta intenção de compra formatadas em Correspondência de Frase `"termo"` e Correspondência Exata `[termo]`.
-    
-    #### B) Lista de Palavras-Chave Negativas (Blindagem de Verba):
-    - Liste 10 termos obrigatórios para negativar de imediato (ex: grátis, pdf grátis, login, reclame aqui, torrent, baixar, etc.).
-    
-    #### C) Anúncio Responsivo de Pesquisa (RSA Pronto para Copiar e Colar):
-    - **Títulos (máx. 30 caracteres cada):** Liste 5 títulos magnéticos diferentes.
-    - **Descrições (máx. 90 caracteres cada):** Liste 3 descrições persuasivas com chamada para ação clara (CTA).
-    
-    #### D) Gancho para YouTube Ads (Vídeo In-Stream / Primeiros 5 Segundos):
-    - A frase de abertura exata para usar na VSL no YouTube, retendo compradores e descartando curiosos antes do limite de cobrança.
-    
-    ### 5. 💰 ESTRATÉGIA DE MONETIZAÇÃO & ESCALA
-    - **Preço Frontend (Brasil):** R$ (Ticket para escala no PIX/Cartão).
-    - **Preço Internacional (EUA/Europa):** US$ / € (para venda com o material traduzido).
-    - **Order Bump Perfeito:** Produto complementar irresistível para adicionar no checkout.
-    
-    Seja pragmático, analítico e 100% voltado para geração de faturamento real.
+    #### A) Palavras-Chave de Fundo de Funil (Correspondência de Frase e Exata)
+    #### B) Lista de 10 Palavras-Chave Negativas Obrigatórias
+    #### C) Anúncio Responsivo de Pesquisa (5 Títulos e 3 Descrições)
+    #### D) Gancho para YouTube Ads (Primeiros 5 Segundos)
+    ### 5. 💰 ESTRATÉGIA DE MONETIZAÇÃO & ESCALA (Preço Brasil, Exterior e Order Bump)
     """
     return executar_prompt_ia(prompt, formato_json=False, temperatura=0.35)
 
 def gerar_roteiro_vsl_ia(nicho: str, promessa: str, publico: str, num_cenas: int = 5) -> List[Dict[str, str]]:
     prompt = f"""
-    Atue como um Diretor de Criação de VSL (Vídeo de Vendas) de altíssima conversão.
-    Crie um roteiro persuasivo e magnético sobre:
+    Atue como Diretor de Criação de VSL de alta conversão.
+    Crie um roteiro persuasivo sobre:
     - Nicho: {nicho}
-    - Promessa Principal: {promessa}
-    - Público-Alvo: {publico}
+    - Promessa: {promessa}
+    - Público: {publico}
     
-    Gere exatamente {num_cenas} cenas cronológicas (gancho de atenção, dor, solução, benefício e CTA).
-    Para CADA cena, gere:
-    1. "fala": Frase falada em português (direta, persuasiva, de 10 a 16 palavras).
-    2. "termo_video": Termo em INGLÊS de 2 a 4 palavras para buscar vídeos em alta definição no Pexels que represente a cena (ex: "artisan sourdough bread", "baker kneading dough flour", "fresh bread in oven", "woman kitchen bakery display"). NUNCA use português nem frases genéricas.
-
-    Retorne estritamente um JSON no seguinte formato:
+    Gere exatamente {num_cenas} cenas.
+    Para cada cena:
+    1. "fala": Frase falada em português (direta, 10 a 16 palavras).
+    2. "termo_video": Termo em INGLÊS de 2 a 4 palavras para buscar vídeos em HD no Pexels (ex: "artisan sourdough bread", "kneading bread dough", "fresh bread baking oven").
+    
+    Retorne estritamente um JSON:
     {{
         "cenas": [
-            {{
-                "fala": "Descubra o segredo dos pães artesanais que transformam sua cozinha em um negócio lucrativo.",
-                "termo_video": "artisan bread bakery"
-            }},
-            {{
-                "fala": "Imagine faturar R$ 3.000 todos os meses produzindo delícias sem glúten na sua casa.",
-                "termo_video": "woman kneading dough"
-            }}
+            {{"fala": "...", "termo_video": "..."}}
         ]
     }}
     """
@@ -280,62 +248,129 @@ def gerar_roteiro_vsl_ia(nicho: str, promessa: str, publico: str, num_cenas: int
         cenas_limpas = []
         for c in cenas_raw:
             if isinstance(c, dict):
-                fala = c.get("fala", c.get("texto", "")).strip()
-                termo = c.get("termo_video", c.get("termo_busca", "artisan bread baking")).strip()
+                fala = c.get("fala", "").strip()
+                termo = c.get("termo_video", "artisan bread").strip()
                 if fala:
                     cenas_limpas.append({"fala": fala, "termo_video": termo})
-            elif isinstance(c, str) and c.strip():
-                cenas_limpas.append({"fala": c.strip(), "termo_video": "artisan bread baking"})
         return cenas_limpas if cenas_limpas else [{"fala": promessa, "termo_video": "artisan bread"}]
     except Exception:
         return [
-            {"fala": f"Descubra o método definitivo sobre {nicho}.", "termo_video": "artisan bread baking"},
+            {"fala": f"Descubra o segredo prático para dominar {nicho}.", "termo_video": "artisan bread baking"},
             {"fala": promessa, "termo_video": "fresh bread oven"},
-            {"fala": "Resultados comprovados para transformar sua vida.", "termo_video": "happy woman kitchen baking"}
+            {"fala": "Aprenda o método testado para ter resultados reais.", "termo_video": "woman baker kitchen"}
         ]
 
 def gerar_conteudo_ebook_ia(tema: str, publico: str) -> dict:
+    """Gera um manual técnico aprofundado, com receitas completas, medidas exatas e resolução de problemas."""
     prompt = f"""
-    Atue como autor técnico e editor de manuais comerciais de alta escala.
-    Crie o conteúdo completo e estruturado para um manual prático e comercial sobre:
-    Tema: {tema}
-    Público: {publico}
-    
-    Retorne estritamente um JSON estruturado com:
+    Atue como Mestre Padeiro Internacional, Engenheiro de Alimentos e Autor de Livros Gastronómicos Comerciais.
+    Crie um Guia Prático, Técnico e Profissional de Alta Autoridade sobre:
+    - TEMA: {tema}
+    - PÚBLICO-ALVO: {publico}
+
+    EXIGÊNCIAS DE CONTEÚDO (PADRÃO LIVRO COMERCIAL PAGO):
+    1. Não escreva textos rasos ou clichês teóricos. Cada capítulo deve entregar valor prático imediato.
+    2. Forneça RECEITAS COMPLETAS com lista de ingredientes em GRAMAS e XÍCARAS, proporções exatas de hidratação, substitutos de glúten (psyllium, goma xantana, féculas) e modo de preparo passo a passo (tempos, temperaturas de forno e ponto de massa).
+    3. Inclua um capítulo dedicado a "Diagnóstico de Erros Comuns": por que a massa embatuma, racha, esfarela ou seca, com a solução técnica exata.
+    4. Inclua orientações financeiras: rendimento de cada receita, custo médio de insumos e cálculo do preço de venda com margem de lucro.
+
+    Retorne estritamente um JSON estruturado com a seguinte arquitetura:
     {{
-        "titulo": "Título Principal",
-        "subtitulo": "Subtítulo Persuasivo",
-        "termo_capa": "Termo em inglês para buscar foto no Pexels (ex: artisan sourdough bread)",
-        "introducao": "Texto completo e formal de introdução...",
+        "titulo": "Título Comercial Magnético",
+        "subtitulo": "Subtítulo de Promessa Concreta e Transformação",
+        "termo_capa": "Termo em inglês para foto de alta qualidade no Pexels (ex: artisan rustic sourdough loaf)",
+        "introducao": "Texto robusto de introdução técnica, desmistificando o processo e alinhando as bases...",
         "capitulos": [
             {{
                 "numero": 1,
-                "titulo": "Título do Módulo 1",
-                "termo_busca_foto": "Termo em inglês para foto (ex: flour and water kneading)",
-                "conteudo": "Texto completo, com passos, checklists e detalhes técnicos..."
+                "titulo": "Fundamentos dos Ingredientes Estruturais e Hidratação",
+                "termo_busca_foto": "flour blend bowls baking kitchen",
+                "dica_mestre": "Regra de ouro sobre a proporção correta de psyllium e retenção de água...",
+                "conteudo": "Explicação técnica detalhada sobre bases de farinhas sem glúten, ação das gomas e controle de humidade...",
+                "receita_nome": "Mix Base Universal de Farinhas para Pães Estruturados",
+                "ingredientes": [
+                    "200g de farinha de arroz branco fino",
+                    "150g de polvilho doce",
+                    "100g de fécula de batata",
+                    "15g de psyllium puro em pó",
+                    "5g de goma xantana"
+                ],
+                "preparo_passos": [
+                    "Peneire todas as farinhas e amidos numa tigela ampla para homogeneização uniforme.",
+                    "Incorpore o psyllium e a goma xantana a seco antes de adicionar qualquer líquido.",
+                    "Armazene em recipiente hermético protegido de calor e humidade por até 60 dias."
+                ]
             }},
             {{
                 "numero": 2,
-                "titulo": "Título do Módulo 2",
-                "termo_busca_foto": "Termo em inglês para foto",
-                "conteudo": "Texto completo..."
+                "titulo": "Pão Francês & Pão Rústico de Crosta Crocante",
+                "termo_busca_foto": "crusty artisan bread oven fresh",
+                "dica_mestre": "O segredo do vapor inicial no forno para garantir pestana aberta e crosta crocante...",
+                "conteudo": "Metodologia prática para fermentação controlada e criação de vapor caseiro...",
+                "receita_nome": "Pão Rústico Artesanal de Fermentação Lenta",
+                "ingredientes": [
+                    "300g do Mix Base Universal",
+                    "280ml de água morna (35°C)",
+                    "7g de fermento biológico seco",
+                    "12g de açúcar mascavado ou mel",
+                    "8g de sal marinho fino",
+                    "25ml de azeite de oliva extravirgem"
+                ],
+                "preparo_passos": [
+                    "Hidrate o fermento na água morna com o açúcar e aguarde espumar por 10 minutos.",
+                    "Agregue a mistura líquida aos secos e bata vigorosamente com espátula até obter massa lisa e pegajosa.",
+                    "Modele com as mãos untadas em azeite e deixe fermentar em cesto com pano enfarinhado por 50 minutos.",
+                    "Asse a 220°C em forno pré-aquecido com bandeja de água no fundo durante os primeiros 20 minutos."
+                ]
             }},
             {{
                 "numero": 3,
-                "titulo": "Título do Módulo 3",
-                "termo_busca_foto": "Termo em inglês para foto",
-                "conteudo": "Texto completo..."
+                "titulo": "Pão de Forma Macio para Sanduíches e Torradas",
+                "termo_busca_foto": "sliced sandwich bread loaf table",
+                "dica_mestre": "Como manter o miolo húmido por até 5 dias sem endurecer nem esfarelar...",
+                "conteudo": "Técnicas de emulsão e uso de gorduras saudáveis para conservação natural da humidade...",
+                "receita_nome": "Pão de Forma Branco Tradicional Super Macio",
+                "ingredientes": [
+                    "250g de farinha de arroz",
+                    "100g de amido de milho ou fécula de mandioca",
+                    "10g de psyllium em pó",
+                    "4g de goma xantana",
+                    "2 ovos inteiros médios",
+                    "40ml de óleo de girassol ou coco derretido",
+                    "240ml de água morna",
+                    "20g de açúcar",
+                    "6g de sal"
+                ],
+                "preparo_passos": [
+                    "Bata os ovos com a água, óleo, açúcar e sal até formar emulsão homogénea.",
+                    "Adicione os secos previamente peneirados e misture em batedeira ou à mão por 4 minutos.",
+                    "Verta a massa para forma de pão de forma untada, nivele com espátula húmida e deixe crescer até dobrar de volume.",
+                    "Asse a 190°C por 35 a 40 minutos até dourar a superfície."
+                ]
             }},
             {{
                 "numero": 4,
-                "titulo": "Título do Módulo 4",
-                "termo_busca_foto": "Termo em inglês para foto",
-                "conteudo": "Texto completo..."
+                "titulo": "Guia de Diagnóstico de Erros & Precificação Comercial",
+                "termo_busca_foto": "baker weighing ingredients scale bakery",
+                "dica_mestre": "Nunca corte o pão sem glúten enquanto estiver quente; o vapor interno completa a estrutura do miolo...",
+                "conteudo": "Checklist prático de resolução de falhas: massa que afunda no centro (excesso de água ou fermentação prolongada), miolo esfarelado (falta de aglutinante ou hidratação insuficiente). Inclui método passo a passo para calcular o custo unitário e estipular margem de lucro de 60% a 150% na venda direta.",
+                "receita_nome": "Planilha Prática de Custo e Margem por Fornada",
+                "ingredientes": [
+                    "Insumos secos pesados",
+                    "Custos de energia/gás por ciclo de forno",
+                    "Embalagem própria microperfurada para conservação de crosta",
+                    "Margem de lucro sugerida (mínimo 100% sobre custo de insumo)"
+                ],
+                "preparo_passos": [
+                    "Pese com precisão todos os ingredientes para estabelecer o Custo da Mercadoria Vendida (CMV).",
+                    "Adicione 25% sobre o custo para despesas operacionais e perdas.",
+                    "Multiplique o subtotal por 2,2 para obter o preço de venda final com lucro sustentável."
+                ]
             }}
         ]
     }}
     """
-    resp = executar_prompt_ia(prompt, formato_json=True, temperatura=0.4)
+    resp = executar_prompt_ia(prompt, formato_json=True, temperatura=0.3)
     return json.loads(resp)
 
 def traduzir_ebook_completo_ia(dados_ebook: dict, idioma_destino: str, progress_bar=None) -> dict:
@@ -357,11 +392,21 @@ def traduzir_ebook_completo_ia(dados_ebook: dict, idioma_destino: str, progress_
     for cap in dados_ebook.get("capitulos", []):
         t_cap_tr = traduzir_texto_ia(cap.get("titulo", ""), idioma_destino)
         c_cap_tr = traduzir_texto_ia(cap.get("conteudo", ""), idioma_destino)
+        dica_tr = traduzir_texto_ia(cap.get("dica_mestre", ""), idioma_destino)
+        r_nome_tr = traduzir_texto_ia(cap.get("receita_nome", ""), idioma_destino)
+        
+        ing_tr = [traduzir_texto_ia(i, idioma_destino) for i in cap.get("ingredientes", [])]
+        passos_tr = [traduzir_texto_ia(p, idioma_destino) for p in cap.get("preparo_passos", [])]
+
         capitulos_tr.append({
             "numero": cap.get("numero", 1),
             "titulo": t_cap_tr,
             "termo_busca_foto": cap.get("termo_busca_foto", ""),
-            "conteudo": c_cap_tr
+            "dica_mestre": dica_tr,
+            "conteudo": c_cap_tr,
+            "receita_nome": r_nome_tr,
+            "ingredientes": ing_tr,
+            "preparo_passos": passos_tr
         })
         etapa_atual += 1
         if progress_bar:
@@ -376,8 +421,38 @@ def traduzir_ebook_completo_ia(dados_ebook: dict, idioma_destino: str, progress_
     }
 
 # ==============================================================================
-# 4. PROCESSAMENTO GRÁFICO (PDF REPORTLAB COM FOTOS DO PEXELS)
+# 4. PROCESSAMENTO GRÁFICO (PDF REPORTLAB COM DIAGRAMAÇÃO EDITORIAL)
 # ==============================================================================
+class NumeradorPaginas(canvas.Canvas):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.pages = []
+
+    def showPage(self):
+        self.pages.append(dict(self.__dict__))
+        self._startPage()
+
+    def save(self):
+        num_paginas = len(self.pages)
+        for page in self.pages:
+            self.__dict__.update(page)
+            self.draw_footer(num_paginas)
+            super().showPage()
+        super().save()
+
+    def draw_footer(self, page_count):
+        if self._pageNumber > 1:
+            self.saveState()
+            self.setFont("Helvetica", 9)
+            self.setFillColor(colors.HexColor("#64748B"))
+            texto_pag = f"Página {self._pageNumber} de {page_count}"
+            self.drawRightString(567, 30, texto_pag)
+            self.drawString(45, 30, "Guia Prático e Comercial - Todos os direitos reservados.")
+            self.setStrokeColor(colors.HexColor("#CBD5E1"))
+            self.setLineWidth(0.5)
+            self.line(45, 42, 567, 42)
+            self.restoreState()
+
 def buscar_foto_pexels(query: str, pexels_key: str, dest_path: str) -> bool:
     if not pexels_key or not query:
         return False
@@ -404,29 +479,31 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_pdf: str)
         rightMargin=45,
         leftMargin=45,
         topMargin=45,
-        bottomMargin=45
+        bottomMargin=55
     )
     styles = getSampleStyleSheet()
 
-    cor_primaria = colors.HexColor("#1A202C")
-    cor_destaque = colors.HexColor("#2B6CB0")
+    cor_primaria = colors.HexColor("#0F172A")
+    cor_azul = colors.HexColor("#1D4ED8")
+    cor_azul_claro = colors.HexColor("#EFF6FF")
+    cor_borda = colors.HexColor("#BFDBFE")
 
     estilo_capa_tit = ParagraphStyle(
         'CapaTitulo',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=28,
-        leading=34,
-        textColor=cor_destaque,
+        fontSize=26,
+        leading=32,
+        textColor=cor_azul,
         alignment=1,
-        spaceAfter=15
+        spaceAfter=12
     )
     estilo_capa_sub = ParagraphStyle(
         'CapaSub',
         parent=styles['Normal'],
         fontName='Helvetica-Oblique',
-        fontSize=15,
-        leading=20,
+        fontSize=14,
+        leading=19,
         textColor=cor_primaria,
         alignment=1,
         spaceAfter=25
@@ -435,70 +512,133 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_pdf: str)
         'TitCap',
         parent=styles['Heading1'],
         fontName='Helvetica-Bold',
-        fontSize=20,
-        leading=26,
-        textColor=cor_destaque,
-        spaceBefore=15,
-        spaceAfter=12
+        fontSize=18,
+        leading=24,
+        textColor=cor_azul,
+        spaceBefore=12,
+        spaceAfter=10
+    )
+    estilo_h2 = ParagraphStyle(
+        'TitSec',
+        parent=styles['Heading2'],
+        fontName='Helvetica-Bold',
+        fontSize=13,
+        leading=18,
+        textColor=cor_primaria,
+        spaceBefore=10,
+        spaceAfter=6
     )
     estilo_corpo = ParagraphStyle(
         'CorpoTexto',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=11,
-        leading=17,
+        fontSize=10,
+        leading=16,
         textColor=cor_primaria,
-        spaceAfter=10
+        spaceAfter=8
+    )
+    estilo_item = ParagraphStyle(
+        'ItemLista',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=9.5,
+        leading=15,
+        textColor=cor_primaria,
+        spaceAfter=4
+    )
+    estilo_box = ParagraphStyle(
+        'BoxDica',
+        parent=styles['Normal'],
+        fontName='Helvetica-Oblique',
+        fontSize=9.5,
+        leading=14,
+        textColor=colors.HexColor("#1E3A8A")
     )
 
     flowables = []
 
     # CAPA
-    flowables.append(Spacer(1, 40))
+    flowables.append(Spacer(1, 30))
     flowables.append(Paragraph(dados.get("titulo", "Manual Técnico"), estilo_capa_tit))
-    flowables.append(Paragraph(dados.get("subtitulo", "Guia de Implementação e Resultados"), estilo_capa_sub))
+    flowables.append(Paragraph(dados.get("subtitulo", "Guia Prático e Comercial"), estilo_capa_sub))
 
-    termo_capa = dados.get("termo_capa", "business strategy")
+    termo_capa = dados.get("termo_capa", "artisan bread")
     capa_img_path = os.path.join(DIR_PEXELS, f"capa_{int(time.time())}.jpg")
     if buscar_foto_pexels(termo_capa, pexels_key, capa_img_path):
         try:
-            flowables.append(RLImage(capa_img_path, width=480, height=270))
+            flowables.append(RLImage(capa_img_path, width=500, height=270))
         except Exception:
             pass
 
     flowables.append(PageBreak())
 
     # INTRODUÇÃO
-    flowables.append(Paragraph("Introdução Estratégica", estilo_h1))
-    flowables.append(Spacer(1, 10))
+    flowables.append(Paragraph("Introdução Técnica & Fundamentos Comerciais", estilo_h1))
+    flowables.append(Spacer(1, 6))
     for p in dados.get("introducao", "").split("\n"):
         if p.strip():
             flowables.append(Paragraph(p.strip(), estilo_corpo))
 
     flowables.append(PageBreak())
 
-    # CAPÍTULOS
+    # CAPÍTULOS TÉCNICOS
     for cap in dados.get("capitulos", []):
         flowables.append(Paragraph(f"Módulo {cap.get('numero')}: {cap.get('titulo')}", estilo_h1))
-        flowables.append(Spacer(1, 8))
+        flowables.append(Spacer(1, 6))
 
         termo_cap = cap.get("termo_busca_foto", "")
         if termo_cap:
             cap_img_path = os.path.join(DIR_PEXELS, f"cap_{cap.get('numero')}_{int(time.time())}.jpg")
             if buscar_foto_pexels(termo_cap, pexels_key, cap_img_path):
                 try:
-                    flowables.append(RLImage(cap_img_path, width=460, height=240))
-                    flowables.append(Spacer(1, 12))
+                    flowables.append(RLImage(cap_img_path, width=480, height=210))
+                    flowables.append(Spacer(1, 8))
                 except Exception:
                     pass
 
+        # Caixa de Dica de Ouro / Mestre
+        dica = cap.get("dica_mestre", "")
+        if dica:
+            tabela_dica = Table(
+                [[Paragraph(f"<b>💡 Dica de Ouro do Mestre:</b> {dica}", estilo_box)]],
+                colWidths=[500]
+            )
+            tabela_dica.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, -1), cor_azul_claro),
+                ('BOX', (0, 0), (-1, -1), 1, cor_borda),
+                ('PADDING', (0, 0), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ]))
+            flowables.append(tabela_dica)
+            flowables.append(Spacer(1, 10))
+
+        # Texto do Capítulo
         for p_cap in cap.get("conteudo", "").split("\n"):
             if p_cap.strip():
                 flowables.append(Paragraph(p_cap.strip(), estilo_corpo))
 
+        # Seção de Receita Prática Estruturada
+        receita_nome = cap.get("receita_nome", "")
+        if receita_nome:
+            flowables.append(Spacer(1, 6))
+            flowables.append(Paragraph(f"📋 Ficha Técnica: {receita_nome}", estilo_h2))
+
+            ingredientes = cap.get("ingredientes", [])
+            if ingredientes:
+                flowables.append(Paragraph("<b>Ingredientes & Proporções:</b>", estilo_item))
+                for ing in ingredientes:
+                    flowables.append(Paragraph(f"• {ing}", estilo_item))
+                flowables.append(Spacer(1, 6))
+
+            passos = cap.get("preparo_passos", [])
+            if passos:
+                flowables.append(Paragraph("<b>Modo de Preparo Passo a Passo:</b>", estilo_item))
+                for idx_p, passo in enumerate(passos, 1):
+                    flowables.append(Paragraph(f"<b>{idx_p}.</b> {passo}", estilo_item))
+
         flowables.append(PageBreak())
 
-    doc.build(flowables)
+    doc.build(flowables, canvasmaker=NumeradorPaginas)
     return caminho_pdf
 
 # ==============================================================================
@@ -724,7 +864,7 @@ def dublar_roteiro_e_renderizar_vsl(
 # 6. INTERFACE STREAMLIT (SISTEMA CENTRALIZADO)
 # ==============================================================================
 
-# BARRA LATERAL (AUTENTICAÇÃO & SALDO)
+# BARRA LATERAL
 with st.sidebar:
     st.sidebar.markdown(
         """
@@ -760,7 +900,6 @@ with st.sidebar:
     st.caption("Automação de Produtos Digitais & Escala Internacional")
     st.markdown("---")
 
-    # CONTROLE DE SESSÃO: Mantém sempre o último e-mail ativo na tela (padrão erp61eng@gmail.com)
     if "email_usuario_ativo" not in st.session_state:
         st.session_state["email_usuario_ativo"] = "erp61eng@gmail.com"
 
@@ -799,7 +938,7 @@ with st.sidebar:
     st.write("• Gemini:", "🟢 Ativo" if GEMINI_API_KEY else "🔴 Ausente")
     st.write("• Pexels:", "🟢 Ativo" if PEXELS_API_KEY else "🔴 Ausente")
 
-# ABAS PRINCIPAIS DO SISTEMA
+# ABAS PRINCIPAIS
 tab_minerador, tab_vsl, tab_ebook, tab_master = st.tabs([
     "🔍 1. Minerador & Google Ads",
     "🚀 2. Criar VSL & Dublagem Global",
@@ -820,10 +959,10 @@ with tab_minerador:
         "🐕 Adestramento Canino & Comportamento Pet",
         "💰 Renda Extra & Milhas Aéreas",
         "🌱 Jardinagem, Suculentas & Hortas em Apartamento",
-        "🛠️️ Manutenção Residencial & Marido de Aluguel",
+        "🛠️ Manutenção Residencial & Marido de Aluguel",
         "💅 Estética, Cílios & Sobrancelhas",
         "🧘 Saúde Natural, Chás Medicinais & Sono",
-        "✍️ Digitar Nicho Personalizado (Manual)..."
+        "✍️️ Digitar Nicho Personalizado (Manual)..."
     ]
 
     col_m1, col_m2 = st.columns([2, 1])
@@ -836,8 +975,7 @@ with tab_minerador:
     if "Manual" in nicho_sel:
         nicho_manual = st.text_input(
             "Digite o Nicho ou Micronicho que deseja pesquisar:",
-            placeholder="Ex: Instalação e higienização de ar condicionado split",
-            help="Pode ser qualquer tema técnico, comercial ou de hobby."
+            placeholder="Ex: Instalação e higienização de ar condicionado split"
         )
         if nicho_manual.strip():
             nicho_final = nicho_manual.strip()
@@ -935,7 +1073,6 @@ with tab_vsl:
                 except Exception as e_vsl:
                     st.error(f"Erro na renderização da VSL: {e_vsl}")
 
-    # Exibição do Vídeo Original e Botão de Dublagem
     if st.session_state.get("video_vsl_pronto") and os.path.exists(st.session_state["video_vsl_pronto"]):
         st.markdown("---")
         st.markdown("### 🎬 Vídeo VSL Finalizado:")
@@ -950,11 +1087,10 @@ with tab_vsl:
                 use_container_width=True
             )
 
-        # MÓDULO DE DUBLAGEM GLOBAL PARA 36 IDIOMAS
         st.markdown("---")
         with st.container(border=True):
             st.markdown("### 🌐 Dublar VSL em 36 Idiomas (DubfyAi Global)")
-            st.caption("Traduza a narração, gere novas vozes nativas e re-sincronize as durações dos cortes automaticamente.")
+            st.caption("Traduza a narração, adapte valores para moedas locais e re-sincronize cortes.")
 
             col_d1, col_d2 = st.columns([2, 1])
             with col_d1:
@@ -1007,40 +1143,39 @@ with tab_vsl:
                 )
 
 # ------------------------------------------------------------------------------
-# ABA 3: CRIAR E-BOOK & TRADUÇÃO GLOBAL
+# ABA 3: CRIAR E-BOOK & TRADUÇÃO GLOBAL (PROFISSIONAL & DENSO)
 # ------------------------------------------------------------------------------
 with tab_ebook:
-    st.markdown("## 📚 Criador de E-book com Fotos Reais & Tradução Global")
-    st.caption("Escreva manuais completos com fotos do Pexels e traduza o livro inteiro para 36 idiomas em 1 clique.")
+    st.markdown("## 📚 Criador de E-book Comercial & Diagramação Editorial")
+    st.caption("Gere manuais práticos com fichas técnicas, gramagens exatas, guia de erros e precificação para venda imediata.")
 
     col_e1, col_e2 = st.columns(2)
     with col_e1:
         tema_ebook = st.text_input("Tema do E-book:", "Manual Definitivo dos Pães Sem Glúten")
     with col_e2:
-        publico_ebook = st.text_input("Público-Alvo:", "Pessoas com restrição alimentar e empreendedoras")
+        publico_ebook = st.text_input("Público-Alvo:", "Pessoas com restrição alimentar e empreendedoras de confeitaria")
 
-    if st.button("📖 Gerar E-book Completo com Fotos (.PDF) (10 cr)", type="primary"):
+    if st.button("📖 Gerar E-book Profissional Completo (.PDF) (10 cr)", type="primary"):
         if saldo_atual < 10:
-            st.error("❌ Saldo insuficiente! Você precisa de 10 créditos.")
+            st.error("❌ Saldo insuficiente! Precisa de 10 créditos.")
         else:
-            with st.spinner("Estruturando capítulos, baixando fotos em HD e gerando PDF..."):
+            with st.spinner("Construindo receitas completas, guias de diagnóstico e compilando PDF editorial..."):
                 try:
                     dados_eb = gerar_conteudo_ebook_ia(tema_ebook, publico_ebook)
                     st.session_state["dados_ebook_sessao"] = dados_eb
 
-                    nome_pdf = f"ebook_{int(time.time())}.pdf"
+                    nome_pdf = f"manual_comercial_{int(time.time())}.pdf"
                     caminho_pdf = os.path.join(DIR_EBOOKS, nome_pdf)
                     compilar_pdf_ebook_com_fotos(dados_eb, PEXELS_API_KEY, caminho_pdf)
 
                     debitar_creditos_cloud(email_usuario, f"Criação E-book ({tema_ebook})", 10)
                     st.session_state["pdf_ebook_pronto"] = caminho_pdf
                     st.session_state["pdf_ebook_nome"] = nome_pdf
-                    st.success("✅ E-book gerado e compilado com sucesso!")
+                    st.success("✅ E-book profissional gerado e diagramado com sucesso!")
                     st.rerun()
                 except Exception as e_eb:
                     st.error(f"Erro na compilação do E-book: {e_eb}")
 
-    # Exibição do E-book Pronto e Expansão Global
     if st.session_state.get("pdf_ebook_pronto") and os.path.exists(st.session_state["pdf_ebook_pronto"]):
         st.markdown("---")
         st.markdown("### 📥 Seu E-book Original em Português:")
@@ -1053,11 +1188,10 @@ with tab_ebook:
                 use_container_width=True
             )
 
-        # TRADUÇÃO GLOBAL NAS 36 LÍNGUAS
         st.markdown("---")
         with st.container(border=True):
             st.markdown("### 🌐 Tradução Global do E-book (36 Idiomas)")
-            st.caption("Internacionalize seu livro mantendo a estrutura de capítulos, imagens em alta resolução e paginação profissional.")
+            st.caption("Internacionalize mantendo receitas em gramas, caixas de destaque e paginação.")
 
             col_tr1, col_tr2 = st.columns([2, 1])
             with col_tr1:
@@ -1075,7 +1209,7 @@ with tab_ebook:
                 else:
                     nome_lingua_eb = IDIOMAS_SISTEMA_36[idioma_eb_sel]
                     barra_eb_tr = st.progress(0.0)
-                    with st.spinner(f"Traduzindo capa, introdução e todos os módulos para {idioma_eb_sel}..."):
+                    with st.spinner(f"Traduzindo receitas, caixas de destaque e módulos para {idioma_eb_sel}..."):
                         try:
                             dados_tr = traduzir_ebook_completo_ia(
                                 st.session_state["dados_ebook_sessao"],
@@ -1114,7 +1248,7 @@ with tab_ebook:
 # ------------------------------------------------------------------------------
 with tab_master:
     st.markdown("## 👑 Painel de Gestão Master")
-    st.caption("Visão geral de faturamento, volume de usuários e integridade do sistema.")
+    st.caption("Visão geral de faturação, volume de utilizadores e integridade do sistema.")
 
     if not supabase_client:
         st.warning("Conexão com o Supabase inativa ou chaves não configuradas.")
@@ -1132,7 +1266,7 @@ with tab_master:
 
             cm1, cm2, cm3 = st.columns(3)
             with cm1:
-                st.metric("Faturamento Kiwify", f"R$ {faturamento_total:,.2f}")
+                st.metric("Faturação Kiwify", f"R$ {faturamento_total:,.2f}")
             with cm2:
                 st.metric("Total de Clientes", total_clientes)
             with cm3:
@@ -1143,7 +1277,7 @@ with tab_master:
             if pedidos_lista:
                 st.dataframe(pedidos_lista, use_container_width=True)
             else:
-                st.info("Nenhum pedido registrado até o momento.")
+                st.info("Nenhum pedido registado até ao momento.")
 
         except Exception as e_master:
             st.error(f"Erro ao carregar dados administrativos: {e_master}")
