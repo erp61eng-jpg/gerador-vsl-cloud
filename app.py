@@ -144,7 +144,7 @@ def debitar_creditos_cloud(email: str, operacao: str, quantidade: int) -> bool:
         return False
 
 # ==============================================================================
-# 3. MOTORES DE IA: GERAÇÃO, TRADUÇÃO & MINERAÇÃO
+# 3. MOTORES DE IA: GERAÇÃO, TRANSCIAÇÃO & MINERAÇÃO
 # ==============================================================================
 def executar_prompt_ia(prompt: str, formato_json: bool = False, temperatura: float = 0.4) -> str:
     if GEMINI_API_KEY:
@@ -173,15 +173,26 @@ def executar_prompt_ia(prompt: str, formato_json: bool = False, temperatura: flo
     raise ValueError("Nenhuma chave válida configurada para Gemini ou OpenAI.")
 
 def traduzir_texto_ia(texto: str, idioma_destino: str) -> str:
+    """Traduz e localiza a copy adaptando valores financeiros para a realidade cultural de cada país."""
     if not texto.strip():
         return ""
     prompt = f"""
-    Atue como tradutor nativo e copywriter sênior no idioma '{idioma_destino}'.
-    Traduza o texto abaixo mantendo o tom persuasivo, ritmo natural e métrica comercial:
-    
+    Atue como tradutor nativo de elite, especialista em localização cultural e copywriter sênior no idioma '{idioma_destino}'.
+    Traduza e faça a TRANSCIAÇÃO do texto abaixo, mantendo a métrica de vendas, persuasão visceral, fluidez nativa e ritmo comercial.
+
+    REGRA DE OURO - LOCALIZAÇÃO FINANCEIRA & MOEDA (CRÍTICO):
+    1. NUNCA mantenha valores em 'Reais' ou 'R$' em textos para o exterior.
+    2. NUNCA faça conversão cega 1 para 1 (exemplo: JAMAIS transforme R$ 3.000 em 3.000 Euros ou 3.000 Dólares! Na Europa ou EUA, 3.000 em renda extra caseira soa como fraude e gera bloqueio imediato no Google/Meta Ads).
+    3. Adapte promessas financeiras para valores realistas e críveis na moeda do país de destino (Paridade de Poder de Compra):
+       - Se o idioma for Espanhol ou europeu (Espanhol, Francês, Alemão, Italiano): R$ 3.000 de renda extra deve ser adaptado para "entre 600€ e 1.000€" (ex: "generar entre 600 y 1.000 euros extra al mes desde tu cocina").
+       - Se o idioma for Inglês / Dólar: R$ 3.000 deve ser adaptado para "$600 a $1.200 USD".
+       - Para outros países, adapte para uma renda extra mensal proporcional, crível e que respeite as diretrizes de compliance de tráfego pago.
+    4. O texto deve soar 100% natural para um habitante nativo de '{idioma_destino}', eliminando gírias ou vícios linguísticos brasileiros.
+
+    Texto original para tradução/transcriação:
     "{texto}"
-    
-    Retorne estritamente o texto traduzido, sem aspas e sem explicações.
+
+    Retorne estritamente o texto final adaptado, sem aspas, sem explicações e sem preâmbulos.
     """
     try:
         return executar_prompt_ia(prompt, formato_json=False, temperatura=0.3).strip()
@@ -809,7 +820,7 @@ with tab_minerador:
         "🐕 Adestramento Canino & Comportamento Pet",
         "💰 Renda Extra & Milhas Aéreas",
         "🌱 Jardinagem, Suculentas & Hortas em Apartamento",
-        "🛠️ Manutenção Residencial & Marido de Aluguel",
+        "🛠️️ Manutenção Residencial & Marido de Aluguel",
         "💅 Estética, Cílios & Sobrancelhas",
         "🧘 Saúde Natural, Chás Medicinais & Sono",
         "✍️ Digitar Nicho Personalizado (Manual)..."
