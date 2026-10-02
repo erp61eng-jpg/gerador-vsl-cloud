@@ -2,6 +2,7 @@ import os
 import re
 import json
 import time
+import textwrap
 import subprocess
 import requests
 from datetime import datetime
@@ -235,25 +236,53 @@ def minerar_nicho_profundo_ia(nicho: str, profundidade: str) -> str:
     """
     return executar_prompt_ia(prompt, formato_json=False, temperatura=0.35)
 
-def gerar_roteiro_vsl_ia(nicho: str, promessa: str, publico: str, num_cenas: int = 5) -> List[str]:
+def gerar_roteiro_vsl_ia(nicho: str, promessa: str, publico: str, num_cenas: int = 5) -> List[Dict[str, str]]:
     prompt = f"""
-    Crie um roteiro persuasivo de alta conversão para VSL (Vídeo de Vendas) sobre:
-    Nicho: {nicho}
-    Promessa: {promessa}
-    Público: {publico}
+    Atue como um Diretor de Criação de VSL (Vídeo de Vendas) de altíssima conversão.
+    Crie um roteiro persuasivo e magnético sobre:
+    - Nicho: {nicho}
+    - Promessa Principal: {promessa}
+    - Público-Alvo: {publico}
     
-    Gere exatamente {num_cenas} frases de impacto direto (cada frase representará uma cena com corte visual dinâmico).
+    Gere exatamente {num_cenas} cenas cronológicas (gancho de atenção, dor, solução, benefício e CTA).
+    Para CADA cena, gere:
+    1. "fala": A frase publicitária em português falada na cena (impactante, curta, entre 10 e 18 palavras).
+    2. "termo_video": Termo em INGLÊS de 2 a 4 palavras para buscar vídeos em alta definição no Pexels que represente perfeitamente o visual daquela cena (Exemplos de termos excelentes: "artisan sourdough bread", "baking fresh bread oven", "kneading dough flour", "woman baker smiling kitchen", "pastry chef bakery display"). NUNCA use termos genéricos como "happy" ou frases em português.
+
     Retorne estritamente um JSON no seguinte formato:
     {{
         "cenas": [
-            "Frase da cena 1...",
-            "Frase da cena 2..."
+            {{
+                "fala": "Descubra o segredo dos pães artesanais que transformam sua cozinha em um negócio lucrativo.",
+                "termo_video": "artisan bread bakery"
+            }},
+            {{
+                "fala": "Imagine faturar R$ 3.000 todos os meses produzindo delícias sem glúten na sua casa.",
+                "termo_video": "woman kneading dough"
+            }}
         ]
     }}
     """
-    resp = executar_prompt_ia(prompt, formato_json=True, temperatura=0.5)
-    dados = json.loads(resp)
-    return dados.get("cenas", [])
+    resp = executar_prompt_ia(prompt, formato_json=True, temperatura=0.4)
+    try:
+        dados = json.loads(resp)
+        cenas_raw = dados.get("cenas", [])
+        cenas_limpas = []
+        for c in cenas_raw:
+            if isinstance(c, dict):
+                fala = c.get("fala", c.get("texto", "")).strip()
+                termo = c.get("termo_video", c.get("termo_busca", "artisan bread baking")).strip()
+                if fala:
+                    cenas_limpas.append({"fala": fala, "termo_video": termo})
+            elif isinstance(c, str) and c.strip():
+                cenas_limpas.append({"fala": c.strip(), "termo_video": "artisan bread baking"})
+        return cenas_limpas if cenas_limpas else [{"fala": promessa, "termo_video": "artisan bread"}]
+    except Exception:
+        return [
+            {"fala": f"Descubra o método definitivo sobre {nicho}.", "termo_video": "artisan bread baking"},
+            {"fala": promessa, "termo_video": "fresh bread oven"},
+            {"fala": "Resultados comprovados para transformar sua vida.", "termo_video": "happy woman kitchen baking"}
+        ]
 
 def gerar_conteudo_ebook_ia(tema: str, publico: str) -> dict:
     prompt = f"""
@@ -488,31 +517,56 @@ def obter_duracao_audio(audio_path: str) -> float:
         return 4.0
 
 def buscar_video_pexels(query: str, pexels_key: str, dest_path: str, vertical: bool = False) -> bool:
-    if not pexels_key or not query:
+    """Busca vídeos de alta qualidade no Pexels com suporte a termos em inglês e fallbacks automáticos."""
+    if not pexels_key:
         return False
+
+    termos_tentativa = [query, "artisan sourdough bread", "baking bread kitchen", "bakery chef display"]
     orientacao = "portrait" if vertical else "landscape"
-    url = f"https://api.pexels.com/videos/search?query={requests.utils.quote(query)}&per_page=1&orientation={orientacao}"
     headers = {"Authorization": pexels_key}
-    try:
-        res = requests.get(url, headers=headers, timeout=12)
-        if res.status_code == 200:
-            data = res.json()
-            if data.get("videos"):
-                video_files = data["videos"][0].get("video_files", [])
-                target_files = [v for v in video_files if v.get("width") and v.get("height")]
-                if target_files:
-                    target_files.sort(key=lambda x: x["width"] * x["height"], reverse=True)
-                    video_url = target_files[0]["link"]
-                    v_bytes = requests.get(video_url, timeout=20).content
-                    with open(dest_path, "wb") as f:
-                        f.write(v_bytes)
-                    return True
-    except Exception:
-        pass
+
+    for termo in termos_tentativa:
+        termo_limpo = re.sub(r'[^a-zA-Z0-9\s]', '', str(termo)).strip()
+        if not termo_limpo:
+            continue
+        try:
+            url = f"https://api.pexels.com/videos/search?query={requests.utils.quote(termo_limpo)}&per_page=4&orientation={orientacao}"
+            res = requests.get(url, headers=headers, timeout=12)
+            if res.status_code == 200:
+                data = res.json()
+                videos = data.get("videos", [])
+                if videos:
+                    for vid in videos:
+                        vfiles = vid.get("video_files", [])
+                        validos = [v for v in vfiles if v.get("width") and v.get("height") and v.get("link")]
+                        if validos:
+                            # Prioriza HD (720p ou 1080p) para download rápido e estável
+                            validos.sort(key=lambda x: x["width"] * x["height"], reverse=True)
+                            escolhido = validos[0]
+                            for v in validos:
+                                if v.get("height") in [720, 1080] or v.get("width") in [720, 1080]:
+                                    escolhido = v
+                                    break
+                            v_bytes = requests.get(escolhido["link"], timeout=25).content
+                            if len(v_bytes) > 60000:
+                                with open(dest_path, "wb") as f:
+                                    f.write(v_bytes)
+                                return True
+        except Exception:
+            continue
     return False
 
+def criar_arquivo_legenda(texto: str, output_path: str, vertical: bool = False) -> str:
+    """Gera arquivo com quebra de linha harmoniosa para evitar corte de texto nas bordas."""
+    largura = 22 if vertical else 38
+    linhas = textwrap.wrap(texto.strip(), width=largura)
+    texto_formatado = "\n".join(linhas)
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(texto_formatado)
+    return output_path
+
 def renderizar_vsl_completa(
-    frases: List[str],
+    cenas: List[Dict[str, str]],
     vertical: bool,
     voz: str,
     pexels_key: str,
@@ -523,44 +577,62 @@ def renderizar_vsl_completa(
 ) -> str:
     res_w, res_h = (1080, 1920) if vertical else (1920, 1080)
     cenas_clipes = []
-    total = len(frases)
+    total = len(cenas)
 
-    for idx, frase in enumerate(frases):
+    for idx, item in enumerate(cenas):
+        frase = item.get("fala", "") if isinstance(item, dict) else str(item)
+        termo_video = item.get("termo_video", "artisan bread") if isinstance(item, dict) else "artisan bread"
+
         prefixo = f"cena_{idx}_{int(time.time())}"
         a_path = os.path.join(DIR_AUDIOS, f"{prefixo}.mp3")
         sintetizar_audio_tts(frase, a_path, voz=voz)
         duracao = obter_duracao_audio(a_path)
 
         v_raw_path = os.path.join(DIR_PEXELS, f"{prefixo}_raw.mp4")
-        tem_video = buscar_video_pexels(frase, pexels_key, v_raw_path, vertical=vertical)
+        tem_video = buscar_video_pexels(termo_video, pexels_key, v_raw_path, vertical=vertical)
 
         cena_out = os.path.join(DIR_VSL, f"{prefixo}_out.mp4")
 
-        # Escapando o texto para o filtro drawtext do FFmpeg
-        txt_escapado = frase.replace(":", "\\:").replace("'", "").replace('"', '').replace("%", "\\%")
+        # Criação de legenda formatada em arquivo UTF-8 para suporte a acentos e quebra de linhas
+        legenda_txt = os.path.join(DIR_VSL, f"{prefixo}_legenda.txt")
+        criar_arquivo_legenda(frase, legenda_txt, vertical=vertical)
+        legenda_path_escapado = legenda_txt.replace(os.sep, "/").replace(":", "\\:")
+
+        fontsize = 44 if not vertical else 48
+        pos_y = "h-(h*0.24)" if not vertical else "h-(h*0.30)"
 
         if tem_video and os.path.exists(v_raw_path):
             vf = (
                 f"scale={res_w}:{res_h}:force_original_aspect_ratio=increase,"
                 f"crop={res_w}:{res_h},"
-                f"drawtext=text='{txt_escapado}':fontcolor=white:fontsize=48:box=1:boxcolor=black@0.65:"
-                f"boxborderw=14:x=(w-text_w)/2:y=h-(h*0.22)"
+                f"setsar=1,"
+                f"fps=30,"
+                f"drawtext=textfile='{legenda_path_escapado}':fontcolor=white:fontsize={fontsize}:"
+                f"box=1:boxcolor=black@0.75:boxborderw=16:line_spacing=12:"
+                f"x=(w-text_w)/2:y={pos_y}"
             )
             cmd = [
                 "ffmpeg", "-y", "-stream_loop", "-1", "-i", v_raw_path,
                 "-i", a_path, "-t", str(duracao),
-                "-vf", vf, "-c:v", "libx264", "-c:a", "aac", "-b:a", "192k",
+                "-vf", vf,
+                "-c:v", "libx264", "-preset", "ultrafast", "-crf", "22",
+                "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2",
                 "-pix_fmt", "yuv420p", "-shortest", cena_out
             ]
         else:
             vf = (
-                f"drawtext=text='{txt_escapado}':fontcolor=white:fontsize=52:box=1:boxcolor=blue@0.65:"
-                f"boxborderw=18:x=(w-text_w)/2:y=(h-text_h)/2"
+                f"setsar=1,fps=30,"
+                f"drawtext=textfile='{legenda_path_escapado}':fontcolor=white:fontsize={fontsize+4}:"
+                f"box=1:boxcolor=blue@0.65:boxborderw=20:line_spacing=14:"
+                f"x=(w-text_w)/2:y=(h-text_h)/2"
             )
             cmd = [
-                "ffmpeg", "-y", "-f", "lavfi", "-i", f"color=c=0x1A202C:s={res_w}x{res_h}:d={duracao}",
-                "-i", a_path, "-vf", vf, "-c:v", "libx264", "-c:a", "aac",
-                "-b:a", "192k", "-pix_fmt", "yuv420p", "-shortest", cena_out
+                "ffmpeg", "-y", "-f", "lavfi", "-i", f"color=c=0x0F172A:s={res_w}x{res_h}:d={duracao}",
+                "-i", a_path, "-t", str(duracao),
+                "-vf", vf,
+                "-c:v", "libx264", "-preset", "ultrafast", "-crf", "22",
+                "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2",
+                "-pix_fmt", "yuv420p", "-shortest", cena_out
             ]
 
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
@@ -569,7 +641,7 @@ def renderizar_vsl_completa(
         if progress_bar:
             progress_bar.progress((idx + 0.8) / total)
 
-    # Concatenação das cenas
+    # Concatenação profissional re-renderizada (elimina qualquer travamento entre cenas)
     concat_txt_path = os.path.join(DIR_VSL, f"concat_{int(time.time())}.txt")
     with open(concat_txt_path, "w", encoding="utf-8") as f:
         for c in cenas_clipes:
@@ -578,11 +650,13 @@ def renderizar_vsl_completa(
     vsl_sem_trilha = os.path.join(DIR_VSL, f"vsl_base_{int(time.time())}.mp4")
     cmd_concat = [
         "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", concat_txt_path,
-        "-c", "copy", vsl_sem_trilha
+        "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
+        "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2",
+        vsl_sem_trilha
     ]
     subprocess.run(cmd_concat, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
 
-    # Finalização: Trilha sonora e Logótipo
+    # Finalização: Trilha sonora (se houver)
     vsl_final = os.path.join(DIR_VSL, f"vsl_final_{int(time.time())}.mp4")
     if musica_fundo_path and os.path.exists(musica_fundo_path):
         cmd_final = [
@@ -599,7 +673,7 @@ def renderizar_vsl_completa(
     return vsl_final
 
 def dublar_roteiro_e_renderizar_vsl(
-    frases_originais: List[str],
+    cenas_originais: List[Dict[str, str]],
     idioma_alvo: str,
     vertical: bool,
     voz: str,
@@ -608,25 +682,21 @@ def dublar_roteiro_e_renderizar_vsl(
     volume_musica: float = 0.08,
     logo_path: Optional[str] = None,
     progress_bar = None
-) -> Tuple[str, List[str]]:
-    frases_traduzidas = []
-    total_frases = len(frases_originais)
+) -> Tuple[str, List[Dict[str, str]]]:
+    cenas_traduzidas = []
+    total_frases = len(cenas_originais)
 
-    for idx_f, frase in enumerate(frases_originais):
-        prompt_tr_cena = f"""
-        Atue como locutor publicitário e copywriter no idioma '{idioma_alvo}'.
-        Traduza e adapte a seguinte frase de VSL para uma fala de alto impacto, natural e persuasiva:
-        "{frase}"
-        
-        Retorne estritamente a frase traduzida, sem aspas ou explicações.
-        """
-        texto_tr = traduzir_texto_ia(frase, idioma_alvo)
-        frases_traduzidas.append(texto_tr)
+    for idx_f, cena in enumerate(cenas_originais):
+        fala_orig = cena.get("fala", "") if isinstance(cena, dict) else str(cena)
+        termo_orig = cena.get("termo_video", "artisan bread") if isinstance(cena, dict) else "artisan bread"
+
+        texto_tr = traduzir_texto_ia(fala_orig, idioma_alvo)
+        cenas_traduzidas.append({"fala": texto_tr, "termo_video": termo_orig})
         if progress_bar:
             progress_bar.progress((idx_f + 1) / (total_frases * 2))
 
     video_dublado = renderizar_vsl_completa(
-        frases=frases_traduzidas,
+        cenas=cenas_traduzidas,
         vertical=vertical,
         voz=voz,
         pexels_key=pexels_key,
@@ -635,7 +705,7 @@ def dublar_roteiro_e_renderizar_vsl(
         logo_path=logo_path,
         progress_bar=progress_bar
     )
-    return video_dublado, frases_traduzidas
+    return video_dublado, cenas_traduzidas
 
 # ==============================================================================
 # 6. INTERFACE STREAMLIT (SISTEMA CENTRALIZADO)
@@ -812,10 +882,10 @@ with tab_vsl:
             st.error("❌ Saldo insuficiente! Você precisa de 20 créditos.")
         else:
             barra_vsl = st.progress(0.0)
-            with st.spinner("Gerando roteiro magnético e compilando cenas no FFmpeg..."):
+            with st.spinner("Criando cenas com visuais do Pexels, áudio sincronizado e cortes dinâmicos..."):
                 try:
-                    roteiro_frases = gerar_roteiro_vsl_ia(tema_vsl, promessa_vsl, publico_vsl, qtd_cenas)
-                    st.session_state["roteiro_vsl"] = roteiro_frases
+                    cenas_estruturadas = gerar_roteiro_vsl_ia(tema_vsl, promessa_vsl, publico_vsl, qtd_cenas)
+                    st.session_state["roteiro_vsl"] = cenas_estruturadas
 
                     p_musica = None
                     if musica_up:
@@ -824,7 +894,7 @@ with tab_vsl:
                             f_m.write(musica_up.getbuffer())
 
                     video_pronto = renderizar_vsl_completa(
-                        frases=roteiro_frases,
+                        cenas=cenas_estruturadas,
                         vertical=formato_vertical,
                         voz=voz_codigo,
                         pexels_key=PEXELS_API_KEY,
@@ -834,7 +904,7 @@ with tab_vsl:
 
                     debitar_creditos_cloud(email_usuario, f"Criação VSL ({tema_vsl})", 20)
                     st.session_state["video_vsl_pronto"] = video_pronto
-                    st.success("✅ VSL original renderizada com sucesso!")
+                    st.success("✅ VSL renderizada com cortes dinâmicos de alta qualidade!")
                     st.rerun()
                 except Exception as e_vsl:
                     st.error(f"Erro na renderização da VSL: {e_vsl}")
@@ -866,7 +936,7 @@ with tab_vsl:
             with col_d2:
                 st.write("")
                 st.caption("Custo: 20 Créditos")
-                btn_dub = st.button("🎙️ Dublar Vídeo Agora (20 cr)", type="primary", use_container_width=True)
+                btn_dub = st.button("🎙️️ Dublar Vídeo Agora (20 cr)", type="primary", use_container_width=True)
 
             if btn_dub:
                 if saldo_atual < 20:
@@ -880,7 +950,7 @@ with tab_vsl:
                         try:
                             p_musica = os.path.join(DIR_MUSICAS, musica_up.name) if musica_up else None
                             v_dublado, rot_tr = dublar_roteiro_e_renderizar_vsl(
-                                frases_originais=st.session_state["roteiro_vsl"],
+                                cenas_originais=st.session_state["roteiro_vsl"],
                                 idioma_alvo=nome_lingua_dub,
                                 vertical=formato_vertical,
                                 voz=voz_codigo,
@@ -950,7 +1020,7 @@ with tab_ebook:
         st.markdown("### 📥 Seu E-book Original em Português:")
         with open(st.session_state["pdf_ebook_pronto"], "rb") as f_eb:
             st.download_button(
-                "⬇️️ Baixar E-book Original (.PDF)",
+                "⬇️ Baixar E-book Original (.PDF)",
                 data=f_eb,
                 file_name=st.session_state.get("pdf_ebook_nome", "ebook.pdf"),
                 mime="application/pdf",
@@ -1005,7 +1075,7 @@ with tab_ebook:
             st.success(f"✅ Arquivo internacionalizado pronto: **{st.session_state.get('pdf_global_lingua')}**")
             with open(st.session_state["pdf_global_pronto"], "rb") as f_tr_eb:
                 st.download_button(
-                    label=f"⬇️ BAIXAR E-BOOK EM {st.session_state.get('pdf_global_lingua').upper()} (.PDF)",
+                    label=f"⬇️️ BAIXAR E-BOOK EM {st.session_state.get('pdf_global_lingua').upper()} (.PDF)",
                     data=f_tr_eb,
                     file_name=st.session_state.get("pdf_global_nome", "ebook_global.pdf"),
                     mime="application/pdf",
