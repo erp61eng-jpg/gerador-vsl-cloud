@@ -1,7 +1,7 @@
 streamlit
 openai
 supabase
-fpdf
+reportlab
 requests
 pillow
 imageio-ffmpeg
