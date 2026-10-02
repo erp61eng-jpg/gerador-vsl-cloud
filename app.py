@@ -147,7 +147,6 @@ def debitar_creditos_cloud(email: str, operacao: str, quantidade: int) -> bool:
 # 3. MOTORES DE IA: GERAÇÃO, TRADUÇÃO & MINERAÇÃO
 # ==============================================================================
 def executar_prompt_ia(prompt: str, formato_json: bool = False, temperatura: float = 0.4) -> str:
-    """Invoca o Gemini (com fallback para OpenAI) de forma resiliente."""
     if GEMINI_API_KEY:
         try:
             if HAS_GENAI_NEW:
@@ -178,7 +177,7 @@ def traduzir_texto_ia(texto: str, idioma_destino: str) -> str:
         return ""
     prompt = f"""
     Atue como tradutor nativo e copywriter sênior no idioma '{idioma_destino}'.
-    Traduza o texto abaixo mantendo o tom persuasivo, ritmo natural, métrica comercial e formatação original:
+    Traduza o texto abaixo mantendo o tom persuasivo, ritmo natural e métrica comercial:
     
     "{texto}"
     
@@ -246,8 +245,8 @@ def gerar_roteiro_vsl_ia(nicho: str, promessa: str, publico: str, num_cenas: int
     
     Gere exatamente {num_cenas} cenas cronológicas (gancho de atenção, dor, solução, benefício e CTA).
     Para CADA cena, gere:
-    1. "fala": A frase publicitária em português falada na cena (impactante, curta, entre 10 e 18 palavras).
-    2. "termo_video": Termo em INGLÊS de 2 a 4 palavras para buscar vídeos em alta definição no Pexels que represente perfeitamente o visual daquela cena (Exemplos de termos excelentes: "artisan sourdough bread", "baking fresh bread oven", "kneading dough flour", "woman baker smiling kitchen", "pastry chef bakery display"). NUNCA use termos genéricos como "happy" ou frases em português.
+    1. "fala": Frase falada em português (direta, persuasiva, de 10 a 16 palavras).
+    2. "termo_video": Termo em INGLÊS de 2 a 4 palavras para buscar vídeos em alta definição no Pexels que represente a cena (ex: "artisan sourdough bread", "baker kneading dough flour", "fresh bread in oven", "woman kitchen bakery display"). NUNCA use português nem frases genéricas.
 
     Retorne estritamente um JSON no seguinte formato:
     {{
@@ -517,7 +516,6 @@ def obter_duracao_audio(audio_path: str) -> float:
         return 4.0
 
 def buscar_video_pexels(query: str, pexels_key: str, dest_path: str, vertical: bool = False) -> bool:
-    """Busca vídeos de alta qualidade no Pexels com suporte a termos em inglês e fallbacks automáticos."""
     if not pexels_key:
         return False
 
@@ -540,7 +538,6 @@ def buscar_video_pexels(query: str, pexels_key: str, dest_path: str, vertical: b
                         vfiles = vid.get("video_files", [])
                         validos = [v for v in vfiles if v.get("width") and v.get("height") and v.get("link")]
                         if validos:
-                            # Prioriza HD (720p ou 1080p) para download rápido e estável
                             validos.sort(key=lambda x: x["width"] * x["height"], reverse=True)
                             escolhido = validos[0]
                             for v in validos:
@@ -557,8 +554,7 @@ def buscar_video_pexels(query: str, pexels_key: str, dest_path: str, vertical: b
     return False
 
 def criar_arquivo_legenda(texto: str, output_path: str, vertical: bool = False) -> str:
-    """Gera arquivo com quebra de linha harmoniosa para evitar corte de texto nas bordas."""
-    largura = 22 if vertical else 38
+    largura = 24 if vertical else 40
     linhas = textwrap.wrap(texto.strip(), width=largura)
     texto_formatado = "\n".join(linhas)
     with open(output_path, "w", encoding="utf-8") as f:
@@ -593,13 +589,12 @@ def renderizar_vsl_completa(
 
         cena_out = os.path.join(DIR_VSL, f"{prefixo}_out.mp4")
 
-        # Criação de legenda formatada em arquivo UTF-8 para suporte a acentos e quebra de linhas
+        # Legenda limpa e com quebra de linha
         legenda_txt = os.path.join(DIR_VSL, f"{prefixo}_legenda.txt")
         criar_arquivo_legenda(frase, legenda_txt, vertical=vertical)
         legenda_path_escapado = legenda_txt.replace(os.sep, "/").replace(":", "\\:")
 
         fontsize = 44 if not vertical else 48
-        pos_y = "h-(h*0.24)" if not vertical else "h-(h*0.30)"
 
         if tem_video and os.path.exists(v_raw_path):
             vf = (
@@ -609,15 +604,22 @@ def renderizar_vsl_completa(
                 f"fps=30,"
                 f"drawtext=textfile='{legenda_path_escapado}':fontcolor=white:fontsize={fontsize}:"
                 f"box=1:boxcolor=black@0.75:boxborderw=16:line_spacing=12:"
-                f"x=(w-text_w)/2:y={pos_y}"
+                f"x=(w-text_w)/2:y=h-text_h-90"
             )
+            # -map 0:v:0 -> PEGA APENAS A IMAGEM DO PEXELS
+            # -map 1:a:0 -> PEGA APENAS A VOZ DA OPENAI (ELIMINA 100% O SOM DE MÁQUINA DO PEXELS)
             cmd = [
-                "ffmpeg", "-y", "-stream_loop", "-1", "-i", v_raw_path,
-                "-i", a_path, "-t", str(duracao),
+                "ffmpeg", "-y",
+                "-stream_loop", "-1", "-i", v_raw_path,
+                "-i", a_path,
+                "-map", "0:v:0",
+                "-map", "1:a:0",
+                "-t", f"{duracao:.2f}",
                 "-vf", vf,
                 "-c:v", "libx264", "-preset", "ultrafast", "-crf", "22",
                 "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2",
-                "-pix_fmt", "yuv420p", "-shortest", cena_out
+                "-pix_fmt", "yuv420p",
+                cena_out
             ]
         else:
             vf = (
@@ -627,12 +629,17 @@ def renderizar_vsl_completa(
                 f"x=(w-text_w)/2:y=(h-text_h)/2"
             )
             cmd = [
-                "ffmpeg", "-y", "-f", "lavfi", "-i", f"color=c=0x0F172A:s={res_w}x{res_h}:d={duracao}",
-                "-i", a_path, "-t", str(duracao),
+                "ffmpeg", "-y",
+                "-f", "lavfi", "-i", f"color=c=0x0F172A:s={res_w}x{res_h}:d={duracao:.2f}",
+                "-i", a_path,
+                "-map", "0:v:0",
+                "-map", "1:a:0",
+                "-t", f"{duracao:.2f}",
                 "-vf", vf,
                 "-c:v", "libx264", "-preset", "ultrafast", "-crf", "22",
                 "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2",
-                "-pix_fmt", "yuv420p", "-shortest", cena_out
+                "-pix_fmt", "yuv420p",
+                cena_out
             ]
 
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
@@ -641,7 +648,7 @@ def renderizar_vsl_completa(
         if progress_bar:
             progress_bar.progress((idx + 0.8) / total)
 
-    # Concatenação profissional re-renderizada (elimina qualquer travamento entre cenas)
+    # Concatenação fluida de todas as cenas
     concat_txt_path = os.path.join(DIR_VSL, f"concat_{int(time.time())}.txt")
     with open(concat_txt_path, "w", encoding="utf-8") as f:
         for c in cenas_clipes:
@@ -656,7 +663,7 @@ def renderizar_vsl_completa(
     ]
     subprocess.run(cmd_concat, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
 
-    # Finalização: Trilha sonora (se houver)
+    # Mixagem de música de fundo (se o usuário tiver feito upload)
     vsl_final = os.path.join(DIR_VSL, f"vsl_final_{int(time.time())}.mp4")
     if musica_fundo_path and os.path.exists(musica_fundo_path):
         cmd_final = [
@@ -904,7 +911,7 @@ with tab_vsl:
 
                     debitar_creditos_cloud(email_usuario, f"Criação VSL ({tema_vsl})", 20)
                     st.session_state["video_vsl_pronto"] = video_pronto
-                    st.success("✅ VSL renderizada com cortes dinâmicos de alta qualidade!")
+                    st.success("✅ VSL renderizada com cortes dinâmicos e narração sincronizada!")
                     st.rerun()
                 except Exception as e_vsl:
                     st.error(f"Erro na renderização da VSL: {e_vsl}")
@@ -936,7 +943,7 @@ with tab_vsl:
             with col_d2:
                 st.write("")
                 st.caption("Custo: 20 Créditos")
-                btn_dub = st.button("🎙️️ Dublar Vídeo Agora (20 cr)", type="primary", use_container_width=True)
+                btn_dub = st.button("🎙️ Dublar Vídeo Agora (20 cr)", type="primary", use_container_width=True)
 
             if btn_dub:
                 if saldo_atual < 20:
