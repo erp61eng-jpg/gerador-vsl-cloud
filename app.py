@@ -263,15 +263,18 @@ def gerar_roteiro_vsl_ia(nicho: str, promessa: str, publico: str, num_cenas: int
 def gerar_conteudo_ebook_ia(tema: str, publico: str) -> dict:
     prompt = f"""
     Atue como Engenheiro de Alimentos Sênior, Mestre Padeiro e Consultor de Panificação Artesanal Sem Glúten.
-    Escreva um MANUAL TÉCNICO E COMERCIAL AVANÇADO, DENSO E APROFUNDADO sobre:
+    Escreva um MANUAL TÉCNICO E COMERCIAL AVANÇADO, DENSO E COM DUPLA ILUSTRAÇÃO sobre:
     - TEMA: {tema}
     - PÚBLICO: {publico}
 
     DIRETRIZES DE EXTREMO RIGOR (PRODUTO COMERCIAL DE ALTO VALOR PERCEBIDO):
     1. PROIBIDO TEXTO SUPERFICIAL OU RESUMINHOS. Escreva como um livro profissional de gastronomia.
-    2. Cada módulo deve ter uma base teórica sólida (ciência da retrogradação do amido, retenção de gases sem glúten, ação do psyllium e da goma xantana, umidade relativa da massa entre 85% e 105%).
-    3. RECEITAS COMPLETAS: Devem conter tabela com ingredientes em GRAMAS exatas, percentuais e função de cada ingrediente, tempo de hidratação, ponto da massa ao toque, temperatura do forno (ºC) e injeção de vapor.
-    4. RESOLUÇÃO DE ERROS (TROUBLESHOOTING): Diagnósticos detalhados para massa gomosa, pão que esfarela, pão que afunda no centro e crosta pálida.
+    2. Cada módulo deve ter uma base teórica sólida (ciência da retrogradação do amido, retenção de gases sem glúten, ação do psyllium e da goma xantana, hidratação da massa entre 85% e 105%).
+    3. Para CADA capítulo, forneça DOIS termos de busca em inglês para o Pexels:
+       - "termo_busca_foto_processo": Ação/preparo (ex: "kneading dough flour baking")
+       - "termo_busca_foto_resultado": Produto pronto irresistível (ex: "crusty sliced artisan bread loaf on wooden board")
+       - "legenda_resultado": Frase técnica sobre o acabamento visual (ex: "Resultado esperado: casca dourada crocante com miolo arejado e alvéolos abertos.")
+    4. RECEITAS COMPLETAS: Devem conter tabela com ingredientes em GRAMAS exatas e função de cada ingrediente, tempo de hidratação, ponto da massa ao toque, temperatura do forno (ºC) e vapor.
     5. CUSTO E PRECIFICAÇÃO: Cálculo de CMV, tempo de forno e precificação para obter de 80% a 150% de lucro real.
 
     Retorne ESTRITAMENTE um JSON estruturado com o seguinte esquema:
@@ -284,7 +287,9 @@ def gerar_conteudo_ebook_ia(tema: str, publico: str) -> dict:
             {{
                 "numero": 1,
                 "titulo": "A Engenharia das Farinhas Sem Glúten & Estruturação de Redes",
-                "termo_busca_foto": "flour blend bowls baking kitchen",
+                "termo_busca_foto_processo": "flour blend bowls baking kitchen",
+                "termo_busca_foto_resultado": "rustic bread loaf flour dusted table",
+                "legenda_resultado": "Pão base perfeitamente assentado com casca firme e estrutura aerada.",
                 "alerta_tecnico": "O maior erro do iniciante é tentar usar farinhas isoladas. Sem a trindade de Estrutura + Amido + Aglutinante Hidrofílico, o pão vira um bloco pesado e solado.",
                 "conteudo": "Aprofundamento sobre as 3 classes essenciais de insumos: 1) Farinhas Estruturais (Arroz, Aveia SG, Sarraceno) que dão sustentação mecânica; 2) Amidos e Féculas (Polvilho Doce, Fécula de Batata) responsáveis pela aeração e formação da casca; 3) Aglutinantes Hidrocoloides (Psyllium e Goma Xantana), que criam uma malha viscoelástica capaz de reter o CO2 da fermentação. Farinhas sem glúten ricas em psyllium exigem hidratação entre 85% e 105% sobre o peso dos secos para garantir salto de forno sem ressecar o miolo.",
                 "receita_nome": "Fórmula do Mix Universal para Pães de Estrutura Firme",
@@ -297,15 +302,17 @@ def gerar_conteudo_ebook_ia(tema: str, publico: str) -> dict:
                     {{"ingrediente": "Goma Xantana", "quantidade": "8g", "funcao": "Agente estabilizante anti-esfarelamento"}}
                 ],
                 "passos_preparo": [
-                    "Pese com rigor cada ingrediente em balança de precisão digital.",
-                    "Peneire as farinhas em tigela ampla três vezes sucessivas para total homogeneização dos hidrocoloides.",
-                    "Armazene em pote hermético em local seco e escuro por até 90 dias."
+                    "Pese rigorosamente cada item em balança digital; variações de 3g de hidrocoloide alteram o miolo.",
+                    "Peneire as farinhas em tigela ampla três vezes para garantir dispersão homogênea do psyllium e da xantana.",
+                    "Armazene a mistura em pote de vidro com fechamento hermético em local seco por até 90 dias."
                 ]
             }},
             {{
                 "numero": 2,
                 "titulo": "Pão Francês de Pestana Aberta & Pães Rústicos de Crosta Estalada",
-                "termo_busca_foto": "crusty artisan bread oven fresh",
+                "termo_busca_foto_processo": "baker scoring bread dough razor",
+                "termo_busca_foto_resultado": "crusty artisan bread oven fresh",
+                "legenda_resultado": "Pestana aberta com salto de forno vigoroso e crosta fina e estalada.",
                 "alerta_tecnico": "Sem vapor abundante nos primeiros 15 minutos de forno, a casca seca precocemente e a pestana nunca abre.",
                 "conteudo": "A dinâmica do salto de forno (oven spring). Como criar vapor em fornos residenciais utilizando pedras refratárias e formas de ferro pré-aquecidas com pedras vulcânicas ou cubos de gelo. O controle da temperatura interna da massa ao sair do forno: o miolo atinge a estabilidade térmica ideal aos 95°C no núcleo.",
                 "receita_nome": "Baguette e Pão Rústico de Casca Crocante",
@@ -330,7 +337,9 @@ def gerar_conteudo_ebook_ia(tema: str, publico: str) -> dict:
             {{
                 "numero": 3,
                 "titulo": "Pão de Forma Super Macio & Conservação de Longa Duração",
-                "termo_busca_foto": "sliced sandwich bread loaf table",
+                "termo_busca_foto_processo": "bread dough in loaf pan kitchen",
+                "termo_busca_foto_resultado": "sliced sandwich bread loaf table",
+                "legenda_resultado": "Fatias elásticas e flexíveis que não esfarelam ao passar manteiga ou fatiar.",
                 "alerta_tecnico": "O segredo para a fatia não esfarelar é a combinação de ovos (lecitina natural) e gordura vegetal equilibrada.",
                 "conteudo": "Métodos práticos contra a retrogradação acelerada do amido sem glúten. A utilização de gorduras saudáveis e emulsão prévia líquida para manter as fatias flexíveis, úmidas e aptas para montagem de sanduíches por até 5 dias sem ressecar.",
                 "receita_nome": "Pão de Forma Tradicional Macio Tipo Brioche",
@@ -357,7 +366,9 @@ def gerar_conteudo_ebook_ia(tema: str, publico: str) -> dict:
             {{
                 "numero": 4,
                 "titulo": "Dossiê Clínico de Resolução de Falhas & Engenharia de Custos",
-                "termo_busca_foto": "baker weighing ingredients scale bakery",
+                "termo_busca_foto_processo": "baker weighing ingredients scale bakery",
+                "termo_busca_foto_resultado": "bread loaves packaging paper bags bakery",
+                "legenda_resultado": "Pães padronizados e embalados em sacos microperfurados prontos para comercialização.",
                 "alerta_tecnico": "Jamais corte um pão sem glúten quente: o vapor interno conclui o cozimento do miolo fora do forno.",
                 "conteudo": "Diagnóstico de falhas: 1) Pão solado ou gomoso: excesso de água ou forno abaixo de 200°C; 2) Pão que afunda no topo: excesso de fermentação ou excesso de fermento; 3) Miolo quebradiço: falta de psyllium ou pesagem imprecisa da xantana; 4) Crosta pálida: falta de açúcar para reação de Maillard. Inclui cálculo preciso de CMV (Custo de Mercadoria Vendida), embalagem e margem para venda direta com lucro de 100% a 150%.",
                 "receita_nome": "Tabela de Precificação e Ficha de Custo Unitário",
@@ -402,6 +413,7 @@ def traduzir_ebook_completo_ia(dados_ebook: dict, idioma_destino: str, progress_
         c_cap_tr = traduzir_texto_ia(cap.get("conteudo", ""), idioma_destino)
         alerta_tr = traduzir_texto_ia(cap.get("alerta_tecnico", ""), idioma_destino)
         r_nome_tr = traduzir_texto_ia(cap.get("receita_nome", ""), idioma_destino)
+        legenda_tr = traduzir_texto_ia(cap.get("legenda_resultado", ""), idioma_destino)
 
         tabela_tr = []
         for item in cap.get("tabela_ingredientes", []):
@@ -416,7 +428,9 @@ def traduzir_ebook_completo_ia(dados_ebook: dict, idioma_destino: str, progress_
         capitulos_tr.append({
             "numero": cap.get("numero", 1),
             "titulo": t_cap_tr,
-            "termo_busca_foto": cap.get("termo_busca_foto", ""),
+            "termo_busca_foto_processo": cap.get("termo_busca_foto_processo", ""),
+            "termo_busca_foto_resultado": cap.get("termo_busca_foto_resultado", ""),
+            "legenda_resultado": legenda_tr,
             "alerta_tecnico": alerta_tr,
             "conteudo": c_cap_tr,
             "receita_nome": r_nome_tr,
@@ -436,7 +450,7 @@ def traduzir_ebook_completo_ia(dados_ebook: dict, idioma_destino: str, progress_
     }
 
 # ==============================================================================
-# 4. PROCESSAMENTO GRÁFICO EDITORIAL (DISTRIBUIÇÃO HARMONIOSA SEM VÁCUO)
+# 4. PROCESSAMENTO GRÁFICO EDITORIAL (DUPLA ILUSTRAÇÃO & ZERO ESPAÇO VAZIO)
 # ==============================================================================
 class NumeradorPaginas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
@@ -460,12 +474,12 @@ class NumeradorPaginas(canvas.Canvas):
             self.saveState()
             self.setFont("Helvetica-Bold", 8)
             self.setFillColor(colors.HexColor("#64748B"))
-            self.drawString(36, 22, "MANUAL TÉCNICO PROFISSIONAL | TODOS OS DIREITOS RESERVADOS")
+            self.drawString(36, 20, "MANUAL TÉCNICO PROFISSIONAL | TODOS OS DIREITOS RESERVADOS")
             texto_pag = f"Página {self._pageNumber} de {page_count}"
-            self.drawRightString(576, 22, texto_pag)
+            self.drawRightString(576, 20, texto_pag)
             self.setStrokeColor(colors.HexColor("#CBD5E1"))
             self.setLineWidth(0.6)
-            self.line(36, 32, 576, 32)
+            self.line(36, 30, 576, 30)
             self.restoreState()
 
 def buscar_foto_pexels(query: str, pexels_key: str, dest_path: str) -> bool:
@@ -488,14 +502,14 @@ def buscar_foto_pexels(query: str, pexels_key: str, dest_path: str) -> bool:
     return False
 
 def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_pdf: str) -> str:
-    # Margens estreitas (36pt = 0.5 pol) para aproveitar a área útil (540pt de largura)
+    # Margens balanceadas em 36pt (área útil de largura = 540pt)
     doc = SimpleDocTemplate(
         caminho_pdf,
         pagesize=letter,
         rightMargin=36,
         leftMargin=36,
         topMargin=36,
-        bottomMargin=44
+        bottomMargin=42
     )
     styles = getSampleStyleSheet()
 
@@ -528,71 +542,82 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_pdf: str)
         'TitCap',
         parent=styles['Heading1'],
         fontName='Helvetica-Bold',
-        fontSize=14,
-        leading=18,
+        fontSize=13.5,
+        leading=17,
         textColor=cor_azul,
         spaceBefore=0,
-        spaceAfter=6,
+        spaceAfter=5,
         keepWithNext=True
     )
     estilo_h2 = ParagraphStyle(
         'TitSec',
         parent=styles['Heading2'],
         fontName='Helvetica-Bold',
-        fontSize=10.5,
-        leading=14,
+        fontSize=10,
+        leading=13.5,
         textColor=cor_primaria,
-        spaceBefore=6,
-        spaceAfter=4,
+        spaceBefore=5,
+        spaceAfter=3,
         keepWithNext=True
     )
     estilo_corpo = ParagraphStyle(
         'CorpoTexto',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=9,
-        leading=13.5,
+        fontSize=8.5,
+        leading=12.5,
         textColor=cor_primaria,
-        spaceAfter=6
+        spaceAfter=5
     )
     estilo_item = ParagraphStyle(
         'ItemPasso',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=8.5,
-        leading=12.5,
+        fontSize=8,
+        leading=11.5,
         textColor=cor_primaria,
-        spaceAfter=3
+        spaceAfter=2
     )
     estilo_alerta = ParagraphStyle(
         'BoxAlerta',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=8.5,
-        leading=12,
+        fontSize=8,
+        leading=11,
         textColor=colors.HexColor("#1E3A8A")
+    )
+    estilo_legenda_foto = ParagraphStyle(
+        'LegendaFoto',
+        parent=styles['Normal'],
+        fontName='Helvetica-Oblique',
+        fontSize=7.5,
+        leading=10,
+        textColor=colors.HexColor("#475569"),
+        alignment=1,
+        spaceBefore=2,
+        spaceAfter=4
     )
     estilo_celula = ParagraphStyle(
         'CelulaTab',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=8,
-        leading=11,
+        fontSize=7.5,
+        leading=10,
         textColor=cor_primaria
     )
     estilo_celula_header = ParagraphStyle(
         'CelulaHeader',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=8,
-        leading=11,
+        fontSize=7.5,
+        leading=10,
         textColor=colors.white
     )
 
     flowables = []
 
     # ==================== CAPA ====================
-    flowables.append(Spacer(1, 25))
+    flowables.append(Spacer(1, 20))
     flowables.append(Paragraph(dados.get("titulo", "Manual Técnico Profissional"), estilo_capa_tit))
     flowables.append(Paragraph(dados.get("subtitulo", "Guia Técnico & Comercial"), estilo_capa_sub))
 
@@ -613,26 +638,26 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_pdf: str)
         if p.strip():
             flowables.append(Paragraph(p.strip(), estilo_corpo))
 
-    flowables.append(Spacer(1, 10))
-    flowables.append(HRFlowable(width="100%", thickness=0.8, color=colors.HexColor("#CBD5E1"), spaceAfter=12))
+    flowables.append(Spacer(1, 8))
+    flowables.append(HRFlowable(width="100%", thickness=0.8, color=colors.HexColor("#CBD5E1"), spaceAfter=10))
 
-    # ==================== CAPÍTULOS TÉCNICOS ====================
+    # ==================== CAPÍTULOS TÉCNICOS COM DUPLA FOTO ====================
     for cap in dados.get("capitulos", []):
         flowables.append(Paragraph(f"Módulo {cap.get('numero')}: {cap.get('titulo')}", estilo_h1))
-        flowables.append(Spacer(1, 4))
+        flowables.append(Spacer(1, 3))
 
-        # Imagem compacta e proporcional para NUNCA estourar a página
-        termo_cap = cap.get("termo_busca_foto", "")
-        if termo_cap:
-            cap_img_path = os.path.join(DIR_PEXELS, f"cap_{cap.get('numero')}_{int(time.time())}.jpg")
-            if buscar_foto_pexels(termo_cap, pexels_key, cap_img_path):
+        # FOTO 1: Ação / Processo / Mão na Massa (Banner no Topo)
+        termo_proc = cap.get("termo_busca_foto_processo", cap.get("termo_busca_foto", "kneading dough"))
+        if termo_proc:
+            proc_img_path = os.path.join(DIR_PEXELS, f"proc_{cap.get('numero')}_{int(time.time())}.jpg")
+            if buscar_foto_pexels(termo_proc, pexels_key, proc_img_path):
                 try:
-                    flowables.append(RLImage(cap_img_path, width=540, height=110))
-                    flowables.append(Spacer(1, 5))
+                    flowables.append(RLImage(proc_img_path, width=540, height=95))
+                    flowables.append(Spacer(1, 4))
                 except Exception:
                     pass
 
-        # Caixa de Alerta Técnico Compacta
+        # Caixa de Alerta Técnico
         alerta = cap.get("alerta_tecnico", "")
         if alerta:
             tabela_alerta = Table(
@@ -642,19 +667,17 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_pdf: str)
             tabela_alerta.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, -1), cor_azul_claro),
                 ('BOX', (0, 0), (-1, -1), 1, cor_borda),
-                ('PADDING', (0, 0), (-1, -1), 5),
-                ('TOPPADDING', (0, 0), (-1, -1), 4),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+                ('PADDING', (0, 0), (-1, -1), 4),
             ]))
             flowables.append(tabela_alerta)
-            flowables.append(Spacer(1, 5))
+            flowables.append(Spacer(1, 4))
 
         # Texto Explicativo Denso
         for p_cap in cap.get("conteudo", "").split("\n"):
             if p_cap.strip():
                 flowables.append(Paragraph(p_cap.strip(), estilo_corpo))
 
-        # Ficha Técnica / Receita com Tabela Estruturada e Otimizada
+        # Ficha Técnica com Tabela de Balança
         receita_nome = cap.get("receita_nome", "")
         if receita_nome:
             flowables.append(Paragraph(f"📋 Ficha Técnica: {receita_nome}", estilo_h2))
@@ -675,7 +698,6 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_pdf: str)
                         Paragraph(item.get("funcao", ""), estilo_celula)
                     ])
 
-                # Largura total = 540pt (200 + 80 + 260)
                 tabela_receita = Table(dados_tabela, colWidths=[200, 80, 260])
                 tabela_receita.setStyle(TableStyle([
                     ('BACKGROUND', (0, 0), (-1, 0), cor_azul),
@@ -683,12 +705,10 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_pdf: str)
                     ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
                     ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
                     ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
-                    ('PADDING', (0, 0), (-1, -1), 3),
-                    ('TOPPADDING', (0, 0), (-1, -1), 3),
-                    ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+                    ('PADDING', (0, 0), (-1, -1), 2.5),
                 ]))
                 flowables.append(tabela_receita)
-                flowables.append(Spacer(1, 4))
+                flowables.append(Spacer(1, 3))
 
             passos = cap.get("passos_preparo", [])
             if passos:
@@ -696,9 +716,21 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_pdf: str)
                 for idx_p, passo in enumerate(passos, 1):
                     flowables.append(Paragraph(f"<b>{idx_p}.</b> {passo}", estilo_item))
 
-        # Divisor suave e quebra controlada
-        flowables.append(Spacer(1, 8))
-        flowables.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#E2E8F0"), spaceAfter=10))
+        # FOTO 2: O Resultado Final Perfeito (Preenche o rodapé eliminando o vácuo)
+        termo_res = cap.get("termo_busca_foto_resultado", "artisan bread sliced loaf")
+        if termo_res:
+            res_img_path = os.path.join(DIR_PEXELS, f"res_{cap.get('numero')}_{int(time.time())}.jpg")
+            if buscar_foto_pexels(termo_res, pexels_key, res_img_path):
+                try:
+                    flowables.append(Spacer(1, 3))
+                    flowables.append(RLImage(res_img_path, width=540, height=95))
+                    legenda = cap.get("legenda_resultado", "Resultado visual do produto finalizado e pronto para consumo.")
+                    flowables.append(Paragraph(f"📷 <b>Resultado Esperado:</b> {legenda}", estilo_legenda_foto))
+                except Exception:
+                    pass
+
+        flowables.append(Spacer(1, 4))
+        flowables.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#E2E8F0"), spaceAfter=6))
         flowables.append(PageBreak())
 
     doc.build(flowables, canvasmaker=NumeradorPaginas)
@@ -1206,11 +1238,11 @@ with tab_vsl:
                 )
 
 # ------------------------------------------------------------------------------
-# ABA 3: CRIAR E-BOOK & TRADUÇÃO GLOBAL (DIAGRAMAÇÃO MILIMÉTRICA)
+# ABA 3: CRIAR E-BOOK & TRADUÇÃO GLOBAL (DUPLA ILUSTRAÇÃO & ZERO VÁCUO)
 # ------------------------------------------------------------------------------
 with tab_ebook:
-    st.markdown("## 📚 Criador de E-book Técnico & Comercial (Distribuição Editorial)")
-    st.caption("Páginas preenchidas com harmonia gráfica: fotos proporcionais, alertas destacados e tabelas em gramas.")
+    st.markdown("## 📚 Criador de E-book Comercial & Diagramação Editorial")
+    st.caption("Páginas 100% preenchidas: foto de preparo no topo, tabelas exatas em gramas e foto do produto pronto no rodapé.")
 
     col_e1, col_e2 = st.columns(2)
     with col_e1:
@@ -1218,30 +1250,30 @@ with tab_ebook:
     with col_e2:
         publico_ebook = st.text_input("Público-Alvo:", "Pessoas com restrição alimentar e empreendedoras de confeitaria")
 
-    if st.button("📖 Gerar E-book Técnico Profissional (.PDF) (10 cr)", type="primary"):
+    if st.button("📖 Gerar E-book Profissional Completo (.PDF) (10 cr)", type="primary"):
         if saldo_atual < 10:
             st.error("❌ Saldo insuficiente! Você precisa de 10 créditos.")
         else:
-            with st.spinner("Compilando dados técnicos com distribuição harmoniosa de linhas e tabelas..."):
+            with st.spinner("Construindo receitas completas, buscando fotos de preparo e resultado e diagramando PDF..."):
                 try:
                     dados_eb = gerar_conteudo_ebook_ia(tema_ebook, publico_ebook)
                     st.session_state["dados_ebook_sessao"] = dados_eb
 
-                    nome_pdf = f"manual_tecnico_{int(time.time())}.pdf"
+                    nome_pdf = f"manual_comercial_{int(time.time())}.pdf"
                     caminho_pdf = os.path.join(DIR_EBOOKS, nome_pdf)
                     compilar_pdf_ebook_com_fotos(dados_eb, PEXELS_API_KEY, caminho_pdf)
 
                     debitar_creditos_cloud(email_usuario, f"Criação E-book ({tema_ebook})", 10)
                     st.session_state["pdf_ebook_pronto"] = caminho_pdf
                     st.session_state["pdf_ebook_nome"] = nome_pdf
-                    st.success("✅ E-book gerado com layout editorial perfeitamente preenchido!")
+                    st.success("✅ E-book gerado com layout editorial completo e dupla ilustração!")
                     st.rerun()
                 except Exception as e_eb:
                     st.error(f"Erro na compilação do E-book: {e_eb}")
 
     if st.session_state.get("pdf_ebook_pronto") and os.path.exists(st.session_state["pdf_ebook_pronto"]):
         st.markdown("---")
-        st.markdown("### 📥 Seu E-book Técnico Original em Português:")
+        st.markdown("### 📥 Seu E-book Original em Português:")
         with open(st.session_state["pdf_ebook_pronto"], "rb") as f_eb:
             st.download_button(
                 "⬇️ Baixar E-book Original (.PDF)",
@@ -1254,7 +1286,7 @@ with tab_ebook:
         st.markdown("---")
         with st.container(border=True):
             st.markdown("### 🌐 Tradução Global do E-book (36 Idiomas)")
-            st.caption("Internacionalize mantendo a distribuição editorial de páginas cheias.")
+            st.caption("Internacionalize mantendo a diagramação editorial de páginas cheias e fotos duplas.")
 
             col_tr1, col_tr2 = st.columns([2, 1])
             with col_tr1:
@@ -1272,7 +1304,7 @@ with tab_ebook:
                 else:
                     nome_lingua_eb = IDIOMAS_SISTEMA_36[idioma_eb_sel]
                     barra_eb_tr = st.progress(0.0)
-                    with st.spinner(f"Traduzindo tabelas e mantendo a diagramação editorial para {idioma_eb_sel}..."):
+                    with st.spinner(f"Traduzindo tabelas, legendas e mantendo a diagramação editorial para {idioma_eb_sel}..."):
                         try:
                             dados_tr = traduzir_ebook_completo_ia(
                                 st.session_state["dados_ebook_sessao"],
