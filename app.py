@@ -2,2004 +2,1022 @@ import os
 import re
 import json
 import time
-import random
-import shutil
 import subprocess
-import urllib.request
-import urllib.parse
-from datetime import datetime
 import requests
-from PIL import Image
+from datetime import datetime
+from typing import List, Dict, Tuple, Optional
 
 import streamlit as st
-
-st.set_page_config(
-    page_title="Central de Produção de VSLs & Infoprodutos",
-    page_icon="⚡",
-    layout="wide"
-)
-
-# ==============================================================================
-# LOCALIZADOR FFMPEG
-# ==============================================================================
-def obter_executavel_ffmpeg() -> str:
-    try:
-        import imageio_ffmpeg
-        exe = imageio_ffmpeg.get_ffmpeg_exe()
-        if exe and os.path.exists(exe):
-            try:
-                os.chmod(exe, 0o755)
-            except Exception:
-                pass
-            return exe
-    except Exception:
-        pass
-    sistema_ffmpeg = shutil.which("ffmpeg")
-    if sistema_ffmpeg:
-        return sistema_ffmpeg
-    return "ffmpeg"
-
-FFMPEG_BIN = obter_executavel_ffmpeg()
-
-if not hasattr(Image, "ANTIALIAS"):
-    Image.ANTIALIAS = Image.Resampling.LANCZOS
-
 from openai import OpenAI
-from google import genai
-from fpdf import FPDF
 from supabase import create_client, Client
 
-# ==============================================================================
-# LEITURA DE SEGREDOS E BANCO SUPABASE
-# ==============================================================================
-def limpar_url_supabase(url_bruta: str) -> str:
-    u = str(url_bruta or "").strip().strip('"').strip("'")
-    if not u.startswith("http://") and not u.startswith("https://"):
-        u = f"https://{u}"
-    parsed = urllib.parse.urlparse(u)
-    return f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
+from reportlab.lib.pagesizes import letter
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as RLImage, PageBreak
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
-OPENAI_API_KEY = str(st.secrets.get("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY") or "").strip().strip('"').strip("'")
-GEMINI_API_KEY = str(
-    st.secrets.get("GEMINI_API_KEY") or 
-    st.secrets.get("GOOGLE_API_KEY") or 
-    os.getenv("GEMINI_API_KEY") or 
-    os.getenv("GOOGLE_API_KEY") or 
-    ""
-).strip().strip('"').strip("'")
-PEXELS_API_KEY = str(st.secrets.get("PEXELS_API_KEY") or os.getenv("PEXELS_API_KEY") or "").strip().strip('"').strip("'")
-ELEVENLABS_API_KEY = str(st.secrets.get("ELEVENLABS_API_KEY") or os.getenv("ELEVENLABS_API_KEY") or "").strip().strip('"').strip("'")
-
-WHATSAPP_NUMERO = str(st.secrets.get("WHATSAPP_NUMERO") or os.getenv("WHATSAPP_NUMERO") or "").strip()
-CALLMEBOT_API_KEY = str(st.secrets.get("CALLMEBOT_API_KEY") or os.getenv("CALLMEBOT_API_KEY") or "").strip()
-
-_url_lida = st.secrets.get("SUPABASE_URL", os.getenv("SUPABASE_URL", "https://vzelyaubnynefsfumhtz.supabase.co"))
-SUPABASE_URL = limpar_url_supabase(_url_lida)
-SUPABASE_KEY = str(st.secrets.get("SUPABASE_KEY") or os.getenv("SUPABASE_KEY") or "").strip()
-
-SENHA_MESTRE_ADMIN = st.secrets.get("ADMIN_KEY", "admin2026vsl")
-
-# ==============================================================================
-# ESTRUTURAÇÃO DE DIRETÓRIOS DINÂMICOS
-# ==============================================================================
-BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
-DIR_AUDIOS  = os.path.join(BASE_DIR, "audios")
-DIR_OUTPUT  = os.path.join(BASE_DIR, "output")
-DIR_TEMP    = os.path.join(BASE_DIR, "temp")
-DIR_MUSICAS = os.path.join(BASE_DIR, "musicas")
-DIR_LOGOS   = os.path.join(BASE_DIR, "logos")
-DIR_BROLL   = os.path.join(BASE_DIR, "broll")
-DIR_EBOOKS  = os.path.join(BASE_DIR, "ebooks")
-DIR_FOTOS   = os.path.join(BASE_DIR, "fotos_ebook")
-DIR_DUBLAGENS = os.path.join(BASE_DIR, "dublagens")
-
-for pasta in [DIR_AUDIOS, DIR_OUTPUT, DIR_TEMP, DIR_MUSICAS, DIR_LOGOS, DIR_BROLL, DIR_EBOOKS, DIR_FOTOS, DIR_DUBLAGENS]:
-    os.makedirs(pasta, exist_ok=True)
-
-@st.cache_resource(show_spinner=False)
-def conectar_supabase(url: str, key: str) -> Client:
-    if not url or not key:
-        st.error("Credenciais do Supabase ausentes nos Secrets.")
-        st.stop()
-    return create_client(url, key)
-
-supabase = conectar_supabase(SUPABASE_URL, SUPABASE_KEY)
-
-# ==============================================================================
-# ESTADOS DE SESSÃO
-# ==============================================================================
-if "login_concluido" not in st.session_state:
-    st.session_state.login_concluido = False
-if "saved_email" not in st.session_state:
-    st.session_state.saved_email = "ricardopintoedson@gmail.com"
-if "saldo_creditos" not in st.session_state:
-    st.session_state.saldo_creditos = 0
-if "total_compras" not in st.session_state:
-    st.session_state.total_compras = 0
-
-# ==============================================================================
-# TELA DE ENTRADA / LOGIN
-# ==============================================================================
-if not st.session_state.login_concluido:
-    st.markdown("""
-        <div style="background: linear-gradient(135deg, #002855 0%, #4169e1 100%); padding: 22px; border-radius: 16px; text-align: center; margin-bottom: 25px;">
-            <h1 style="color: #ffffff; margin: 0; font-size: 34px; font-weight: 900;">⚡ Central de Produção de VSLs & Infoprodutos</h1>
-            <p style="color: #00d4ff; margin: 5px 0 0 0; font-size: 14px;">Acesso Unificado e Seguro</p>
-        </div>
-    """, unsafe_allow_html=True)
-
-    col_l1, col_l2, col_l3 = st.columns([1, 2, 1])
-    with col_l2:
-        with st.container(border=True):
-            st.write("### 👤 Digite seu E-mail de Acesso:")
-            email_digitado = st.text_input(
-                "E-mail:",
-                value=st.session_state.saved_email,
-                placeholder="seuemail@exemplo.com",
-                label_visibility="collapsed"
-            ).strip().lower()
-
-            if email_digitado:
-                st.session_state.saved_email = email_digitado
-                email_existe_no_banco = False
-                try:
-                    resposta_check = supabase.table("usuarios").select("email").eq("email", email_digitado).execute()
-                    if getattr(resposta_check, "data", []):
-                        email_existe_no_banco = True
-                except Exception:
-                    pass
-
-                if not email_existe_no_banco:
-                    st.warning("📝 Novo e-mail detectado. Confirme para prosseguir:")
-                    email_confirmacao = st.text_input("Confirme seu E-mail:", placeholder="seuemail@exemplo.com").strip().lower()
-                    if email_confirmacao and email_digitado == email_confirmacao:
-                        if st.button("🚀 Criar Minha Conta e Entrar", use_container_width=True):
-                            st.session_state.login_concluido = True
-                            st.rerun()
-                    elif email_confirmacao:
-                        st.error("❌ Os e-mails digitados não coincidem!")
-                else:
-                    if st.button("Entrar no Aplicativo 🚀", type="primary", use_container_width=True):
-                        st.session_state.login_concluido = True
-                        st.rerun()
-    st.stop()
-else:
-    email_usuario = st.session_state.saved_email
-
-# ==============================================================================
-# SINCRONIZAÇÃO DE SALDO E HISTÓRICO COM SUPABASE
-# ==============================================================================
-def carregar_dados_usuario(email: str) -> tuple[int, int]:
+# Tentativa de importação compatível do SDK do Google Gemini
+try:
+    from google import genai
+    HAS_GENAI_NEW = True
+except ImportError:
+    HAS_GENAI_NEW = False
     try:
-        resposta = supabase.table("usuarios").select("*").eq("email", email).execute()
-        dados_lista = getattr(resposta, "data", [])
+        import google.generativeai as legacy_genai
+        HAS_GENAI_LEGACY = True
+    except ImportError:
+        HAS_GENAI_LEGACY = False
 
-        if not dados_lista:
-            saldo_inicial = 5000 if email in ["ricardopintoedson@gmail.com", "erp61eng@gmail.com"] else 0
-            supabase.table("usuarios").insert([{
-                "email": email,
-                "saldo_creditos": saldo_inicial,
-                "creditos": saldo_inicial,
-                "total_compras": 0
-            }]).execute()
-            return saldo_inicial, 0
+# ==============================================================================
+# 1. CONFIGURAÇÕES INICIAIS, DIRETÓRIOS & CONSTANTES
+# ==============================================================================
+st.set_page_config(
+    page_title="Central VSL & DubfyAi Global",
+    page_icon="⚡",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-        usr = dados_lista[0]
-        saldo = usr.get("saldo_creditos")
-        if saldo is None:
-            saldo = usr.get("creditos", 0)
+DIR_BASE = os.path.dirname(os.path.abspath(__file__))
+DIR_VSL = os.path.join(DIR_BASE, "temp_vsl")
+DIR_EBOOKS = os.path.join(DIR_BASE, "temp_ebooks")
+DIR_AUDIOS = os.path.join(DIR_BASE, "temp_audios")
+DIR_PEXELS = os.path.join(DIR_BASE, "temp_pexels")
+DIR_MUSICAS = os.path.join(DIR_BASE, "temp_musicas")
+DIR_LOGOS = os.path.join(DIR_BASE, "temp_logos")
 
-        compras = int(usr.get("total_compras", 0) or 0)
+for d in [DIR_VSL, DIR_EBOOKS, DIR_AUDIOS, DIR_PEXELS, DIR_MUSICAS, DIR_LOGOS]:
+    os.makedirs(d, exist_ok=True)
 
-        if email in ["ricardopintoedson@gmail.com", "erp61eng@gmail.com"] and (saldo is None or int(saldo) <= 50):
-            saldo = 5000
-            try:
-                supabase.table("usuarios").update({"saldo_creditos": 5000, "creditos": 5000}).eq("email", email).execute()
-            except Exception:
-                pass
-        return int(saldo or 0), compras
+def obter_credencial(chave: str, padrao: str = "") -> str:
+    try:
+        return st.secrets.get(chave, os.getenv(chave, padrao))
     except Exception:
-        return (5000 if email in ["ricardopintoedson@gmail.com", "erp61eng@gmail.com"] else 0), 0
+        return os.getenv(chave, padrao)
 
-saldo_lido, compras_lidas = carregar_dados_usuario(email_usuario)
-st.session_state.saldo_creditos = saldo_lido
-st.session_state.total_compras = compras_lidas
+SUPABASE_URL = obter_credencial("SUPABASE_URL")
+SUPABASE_KEY = obter_credencial("SUPABASE_KEY")
+OPENAI_API_KEY = obter_credencial("OPENAI_API_KEY")
+GEMINI_API_KEY = obter_credencial("GEMINI_API_KEY")
+PEXELS_API_KEY = obter_credencial("PEXELS_API_KEY")
 
-def debitar_creditos_cloud(email: str, operacao: str, custo: int) -> bool:
-    email_limpo = str(email or "").strip().lower()
-    saldo_atual = st.session_state.get("saldo_creditos", 0)
-    if saldo_atual >= custo:
-        novo_saldo = saldo_atual - custo
-        try:
-            supabase.table("usuarios").update({"saldo_creditos": novo_saldo, "creditos": novo_saldo}).eq("email", email_limpo).execute()
-        except Exception:
-            try:
-                supabase.table("usuarios").update({"saldo_creditos": novo_saldo}).eq("email", email_limpo).execute()
-            except Exception:
-                try:
-                    supabase.table("usuarios").update({"creditos": novo_saldo}).eq("email", email_limpo).execute()
-                except Exception:
-                    pass
+# Inicialização do Supabase
+supabase_client: Optional[Client] = None
+if SUPABASE_URL and SUPABASE_KEY:
+    try:
+        supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    except Exception as e:
+        st.sidebar.error(f"Erro ao ligar ao Supabase: {e}")
 
-        try:
-            supabase.table("historico").insert({"email": email_limpo, "operacao": operacao, "creditos": -custo}).execute()
-        except Exception:
-            pass
+# 36 Idiomas Oficiais do Sistema
+IDIOMAS_SISTEMA_36 = {
+    "🇺🇸 Inglês (EUA)": "English (US)",
+    "🇬🇧 Inglês (Reino Unido)": "English (UK)",
+    "🇪🇸 Espanhol": "Español",
+    "🇫🇷 Francês": "Français",
+    "🇩🇪 Alemão": "Deutsch",
+    "🇮🇹 Italiano": "Italiano",
+    "🇵🇹 Português (Portugal)": "Português (PT)",
+    "🇳🇱 Holandês": "Nederlands",
+    "🇵🇱 Polaco": "Polski",
+    "🇷🇺 Russo": "Русский",
+    "🇨🇳 Mandarim (Simplificado)": "Chinese (Simplified)",
+    "🇯🇵 Japonês": "Japanese",
+    "🇰🇷 Coreano": "Korean",
+    "🇸🇦 Árabe": "Arabic",
+    "🇮🇳 Hindi": "Hindi",
+    "🇹🇷 Turco": "Türkçe",
+    "🇸🇪 Sueco": "Svenska",
+    "🇳🇴 Norueguês": "Norsk",
+    "🇩🇰 Dinamarquês": "Dansk",
+    "🇫🇮 Finlandês": "Suomi",
+    "🇬🇷 Grego": "Greek",
+    "🇨🇿 Checo": "Czech",
+    "🇷🇴 Romeno": "Română",
+    "🇭🇺 Húngaro": "Magyar",
+    "🇮🇱 Hebraico": "Hebrew",
+    "🇮🇩 Indonésio": "Bahasa Indonesia",
+    "🇻🇳 Vietnamita": "Tiếng Việt",
+    "🇹🇭 Tailandês": "Thai",
+    "🇺🇦 Ucraniano": "Ukrainian",
+    "🇲🇾 Malaio": "Bahasa Melayu",
+    "🇵🇭 Filipino (Tagalog)": "Tagalog",
+    "🇧🇩 Bengali": "Bengali",
+    "🇭🇷 Croata": "Hrvatski",
+    "🇸🇰 Eslovaco": "Slovenčina",
+    "🇧🇬 Búlgaro": "Bulgarian",
+    "🇿🇦 Africâner": "Afrikaans"
+}
 
-        st.session_state.saldo_creditos = novo_saldo
+# ==============================================================================
+# 2. MOTOR DE CRÉDITOS & SUPABASE
+# ==============================================================================
+def obter_dados_usuario(email: str) -> dict:
+    if not supabase_client or not email:
+        return {"saldo": 0, "total_compras": 0}
+    try:
+        res = supabase_client.from_("usuarios").select("*").eq("email", email.lower().strip()).execute()
+        if res.data and len(res.data) > 0:
+            user = res.data[0]
+            saldo = user.get("saldo_creditos", user.get("creditos", 0))
+            return {"saldo": saldo, "total_compras": user.get("total_compras", 0)}
+        else:
+            supabase_client.from_("usuarios").insert([{"email": email.lower().strip(), "saldo_creditos": 0, "creditos": 0, "total_compras": 0}]).execute()
+            return {"saldo": 0, "total_compras": 0}
+    except Exception:
+        return {"saldo": 0, "total_compras": 0}
+
+def debitar_creditos_cloud(email: str, operacao: str, quantidade: int) -> bool:
+    if not supabase_client or not email:
         return True
-    return False
-
-def disparar_comemoracao():
-    st.balloons()
-
-# ==============================================================================
-# AUDITORIA DE CRÉDITOS, BALANÇO EMPRESARIAL & NOTIFICAÇÃO WHATSAPP
-# ==============================================================================
-def auditar_infraestrutura() -> dict:
-    relatorio = {
-        "data_hora": datetime.now().strftime("%d/%m/%Y %H:%M"),
-        "openai": {"status": "Indisponível", "detalhes": "Chave não configurada", "ok": False},
-        "elevenlabs": {"status": "Indisponível", "detalhes": "Chave não configurada", "ok": False},
-        "gemini": {"status": "Indisponível", "detalhes": "Chave não configurada", "ok": False},
-        "supabase": {"status": "Operacional", "usuarios": 0, "creditos_circulando": 0, "ok": True},
-        "financeiro": {
-            "creditos_clientes": 0,
-            "custo_ia_estimado_brl": 0.0,
-            "custo_ia_estimado_usd": 0.0,
-            "total_faturado_kiwify": 0.0,
-            "pedidos_aprovados": 0
-        }
-    }
-
-    # 1. Checagem OpenAI
-    if OPENAI_API_KEY:
-        try:
-            client_oai = OpenAI(api_key=OPENAI_API_KEY)
-            client_oai.models.list()
-            relatorio["openai"] = {"status": "100% Operacional", "detalhes": "Chave ativa e conectada", "ok": True}
-        except Exception as e:
-            msg_e = str(e)
-            if "insufficient_quota" in msg_e.lower():
-                relatorio["openai"] = {"status": "SEM SALDO!", "detalhes": "Recarga pré-paga necessária", "ok": False}
-            else:
-                relatorio["openai"] = {"status": "Instável / Erro", "detalhes": msg_e[:40], "ok": False}
-
-    # 2. Checagem ElevenLabs
-    if ELEVENLABS_API_KEY:
-        try:
-            r_eleven = requests.get(
-                "https://api.elevenlabs.io/v1/user/subscription",
-                headers={"xi-api-key": ELEVENLABS_API_KEY},
-                timeout=8
-            )
-            if r_eleven.status_code == 200:
-                d = r_eleven.json()
-                usados = d.get("character_count", 0)
-                limite = d.get("character_limit", 0)
-                restantes = max(0, limite - usados)
-                relatorio["elevenlabs"] = {
-                    "status": f"{restantes:,} caracteres restantes".replace(",", "."),
-                    "detalhes": f"Plano {d.get('tier', 'Ativo')} (Usado: {usados:,}/{limite:,})",
-                    "ok": restantes > 1000
-                }
-            else:
-                relatorio["elevenlabs"] = {"status": "Erro na Consulta", "detalhes": f"Código {r_eleven.status_code}", "ok": False}
-        except Exception as e:
-            relatorio["elevenlabs"] = {"status": "Falha de Conexão", "detalhes": str(e)[:35], "ok": False}
-    else:
-        relatorio["elevenlabs"] = {"status": "Não Vinculada", "detalhes": "Inserir em Secrets se for utilizar", "ok": True}
-
-    # 3. Checagem Gemini via Consulta Direta aos Modelos
-    if GEMINI_API_KEY:
-        try:
-            url_g = f"https://generativelanguage.googleapis.com/v1beta/models?key={GEMINI_API_KEY}"
-            resp_g = requests.get(url_g, timeout=8)
-            if resp_g.status_code == 200:
-                dados_m = resp_g.json().get("models", [])
-                nomes_mod = [m.get("name", "").replace("models/", "") for m in dados_m]
-                
-                modelo_ativo = "gemini-1.5-flash"
-                for pref in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]:
-                    if pref in nomes_mod:
-                        modelo_ativo = pref
-                        break
-
-                relatorio["gemini"] = {
-                    "status": "100% Operacional",
-                    "detalhes": f"Conta Paga Ativa ({modelo_ativo})",
-                    "ok": True
-                }
-            else:
-                err_data = resp_g.json().get("error", {})
-                msg_err = err_data.get("message") or f"HTTP {resp_g.status_code}"
-                relatorio["gemini"] = {
-                    "status": "Erro na API",
-                    "detalhes": msg_err[:40],
-                    "ok": False
-                }
-        except Exception as e:
-            relatorio["gemini"] = {
-                "status": "Falha de Rede",
-                "detalhes": str(e)[:35],
-                "ok": False
-            }
-    else:
-        relatorio["gemini"] = {
-            "status": "Chave Ausente",
-            "detalhes": "Configure GEMINI_API_KEY nos Secrets",
-            "ok": False
-        }
-
-    # 4. Checagem Supabase & Balanço Operacional
     try:
-        res_usr = supabase.table("usuarios").select("email, saldo_creditos, creditos").execute()
-        lista_u = getattr(res_usr, "data", [])
-        
-        emails_admin = ["ricardopintoedson@gmail.com", "erp61eng@gmail.com"]
-        clientes_reais = [u for u in lista_u if u.get("email") not in emails_admin]
-        
-        total_cr_clientes = sum([int(u.get("saldo_creditos") or u.get("creditos") or 0) for u in clientes_reais])
-        total_cr_geral = sum([int(u.get("saldo_creditos") or u.get("creditos") or 0) for u in lista_u])
-        
-        custo_suprir_brl = round(total_cr_clientes * 0.0035, 2)
-        custo_suprir_usd = round(total_cr_clientes * 0.00065, 2)
-
-        faturamento_kiwify = 0.0
-        qtd_pedidos = 0
-        try:
-            res_ped = supabase.table("pedidos_kiwify").select("valor_pago").execute()
-            pedidos_lista = getattr(res_ped, "data", [])
-            qtd_pedidos = len(pedidos_lista)
-            faturamento_kiwify = sum([float(p.get("valor_pago") or 0) for p in pedidos_lista])
-        except Exception:
-            pass
-
-        relatorio["supabase"] = {
-            "status": "Operacional Conectado",
-            "usuarios": len(lista_u),
-            "creditos_circulando": total_cr_geral,
-            "ok": True
-        }
-        relatorio["financeiro"] = {
-            "creditos_clientes": total_cr_clientes,
-            "custo_ia_estimado_brl": custo_suprir_brl,
-            "custo_ia_estimado_usd": custo_suprir_usd,
-            "total_faturado_kiwify": faturamento_kiwify,
-            "pedidos_aprovados": qtd_pedidos
-        }
-    except Exception:
-        relatorio["supabase"]["status"] = "Instabilidade Temporária"
-        relatorio["supabase"]["ok"] = False
-
-    return relatorio
-
-def disparar_relatorio_whatsapp(relatorio: dict) -> tuple[bool, str]:
-    fin = relatorio["financeiro"]
-    msg = (
-        f"📊 *CONTABILIDADE EMPRESARIAL & SUPRIMENTO DE IAs*\n"
-        f"🗓️ Data: {relatorio['data_hora']}\n\n"
-        f"🏢 *Balanço da Empresa:*\n"
-        f"• Faturamento Kiwify: R$ {fin['total_faturado_kiwify']:.2f} ({fin['pedidos_aprovados']} pedidos)\n"
-        f"• Créditos Ativos dos Clientes: {fin['creditos_clientes']} cr\n"
-        f"• Reserva Necessária nas APIs: R$ {fin['custo_ia_estimado_brl']:.2f} (~$ {fin['custo_ia_estimado_usd']:.2f} USD)\n\n"
-        f"📡 *Status Técnico das APIs:*\n"
-        f"• OpenAI: {relatorio['openai']['status']}\n"
-        f"• Gemini: {relatorio['gemini']['status']}\n"
-        f"• ElevenLabs: {relatorio['elevenlabs']['status']}\n"
-        f"• Supabase: {relatorio['supabase']['status']} ({relatorio['supabase']['usuarios']} usuários)\n\n"
-        f"🛡️ *Margem de Segurança:* Suprimento coberto com folga."
-    )
-
-    if WHATSAPP_NUMERO and CALLMEBOT_API_KEY:
-        try:
-            url_wpp = f"https://api.callmebot.com/whatsapp.php?phone={urllib.parse.quote(WHATSAPP_NUMERO)}&text={urllib.parse.quote(msg)}&apikey={urllib.parse.quote(CALLMEBOT_API_KEY)}"
-            res = requests.get(url_wpp, timeout=12)
-            if res.status_code == 200:
-                return True, "Mensagem contábil enviada com sucesso para o seu WhatsApp!"
-        except Exception:
-            pass
-
-    link_manual = f"https://api.whatsapp.com/send?text={urllib.parse.quote(msg)}"
-    return False, link_manual
-
-# ==============================================================================
-# MOTOR DUBFYAI: DUBLAGEM & TRADUÇÃO ONLINE (WHISPER + GPT/GEMINI + TTS)
-# ==============================================================================
-IDIOMAS_DUBLAGEM = {
-    "Inglês (EUA)": {"codigo": "en", "voz_tts": "onyx"},
-    "Espanhol (Latino)": {"codigo": "es", "voz_tts": "echo"},
-    "Francês": {"codigo": "fr", "voz_tts": "nova"},
-    "Alemão": {"codigo": "de", "voz_tts": "onyx"},
-    "Italiano": {"codigo": "it", "voz_tts": "nova"},
-    "Japonês": {"codigo": "ja", "voz_tts": "shimmer"},
-    "Português (Brasil)": {"codigo": "pt", "voz_tts": "onyx"}
-}
-
-def extrair_audio_de_video(caminho_video: str, caminho_saida_audio: str) -> bool:
-    try:
-        cmd = [FFMPEG_BIN, "-nostdin", "-y", "-i", caminho_video, "-vn", "-acodec", "libmp3lame", "-b:a", "128k", caminho_saida_audio]
-        p = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=60)
-        return p.returncode == 0 and os.path.exists(caminho_saida_audio)
-    except Exception:
-        return False
-
-def transcrever_audio_whisper(caminho_audio: str) -> str:
-    if not OPENAI_API_KEY:
-        raise ValueError("Chave OPENAI_API_KEY necessária para transcrição Whisper.")
-    client_oai = OpenAI(api_key=OPENAI_API_KEY)
-    with open(caminho_audio, "rb") as f_aud:
-        transcricao = client_oai.audio.transcriptions.create(
-            model="whisper-1",
-            file=f_aud,
-            response_format="text"
-        )
-    return str(transcricao).strip()
-
-def traduzir_texto_ia(texto_original: str, idioma_alvo: str) -> str:
-    prompt = f"""
-    Atue como tradutor profissional e dublador de audiovisual.
-    Traduza o texto a seguir para o idioma '{idioma_alvo}'.
-    Mantenha o tom natural, o ritmo da fala e a mesma intenção emocional.
-    Texto original:
-    "{texto_original}"
-
-    Retorne APENAS o texto traduzido, sem aspas, explicações ou notas adicionais.
-    """
-    if GEMINI_API_KEY:
-        try:
-            client_g = genai.Client(api_key=GEMINI_API_KEY)
-            r = client_g.models.generate_content(model="gemini-1.5-flash", contents=prompt)
-            if r and r.text:
-                return r.text.strip()
-        except Exception:
-            pass
-
-    if OPENAI_API_KEY:
-        client_oai = OpenAI(api_key=OPENAI_API_KEY)
-        r = client_oai.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.3
-        )
-        return r.choices[0].message.content.strip()
-
-    return texto_original
-
-def sintetizar_fala_dublada(texto: str, caminho_saida: str, voz: str = "onyx") -> str:
-    client_oai = OpenAI(api_key=OPENAI_API_KEY)
-    resposta = client_oai.audio.speech.create(model="tts-1", voice=voz, input=texto)
-    with open(caminho_saida, "wb") as f:
-        for chunk in resposta.iter_bytes():
-            f.write(chunk)
-    return caminho_saida
-
-def mesclar_audio_dublado_em_video(caminho_video_orig: str, caminho_audio_dub: str, caminho_saida: str) -> bool:
-    try:
-        # Substitui a faixa de áudio original pelo áudio dublado
-        cmd = [
-            FFMPEG_BIN, "-nostdin", "-y",
-            "-i", caminho_video_orig,
-            "-i", caminho_audio_dub,
-            "-c:v", "copy",
-            "-map", "0:v:0",
-            "-map", "1:a:0",
-            "-shortest",
-            "-movflags", "+faststart",
-            caminho_saida
-        ]
-        p = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=120)
-        return p.returncode == 0 and os.path.exists(caminho_saida)
+        dados = obter_dados_usuario(email)
+        saldo_atual = dados["saldo"]
+        if saldo_atual < quantidade:
+            return False
+        novo_saldo = saldo_atual - quantidade
+        supabase_client.from_("usuarios").update({"saldo_creditos": novo_saldo, "creditos": novo_saldo}).eq("email", email.lower().strip()).execute()
+        supabase_client.from_("historico").insert([{"email": email.lower().strip(), "operacao": f"Uso: {operacao}", "creditos": -quantidade}]).execute()
+        return True
     except Exception:
         return False
 
 # ==============================================================================
-# MOTOR PEXELS (FOTOS PARA O E-BOOK & VÍDEOS PARA VSL)
+# 3. MOTORES DE IA: GERAÇÃO, TRADUÇÃO & MINERAÇÃO
 # ==============================================================================
-def baixar_foto_nicho_pexels(termo_busca: str, pexels_key: str, identificador: str) -> str:
-    if not pexels_key or not termo_busca:
-        return None
-    caminho_local = os.path.join(DIR_FOTOS, f"foto_{identificador}.jpg")
-    url = f"https://api.pexels.com/v1/search?query={urllib.parse.quote(termo_busca)}&orientation=landscape&per_page=6"
-    headers = {"Authorization": pexels_key}
-    try:
-        res = requests.get(url, headers=headers, timeout=12)
-        if res.status_code == 200:
-            fotos = res.json().get("photos", [])
-            if fotos:
-                escolhida = random.choice(fotos)
-                link_img = escolhida.get("src", {}).get("large") or escolhida.get("src", {}).get("medium")
-                if link_img:
-                    conteudo = requests.get(link_img, timeout=20)
-                    if conteudo.status_code == 200 and len(conteudo.content) > 5000:
-                        with open(caminho_local, "wb") as f:
-                            f.write(conteudo.content)
-                        with Image.open(caminho_local) as im:
-                            rgb_im = im.convert("RGB")
-                            rgb_im.thumbnail((1280, 720), Image.Resampling.LANCZOS)
-                            rgb_im.save(caminho_local, "JPEG", quality=85)
-                        return caminho_local
-    except Exception:
-        pass
-    return None
-
-def baixar_video_pexels(termo: str, pexels_key: str, vertical: bool, prefixo_arq: str) -> str:
-    caminho_local = os.path.join(DIR_BROLL, f"{prefixo_arq}.mp4")
-    orientacao = "portrait" if vertical else "landscape"
-    url = f"https://api.pexels.com/videos/search?query={urllib.parse.quote(termo)}&orientation={orientacao}&per_page=8"
-    headers = {"Authorization": pexels_key}
-    try:
-        res = requests.get(url, headers=headers, timeout=12)
-        if res.status_code == 200:
-            videos = res.json().get("videos", [])
-            if videos:
-                escolhido = random.choice(videos)
-                arquivos = escolhido.get("video_files", [])
-                otimizados = [v for v in arquivos if 0 < v.get("width", 0) <= 1920]
-                link = otimizados[0]["link"] if otimizados else (arquivos[0]["link"] if arquivos else None)
-                if link:
-                    conteudo = requests.get(link, timeout=25)
-                    if conteudo.status_code == 200 and len(conteudo.content) > 10000:
-                        with open(caminho_local, "wb") as f:
-                            f.write(conteudo.content)
-                        return caminho_local
-    except Exception:
-        pass
-    return None
-
-# ==============================================================================
-# MOTORES DE INTELIGÊNCIA ARTIFICIAL: RADAR E VSL
-# ==============================================================================
-PLATAFORMAS_CONFIG = {
-    "TikTok": {"icone": "📱", "ds": "", "modificador": "tiktok viral", "perfil": "Ganchos imediatos, ritmo acelerado e curiosidade instantânea."},
-    "Instagram (Reels)": {"icone": "📸", "ds": "", "modificador": "instagram reels", "perfil": "Estética visual, estilo de vida e autoridade imediata."},
-    "Facebook Ads": {"icone": "📢", "ds": "", "modificador": "como resolver", "perfil": "Público 35+, resolução de dores práticas e alívio imediato."},
-    "YouTube": {"icone": "▶", "ds": "yt", "modificador": "como fazer", "perfil": "Intenção de pesquisa ativa, tutoriais passo a passo e clareza."},
-    "Kwai": {"icone": "🔥", "ds": "", "modificador": "urgente renda extra", "perfil": "Linguagem simples, forte apelo popular e urgência financeira."},
-    "Kiwify": {"icone": "🥝", "ds": "", "modificador": "metodo download", "perfil": "Infoprodutos de impulso (R$ 19 a R$ 97) e protocolos práticos."},
-    "Hotmart": {"icone": "🚀", "ds": "", "modificador": "curso completo", "perfil": "Produtos estruturados (R$ 197 a R$ 997) e métodos validados."}
-}
-
-def minerar_buscas_fallback_ia(termo_semente: str, plataforma: str) -> list[str]:
-    prompt = f"""
-    Liste exatamente 10 termos e buscas reais de alta intenção que usuários no Brasil estão digitando no {plataforma} sobre o ângulo: "{termo_semente}".
-    Retorne estritamente um JSON com a chave 'buscas' contendo a lista de 10 strings curtas.
-    """
+def executar_prompt_ia(prompt: str, formato_json: bool = False, temperatura: float = 0.4) -> str:
+    """Invoca o Gemini (com fallback para OpenAI) de forma resiliente."""
     if GEMINI_API_KEY:
         try:
-            client_g = genai.Client(api_key=GEMINI_API_KEY)
-            resp = client_g.models.generate_content(
-                model="gemini-1.5-flash",
-                contents=prompt,
-                config={"response_mime_type": "application/json"}
-            )
-            dados = json.loads(resp.text.strip())
-            return dados.get("buscas", [])
+            if HAS_GENAI_NEW:
+                client = genai.Client(api_key=GEMINI_API_KEY)
+                cfg = {"response_mime_type": "application/json"} if formato_json else {}
+                res = client.models.generate_content(model="gemini-1.5-flash", contents=prompt, config=cfg)
+                return res.text
+            elif HAS_GENAI_LEGACY:
+                legacy_genai.configure(api_key=GEMINI_API_KEY)
+                model = legacy_genai.GenerativeModel("gemini-1.5-flash")
+                res = model.generate_content(prompt)
+                return res.text
         except Exception:
             pass
 
     if OPENAI_API_KEY:
-        try:
-            client_o = OpenAI(api_key=OPENAI_API_KEY)
-            resp = client_o.chat.completions.create(
-                model="gpt-4o-mini",
-                response_format={"type": "json_object"},
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.7
-            )
-            dados = json.loads(resp.choices[0].message.content)
-            return dados.get("buscas", [])
-        except Exception:
-            pass
+        client = OpenAI(api_key=OPENAI_API_KEY)
+        kwargs = {"model": "gpt-4o-mini", "messages": [{"role": "user", "content": prompt}], "temperature": temperatura}
+        if formato_json:
+            kwargs["response_format"] = {"type": "json_object"}
+        res = client.chat.completions.create(**kwargs)
+        return res.choices[0].message.content
 
-    return [
-        f"{termo_semente} passo a passo 2026",
-        f"{termo_semente} funciona de verdade",
-        f"{termo_semente} método simples",
-        f"{termo_semente} do zero sem aparecer",
-        f"{termo_semente} estratégia atualizada",
-        f"{termo_semente} ferramentas práticas"
-    ]
+    raise ValueError("Nenhuma chave válida configurada para Gemini ou OpenAI.")
 
-def minerar_buscas_plataforma(termo_semente: str, plataforma: str) -> list[str]:
-    cfg = PLATAFORMAS_CONFIG.get(plataforma, PLATAFORMAS_CONFIG["TikTok"])
-    if cfg["ds"] == "yt":
-        url = f"https://suggestqueries.google.com/complete/search?client=firefox&ds=yt&hl=pt-BR&q={urllib.parse.quote(termo_semente)}"
-    else:
-        termo_busca = f"{termo_semente} {cfg['modificador']}".strip()
-        url = f"https://suggestqueries.google.com/complete/search?client=firefox&hl=pt-BR&q={urllib.parse.quote(termo_busca)}"
-
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
-    }
-    try:
-        req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, timeout=4) as resposta:
-            dados = json.loads(resposta.read().decode("utf-8"))
-            if len(dados) > 1 and dados[1]:
-                return dados[1]
-    except Exception:
-        pass
-
-    return minerar_buscas_fallback_ia(termo_semente, plataforma)
-
-def analisar_oportunidades_ia(buscas: list[str], plataforma: str) -> list[dict]:
-    cfg = PLATAFORMAS_CONFIG.get(plataforma, PLATAFORMAS_CONFIG["TikTok"])
-    lista_formatada = "\n".join([f"- {b}" for b in buscas[:12]])
-
+def traduzir_texto_ia(texto: str, idioma_destino: str) -> str:
+    if not texto.strip():
+        return ""
     prompt = f"""
-    Atue como estrategista sênior de monetização para {plataforma} ({cfg['perfil']}).
-    Buscas reais mineradas:
-    {lista_formatada}
-
-    Retorne estritamente um JSON com a chave 'oportunidades', contendo 4 objetos com as chaves:
-    - 'produto': Nome comercial magnético da oferta
-    - 'publico': Quem compra especificamente e sua dor principal
-    - 'angulo': Gancho principal de conversão e mecanismo único
-    """
-
-    if GEMINI_API_KEY:
-        try:
-            client_g = genai.Client(api_key=GEMINI_API_KEY)
-            resp = client_g.models.generate_content(
-                model="gemini-1.5-flash",
-                contents=prompt,
-                config={"response_mime_type": "application/json"}
-            )
-            dados = json.loads(resp.text.strip())
-            return dados.get("oportunidades", [])
-        except Exception:
-            pass
-
-    if OPENAI_API_KEY:
-        try:
-            client_o = OpenAI(api_key=OPENAI_API_KEY)
-            resp = client_o.chat.completions.create(
-                model="gpt-4o-mini",
-                response_format={"type": "json_object"},
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.7
-            )
-            dados = json.loads(resp.choices[0].message.content)
-            return dados.get("oportunidades", [])
-        except Exception:
-            pass
-
-    return []
-
-def obter_roteiro_ia_por_ticket(produto: str, publico: str, angulo: str, faixa_preco: str, plataforma: str) -> list[str]:
-    client = OpenAI(api_key=OPENAI_API_KEY)
-    if "Baixo" in faixa_preco:
-        qtd_frases = 3
-        diretrizes = f"- Canal: {plataforma} | TICKET BAIXO (R$ 27 a R$ 97).\n- 3 frases curtas e diretas de interrupção (20 a 30s)."
-    elif "Médio" in faixa_preco:
-        qtd_frases = 5
-        diretrizes = f"- Canal: {plataforma} | TICKET MÉDIO (R$ 197 a R$ 497).\n- 5 frases progressivas com dor, causa oculta e CTA (50 a 70s)."
-    else:
-        qtd_frases = 7
-        diretrizes = f"- Canal: {plataforma} | ALTO TICKET (R$ 997+).\n- 7 frases de autoridade e qualificação (90 a 120s)."
-
-    prompt = f"""
-    Crie o roteiro de vendas persuasivo para: '{produto}'.
-    Público: '{publico}'. Ângulo: '{angulo}'.
-    {diretrizes}
-    Retorne APENAS as {qtd_frases} frases, exatamente uma por linha, sem numeração ou aspas.
-    """
-    resp = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.7
-    )
-    return [l.strip() for l in resp.choices[0].message.content.strip().split("\n") if l.strip()]
-
-def extrair_termo_broll_ia(frase: str, perfil_personagem: str = "") -> str:
-    client = OpenAI(api_key=OPENAI_API_KEY)
-    instrucao_tipo = f'O ator/pessoa DEVE ter o perfil: "{perfil_personagem}".' if perfil_personagem and "Decide" not in perfil_personagem else ""
-    prompt = f"""
-    Frase narrada: "{frase}"
-    {instrucao_tipo}
-    Gere o melhor termo de busca visual em inglês (2 a 4 palavras) para biblioteca Pexels.
-    Retorne APENAS o termo em inglês, sem pontuação.
+    Atue como tradutor nativo e copywriter sênior no idioma '{idioma_destino}'.
+    Traduza o texto abaixo mantendo o tom persuasivo, ritmo natural, métrica comercial e formatação original:
+    
+    "{texto}"
+    
+    Retorne estritamente o texto traduzido, sem aspas e sem explicações.
     """
     try:
-        resp = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.3
-        )
-        return resp.choices[0].message.content.strip().replace('"', '')
+        return executar_prompt_ia(prompt, formato_json=False, temperatura=0.3).strip()
     except Exception:
-        return "business lifestyle"
+        return texto
 
-# ==============================================================================
-# SÍNTESE DE VSL A PARTIR DOS DADOS DO E-BOOK APROVADO
-# ==============================================================================
-def gerar_roteiro_vsl_de_ebook(dados_ebook: dict) -> list[str]:
-    titulo = dados_ebook.get("titulo", "")
-    subtitulo = dados_ebook.get("subtitulo", "")
-    intro = dados_ebook.get("introducao", "")[:350]
-    modulos = [c.get("titulo", "") for c in dados_ebook.get("capitulos", [])]
-
+def minerar_nicho_profundo_ia(nicho: str, profundidade: str) -> str:
     prompt = f"""
-    Atue como copywriter de resposta direta de alta conversão.
-    Crie um roteiro de VSL de 5 frases magnéticas para vender o infoproduto:
-    - Título: {titulo}
-    - Subtítulo: {subtitulo}
-    - Problema / Diagnóstico: {intro}
-    - Conteúdo dos Módulos: {', '.join(modulos)}
-
-    ESTRUTURA DAS 5 FRASES DE ALTA RETENÇÃO:
-    Frase 1 (Quebra de Padrão): Pergunta ou afirmação chocante expondo o erro do público.
-    Frase 2 (Agitação do Problema): Mostra por que continuar no erro custa caro.
-    Frase 3 (Apresentação do Mecanismo): Revela que o método prático de '{titulo}' resolve isso sem enrolação.
-    Frase 4 (Entrega Prática): Cita que ele recebe checklists e passos prontos para executar imediatamente.
-    Frase 5 (Chamada para Ação): Convite direto para tocar no link abaixo e garantir o manual agora.
-
-    Retorne APENAS as 5 frases, exatamente uma por linha, sem títulos, numeração ou aspas.
+    Atue como Diretor de Aquisição e Especialista Sênior em Tráfego Pago, Copywriting e Validação de Produtos Digitais.
+    Domínio absoluto de: Google Ads (Search, YouTube Ads, PMax), Meta Ads, Kiwify e plataformas internacionais.
+    
+    Analise a fundo o seguinte nicho:
+    NICHO: "{nicho}"
+    NÍVEL DE PROFUNDIDADE: {profundidade}
+    
+    Gere um dossiê executivo completo formatado em Markdown com as seguintes seções estruturadas:
+    
+    ### 1. 🎯 PÚBLICO-ALVO & NÍVEL DE CONSCIÊNCIA
+    - Perfil do comprador real (faixa etária, motivação urgente de compra).
+    - Nível de consciência e temperatura média de tráfego.
+    
+    ### 2. ⚡ AS 3 MAIORES DORES OCULTAS & AS 3 PRINCIPAIS OBJEÇÕES
+    - Dores profundas que aceleram a decisão de compra.
+    - Objeções reais e contra-argumentos de resposta imediata na copy.
+    
+    ### 3. 💎 ARQUITETURA DO PRODUTO & MECANISMO ÚNICO
+    - **Nome Sugerido do E-book / Treinamento:** (Comercial, magnético e de alto valor percebido).
+    - **A Grande Promessa (Big Idea):** (1 frase direta e de impacto visceral).
+    - **Mecanismo Único:** Qual o método exclusivo por trás da solução?
+    
+    ### 4. 👑 O PATRÃO GOOGLE ADS (KIT COMPLETO DE CAMPANHA)
+    #### A) Palavras-Chave de Fundo de Funil (Compradores Reais):
+    - Liste 6 a 8 palavras-chave com alta intenção de compra formatadas em Correspondência de Frase `"termo"` e Correspondência Exata `[termo]`.
+    
+    #### B) Lista de Palavras-Chave Negativas (Blindagem de Verba):
+    - Liste 10 termos obrigatórios para negativar de imediato (ex: grátis, pdf grátis, login, reclame aqui, torrent, baixar, etc.).
+    
+    #### C) Anúncio Responsivo de Pesquisa (RSA Pronto para Copiar e Colar):
+    - **Títulos (máx. 30 caracteres cada):** Liste 5 títulos magnéticos diferentes.
+    - **Descrições (máx. 90 caracteres cada):** Liste 3 descrições persuasivas com chamada para ação clara (CTA).
+    
+    #### D) Gancho para YouTube Ads (Vídeo In-Stream / Primeiros 5 Segundos):
+    - A frase de abertura exata para usar na VSL no YouTube, retendo compradores e descartando curiosos antes do limite de cobrança.
+    
+    ### 5. 💰 ESTRATÉGIA DE MONETIZAÇÃO & ESCALA
+    - **Preço Frontend (Brasil):** R$ (Ticket para escala no PIX/Cartão).
+    - **Preço Internacional (EUA/Europa):** US$ / € (para venda com o material traduzido).
+    - **Order Bump Perfeito:** Produto complementar irresistível para adicionar no checkout.
+    
+    Seja pragmático, analítico e 100% voltado para geração de faturamento real.
     """
-    if GEMINI_API_KEY:
-        try:
-            client_g = genai.Client(api_key=GEMINI_API_KEY)
-            resp = client_g.models.generate_content(model="gemini-1.5-flash", contents=prompt)
-            linhas = [l.strip() for l in resp.text.strip().split("\n") if l.strip() and not l.strip().startswith("#")]
-            if len(linhas) >= 3:
-                return linhas[:5]
-        except Exception:
-            pass
+    return executar_prompt_ia(prompt, formato_json=False, temperatura=0.35)
 
-    if OPENAI_API_KEY:
-        try:
-            client_o = OpenAI(api_key=OPENAI_API_KEY)
-            resp = client_o.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.7
-            )
-            linhas = [l.strip() for l in resp.choices[0].message.content.strip().split("\n") if l.strip()]
-            return linhas[:5]
-        except Exception:
-            pass
-
-    return [
-        f"Você continua perdendo tempo tentando acertar no mercado sem um método validado?",
-        f"O grande erro da maioria é seguir dicas soltas que não ensinam o processo operacional.",
-        f"Por isso criamos o {titulo}, um manual prático focado em execução direta.",
-        f"Você terá em mãos checklists detalhados e o passo a passo exato para aplicar hoje.",
-        f"Toque no link abaixo agora mesmo e faça o download do material completo."
-    ]
-
-# ==============================================================================
-# MOTOR DE E-BOOK EM PIPELINE MODULAR (ALTA DENSIDADE E VOLUME REAL DE LIVRO)
-# ==============================================================================
-def gerar_conteudo_ebook_gemini(nicho_produto: str, publico: str, promessa_angulo: str) -> dict:
-    if not GEMINI_API_KEY:
-        if not OPENAI_API_KEY:
-            raise ValueError("Nenhuma chave válida configurada (GEMINI_API_KEY ou OPENAI_API_KEY).")
-        client_oai = OpenAI(api_key=OPENAI_API_KEY)
-        p_fallback = f"""
-        Escreva um Livro Operacional completo, detalhado e aprofundado sobre '{nicho_produto}'.
-        Público: '{publico}'. Promessa: '{promessa_angulo}'.
-        Retorne estritamente um JSON com 'titulo', 'subtitulo', 'termo_capa', 'introducao' e 'capitulos' (lista com 'numero', 'titulo', 'termo_busca_foto', 'conteudo').
-        """
-        r_oai = client_oai.chat.completions.create(
-            model="gpt-4o-mini",
-            response_format={"type": "json_object"},
-            messages=[{"role": "user", "content": p_fallback}],
-            temperature=0.7
-        )
-        return json.loads(r_oai.choices[0].message.content)
-
-    client = genai.Client(api_key=GEMINI_API_KEY)
-    modelo_ativo = "gemini-1.5-flash"
-
-    prompt_base = f"""
-    Atue como autor de livros técnicos de excelência e estrategista de infoprodutos.
-    Estruture a arquitetura de um LIVRO / MANUAL OPERACIONAL COMPLETO, DENSO E PROFUNDO sobre: "{nicho_produto}".
-    Público-Alvo e Dores: "{publico}".
-    Promessa Central e Mecanismo: "{promessa_angulo}".
-
-    DIRETRIZES DE IMAGEM (PEXELS):
-    - Se for comida/culinária, use descritores de fotografia gastronómica vibrante: 'vibrant colorful gourmet plating food styling', 'fresh ingredients flatlay close up', 'chef preparing colorful dish in kitchen'.
-    - Se for outro nicho, use termos profissionais de alta saturação visual.
-
-    Retorne ESTRITAMENTE um JSON estruturado com o seguinte esquema:
+def gerar_roteiro_vsl_ia(nicho: str, promessa: str, publico: str, num_cenas: int = 5) -> List[str]:
+    prompt = f"""
+    Crie um roteiro persuasivo de alta conversão para VSL (Vídeo de Vendas) sobre:
+    Nicho: {nicho}
+    Promessa: {promessa}
+    Público: {publico}
+    
+    Gere exatamente {num_cenas} frases de impacto direto (cada frase representará uma cena com corte visual dinâmico).
+    Retorne estritamente um JSON no seguinte formato:
     {{
-      "titulo": "Título Comercial Magnético e Direto",
-      "subtitulo": "Subtítulo Persuasivo Focado em Tempo e Resultado",
-      "termo_capa": "termo em ingles para foto de capa no Pexels (2 a 4 palavras)",
-      "introducao": "Texto longo da introdução com diagnóstico cru, quebra de crenças, ciência/técnica por trás do método e como usar o livro (mínimo 350 palavras)...",
-      "ementa_modulos": [
-        {{
-          "numero": 1,
-          "titulo": "Setup Obrigatório, Ingredientes Críticos e Equipamentos",
-          "termo_foto": "termo em ingles para foto profissional no Pexels",
-          "foco_operacional": "Ficha completa de ingredientes, proporções fundamentais, utensílios obrigatórios e preparação do ambiente"
-        }},
-        {{
-          "numero": 2,
-          "titulo": "O Método Técnico de Execução Passo a Passo Sem Erros",
-          "termo_foto": "termo em ingles para foto profissional no Pexels",
-          "foco_operacional": "Procedimento técnico completo, pontos de textura/temperatura, tempos precisos e técnicas de controle"
-        }},
-        {{
-          "numero": 3,
-          "titulo": "Fichas Técnicas Prontas, Receitas Mestras e Variações",
-          "termo_foto": "termo em ingles para foto profissional no Pexels",
-          "foco_operacional": "Fichas completas com gramaturas, modo de preparo detalhado e soluções para adaptações"
-        }},
-        {{
-          "numero": 4,
-          "titulo": "Guia de Resolução de Problemas, Conservação e Checklist",
-          "termo_foto": "termo em ingles para foto profissional no Pexels",
-          "foco_operacional": "Diagnóstico dos 5 erros mais comuns, tabela de armazenamento/validade e checklist diário de execução"
-        }}
-      ]
+        "cenas": [
+            "Frase da cena 1...",
+            "Frase da cena 2..."
+        ]
     }}
     """
+    resp = executar_prompt_ia(prompt, formato_json=True, temperatura=0.5)
+    dados = json.loads(resp)
+    return dados.get("cenas", [])
 
-    dados_base = None
-    modelos_disponiveis = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-pro"]
+def gerar_conteudo_ebook_ia(tema: str, publico: str) -> dict:
+    prompt = f"""
+    Atue como autor técnico e editor de manuais comerciais de alta escala.
+    Crie o conteúdo completo e estruturado para um manual prático e comercial sobre:
+    Tema: {tema}
+    Público: {publico}
+    
+    Retorne estritamente um JSON estruturado com:
+    {{
+        "titulo": "Título Principal",
+        "subtitulo": "Subtítulo Persuasivo",
+        "termo_capa": "Termo em inglês para buscar foto no Pexels (ex: artisan sourdough bread)",
+        "introducao": "Texto completo e formal de introdução...",
+        "capitulos": [
+            {{
+                "numero": 1,
+                "titulo": "Título do Módulo 1",
+                "termo_busca_foto": "Termo em inglês para foto (ex: flour and water kneading)",
+                "conteudo": "Texto completo, com passos, checklists e detalhes técnicos..."
+            }},
+            {{
+                "numero": 2,
+                "titulo": "Título do Módulo 2",
+                "termo_busca_foto": "Termo em inglês para foto",
+                "conteudo": "Texto completo..."
+            }},
+            {{
+                "numero": 3,
+                "titulo": "Título do Módulo 3",
+                "termo_busca_foto": "Termo em inglês para foto",
+                "conteudo": "Texto completo..."
+            }},
+            {{
+                "numero": 4,
+                "titulo": "Título do Módulo 4",
+                "termo_busca_foto": "Termo em inglês para foto",
+                "conteudo": "Texto completo..."
+            }}
+        ]
+    }}
+    """
+    resp = executar_prompt_ia(prompt, formato_json=True, temperatura=0.4)
+    return json.loads(resp)
 
-    for mod in modelos_disponiveis:
-        try:
-            res_base = client.models.generate_content(
-                model=mod,
-                contents=prompt_base,
-                config={"response_mime_type": "application/json"}
-            )
-            if res_base and getattr(res_base, "text", None):
-                dados_base = json.loads(res_base.text.strip())
-                modelo_ativo = mod
-                break
-        except Exception:
-            continue
+def traduzir_ebook_completo_ia(dados_ebook: dict, idioma_destino: str, progress_bar=None) -> dict:
+    total_etapas = 2 + len(dados_ebook.get("capitulos", []))
+    etapa_atual = 0
 
-    if not dados_base:
-        raise RuntimeError("Não foi possível gerar conteúdo via Gemini. Verifique a chave nos Secrets.")
+    titulo_tr = traduzir_texto_ia(dados_ebook.get("titulo", ""), idioma_destino)
+    subtitulo_tr = traduzir_texto_ia(dados_ebook.get("subtitulo", ""), idioma_destino)
+    etapa_atual += 1
+    if progress_bar:
+        progress_bar.progress(etapa_atual / total_etapas)
 
-    capitulos_processados = []
+    intro_tr = traduzir_texto_ia(dados_ebook.get("introducao", ""), idioma_destino)
+    etapa_atual += 1
+    if progress_bar:
+        progress_bar.progress(etapa_atual / total_etapas)
 
-    for mod in dados_base.get("ementa_modulos", []):
-        num = mod.get("numero", 1)
-        tit = mod.get("titulo", f"Módulo {num}")
-        foco = mod.get("foco_operacional", "")
-
-        prompt_cap = f"""
-        Você está redigindo o conteúdo integral do Módulo {num}: "{tit}" do livro "{dados_base.get('titulo')}".
-        Público: {publico} | Mecanismo Central: {promessa_angulo}
-        Foco Operacional Obrigatório: {foco}
-
-        DIRETRIZES DE QUALIDADE E PROFUNDIDADE:
-        - PROIBIDO textos superficiais ou listas curtas. Escreva um material denso, minucioso e de alto valor prático (mínimo 600 a 850 palavras neste capítulo).
-        - Divida o texto com subtítulos claros em CAIXA ALTA (ex.: 1. OS FUNDAMENTOS TÉCNICOS, 2. PROCEDIMENTO PASSO A PASSO, 3. TABELA DE PROPORÇÕES, 4. PONTOS DE ATENÇÃO).
-        - OBRIGATÓRIO incluir dados exatos, gramaturas, temperaturas, tempos e especificações práticas.
-        - OBRIGATÓRIO incluir ao final a seção: 'CHECKLIST OPERACIONAL' com itens objetivos em formato [ ] para o leitor marcar.
-        Retorne APENAS o texto corrido do módulo, sem tags de código ou títulos markdown (#).
-        """
-
-        conteudo_capitulo = ""
-        try:
-            res_cap = client.models.generate_content(
-                model=modelo_ativo,
-                contents=prompt_cap
-            )
-            conteudo_capitulo = res_cap.text.strip()
-        except Exception:
-            conteudo_capitulo = f"1. SETUP E FUNDAMENTOS TÉCNICOS\nInicialização e organização completa dos materiais para {foco}.\n\n2. PROCEDIMENTO PASSO A PASSO\nPasso 1: Verificação de insumos e pesagem exata.\nPasso 2: Processamento e execução da técnica.\nPasso 3: Controle térmico e finalização.\n\nCHECKLIST OPERACIONAL:\n[ ] Insumos validados e pesados\n[ ] Temperatura e ambiente controlados\n[ ] Produto final padronizado"
-
-        capitulos_processados.append({
-            "numero": num,
-            "titulo": tit,
-            "termo_busca_foto": mod.get("termo_foto", "vibrant colorful gourmet food presentation"),
-            "conteudo": conteudo_capitulo
+    capitulos_tr = []
+    for cap in dados_ebook.get("capitulos", []):
+        t_cap_tr = traduzir_texto_ia(cap.get("titulo", ""), idioma_destino)
+        c_cap_tr = traduzir_texto_ia(cap.get("conteudo", ""), idioma_destino)
+        capitulos_tr.append({
+            "numero": cap.get("numero", 1),
+            "titulo": t_cap_tr,
+            "termo_busca_foto": cap.get("termo_busca_foto", ""),
+            "conteudo": c_cap_tr
         })
+        etapa_atual += 1
+        if progress_bar:
+            progress_bar.progress(etapa_atual / total_etapas)
 
     return {
-        "titulo": dados_base.get("titulo", "MANUAL DE IMPLEMENTAÇÃO PRÁTICA"),
-        "subtitulo": dados_base.get("subtitulo", "Guia Técnico Passo a Passo"),
-        "termo_capa": dados_base.get("termo_capa", "vibrant colorful culinary gourmet presentation"),
-        "introducao": dados_base.get("introducao", ""),
-        "capitulos": capitulos_processados
+        "titulo": titulo_tr,
+        "subtitulo": subtitulo_tr,
+        "termo_capa": dados_ebook.get("termo_capa", ""),
+        "introducao": intro_tr,
+        "capitulos": capitulos_tr
     }
 
 # ==============================================================================
-# MOTOR DE DIAGRAMAÇÃO DE PDF COM ACESSIBILIDADE E TIPOGRAFIA AMPLA (14pt)
+# 4. PROCESSAMENTO GRÁFICO (PDF REPORTLAB COM FOTOS DO PEXELS)
 # ==============================================================================
-class PDFEbookComFotos(FPDF):
-    def __init__(self, titulo_guia: str):
-        super().__init__(orientation="P", unit="mm", format="A4")
-        self.titulo_guia = sanitizar_pdf(titulo_guia)
-
-    def header(self):
-        if self.page_no() > 1:
-            self.set_font("Helvetica", "B", 10)
-            self.set_text_color(70, 80, 95)
-            self.cell(0, 8, self.titulo_guia[:45].upper(), border=0, align="L")
-            self.cell(0, 8, "GUIA TÉCNICO OFICIAL", border=0, align="R")
-            self.ln(9)
-            self.set_draw_color(200, 210, 220)
-            self.set_line_width(0.4)
-            self.line(18, 17, 192, 17)
-            self.ln(6)
-
-    def footer(self):
-        if self.page_no() > 1:
-            self.set_y(-18)
-            self.set_draw_color(200, 210, 220)
-            self.set_line_width(0.4)
-            self.line(18, 279, 192, 279)
-            self.set_font("Helvetica", "B", 11)
-            self.set_text_color(70, 80, 95)
-            self.cell(0, 10, f"Página {self.page_no()}", border=0, align="C")
-
-def sanitizar_pdf(txt: str) -> str:
-    if not txt:
-        return ""
-    substituicoes = {
-        "–": "-", "—": "-", "“": '"', "”": '"', "’": "'", "‘": "'",
-        "•": "*", "…": "...", "→": "->", "←": "<-", "\t": " "
-    }
-    for orig, dest in substituicoes.items():
-        txt = txt.replace(orig, dest)
-    return txt.encode("latin-1", "replace").decode("latin-1")
-
-def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_saida: str):
-    titulo = dados.get("titulo", "GUIA OPERACIONAL")
-    subtitulo = dados.get("subtitulo", "")
-    pdf = PDFEbookComFotos(titulo_guia=titulo)
-    pdf.set_auto_page_break(auto=True, margin=24)
-    pdf.set_margins(18, 22, 18)
-
-    # ---------------- CAPA PREMIUM COM DESTAQUE VISUAL ----------------
-    pdf.add_page()
-    pdf.set_fill_color(15, 23, 42)
-    pdf.rect(0, 0, 210, 297, "F")
-
-    pdf.set_fill_color(245, 158, 11)
-    pdf.rect(18, 28, 174, 4, "F")
-
-    pdf.set_y(38)
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.set_text_color(245, 158, 11)
-    pdf.cell(0, 8, "MATERIAL EXCLUSIVO - EDIÇÃO COMPLETA", align="L", ln=True)
-
-    pdf.ln(3)
-    pdf.set_font("Helvetica", "B", 26)
-    pdf.set_text_color(255, 255, 255)
-    pdf.multi_cell(0, 12, sanitizar_pdf(titulo.upper()), align="L")
-
-    if subtitulo:
-        pdf.ln(4)
-        pdf.set_font("Helvetica", "B", 15)
-        pdf.set_text_color(226, 232, 240)
-        pdf.multi_cell(0, 8, sanitizar_pdf(subtitulo), align="L")
-
-    termo_capa = dados.get("termo_capa") or "vibrant gourmet food presentation"
-    foto_capa = baixar_foto_nicho_pexels(termo_capa, pexels_key, "capa")
-    if foto_capa and os.path.exists(foto_capa):
-        pdf.ln(6)
-        y_foto_capa = pdf.get_y()
-        if y_foto_capa < 185:
-            pdf.image(foto_capa, x=18, y=y_foto_capa, w=174, h=92)
-
-    pdf.set_y(260)
-    pdf.set_font("Helvetica", "B", 11)
-    pdf.set_text_color(255, 255, 255)
-    pdf.cell(0, 6, "SISTEMA DE EXECUÇÃO E IMPLEMENTAÇÃO DIRETA", ln=True)
-    pdf.set_font("Helvetica", "", 10)
-    pdf.set_text_color(148, 163, 184)
-    pdf.cell(0, 6, f"Gerado em {datetime.now().strftime('%d/%m/%Y')} | Todos os direitos reservados", ln=True)
-
-    # ---------------- INTRODUÇÃO ESTRUTURADA (LETRA GRANDE 14pt) ----------------
-    pdf.add_page()
-    pdf.set_text_color(15, 23, 42)
-    pdf.set_font("Helvetica", "B", 22)
-    pdf.cell(0, 12, "Visão Geral e Diagnóstico Estratégico", ln=True)
-    pdf.ln(4)
-
-    pdf.set_font("Helvetica", "", 14)
-    pdf.set_text_color(15, 23, 42)
-    for p in dados.get("introducao", "").split("\n"):
-        p_limpo = p.strip()
-        if p_limpo:
-            pdf.multi_cell(0, 9.0, sanitizar_pdf(p_limpo))
-            pdf.ln(4)
-
-    # ---------------- CAPÍTULOS AMPLOS COM FOTOS E ACESSIBILIDADE TOTAL ----------------
-    for idx_cap, cap in enumerate(dados.get("capitulos", [])):
-        pdf.add_page()
-        num = cap.get("numero", idx_cap + 1)
-        tit = cap.get("titulo", f"Módulo {num}")
-
-        pdf.set_fill_color(30, 58, 138)
-        pdf.rect(18, 22, 174, 18, "F")
-        pdf.set_y(24)
-        pdf.set_font("Helvetica", "B", 14)
-        pdf.set_text_color(255, 255, 255)
-        pdf.cell(0, 14, sanitizar_pdf(f" MÓDULO {num}: {tit.upper()}"), ln=True)
-        pdf.ln(6)
-
-        termo_cap = cap.get("termo_busca_foto") or "colorful culinary dish plating"
-        foto_cap = baixar_foto_nicho_pexels(termo_cap, pexels_key, f"cap_{num}")
-        if foto_cap and os.path.exists(foto_cap):
-            y_img = pdf.get_y()
-            pdf.image(foto_cap, x=18, y=y_img, w=174, h=80)
-            pdf.set_y(y_img + 86)
-
-        for linha in cap.get("conteudo", "").split("\n"):
-            l_limpa = linha.strip()
-            if l_limpa:
-                if re.match(r"^[0-9]\.\s+[A-Z\s]{4,}", l_limpa) or (l_limpa.isupper() and len(l_limpa) > 5):
-                    pdf.ln(3)
-                    pdf.set_font("Helvetica", "B", 16)
-                    pdf.set_text_color(30, 58, 138)
-                    pdf.multi_cell(0, 9.5, sanitizar_pdf(l_limpa))
-                    pdf.ln(2)
-                elif l_limpa.startswith(("-", "*", "•", "[ ]", "[x]", "1.", "2.", "3.", "4.", "5.")):
-                    pdf.set_font("Helvetica", "B", 14)
-                    pdf.set_text_color(15, 23, 42)
-                    pdf.set_x(22)
-                    pdf.multi_cell(170, 9.0, sanitizar_pdf(l_limpa))
-                    pdf.ln(2.5)
-                else:
-                    pdf.set_font("Helvetica", "", 14)
-                    pdf.set_text_color(15, 23, 42)
-                    pdf.multi_cell(0, 9.0, sanitizar_pdf(l_limpa))
-                    pdf.ln(3.5)
-
-    pdf.output(caminho_saida)
-    return caminho_saida
-
-# ==============================================================================
-# MOTOR FFMPEG RESILIENTE (COM ESCUDO ANTI-PAU)
-# ==============================================================================
-def obter_duracao_audio_ffmpeg(caminho_audio: str) -> float:
+def buscar_foto_pexels(query: str, pexels_key: str, dest_path: str) -> bool:
+    if not pexels_key or not query:
+        return False
     try:
-        cmd = [FFMPEG_BIN, "-nostdin", "-i", caminho_audio]
-        proc = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, timeout=10)
-        match = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.\d+)", proc.stderr)
-        if match:
-            h, m, s = match.groups()
-            return round(int(h) * 3600 + int(m) * 60 + float(s), 2)
+        url = f"https://api.pexels.com/v1/search?query={requests.utils.quote(query)}&per_page=1&orientation=landscape"
+        headers = {"Authorization": pexels_key}
+        res = requests.get(url, headers=headers, timeout=12)
+        if res.status_code == 200:
+            data = res.json()
+            if data.get("photos"):
+                img_url = data["photos"][0]["src"]["large"]
+                img_data = requests.get(img_url, timeout=12).content
+                with open(dest_path, "wb") as f:
+                    f.write(img_data)
+                return True
     except Exception:
         pass
-    return 3.5
+    return False
 
-def sintetizar_voz_segura(texto: str, caminho_out: str, voz: str) -> str:
-    texto_limpo = re.sub(r"[\*\_#\[\]\(\)\"]", "", texto).strip() or "Atenção a este detalhe."
-    client = OpenAI(api_key=OPENAI_API_KEY)
-    for _ in range(3):
+def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_pdf: str) -> str:
+    doc = SimpleDocTemplate(
+        caminho_pdf,
+        pagesize=letter,
+        rightMargin=45,
+        leftMargin=45,
+        topMargin=45,
+        bottomMargin=45
+    )
+    styles = getSampleStyleSheet()
+
+    cor_primaria = colors.HexColor("#1A202C")
+    cor_destaque = colors.HexColor("#2B6CB0")
+
+    estilo_capa_tit = ParagraphStyle(
+        'CapaTitulo',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=28,
+        leading=34,
+        textColor=cor_destaque,
+        alignment=1,
+        spaceAfter=15
+    )
+    estilo_capa_sub = ParagraphStyle(
+        'CapaSub',
+        parent=styles['Normal'],
+        fontName='Helvetica-Oblique',
+        fontSize=15,
+        leading=20,
+        textColor=cor_primaria,
+        alignment=1,
+        spaceAfter=25
+    )
+    estilo_h1 = ParagraphStyle(
+        'TitCap',
+        parent=styles['Heading1'],
+        fontName='Helvetica-Bold',
+        fontSize=20,
+        leading=26,
+        textColor=cor_destaque,
+        spaceBefore=15,
+        spaceAfter=12
+    )
+    estilo_corpo = ParagraphStyle(
+        'CorpoTexto',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=11,
+        leading=17,
+        textColor=cor_primaria,
+        spaceAfter=10
+    )
+
+    flowables = []
+
+    # CAPA
+    flowables.append(Spacer(1, 40))
+    flowables.append(Paragraph(dados.get("titulo", "Manual Técnico"), estilo_capa_tit))
+    flowables.append(Paragraph(dados.get("subtitulo", "Guia de Implementação e Resultados"), estilo_capa_sub))
+
+    termo_capa = dados.get("termo_capa", "business strategy")
+    capa_img_path = os.path.join(DIR_PEXELS, f"capa_{int(time.time())}.jpg")
+    if buscar_foto_pexels(termo_capa, pexels_key, capa_img_path):
         try:
-            if os.path.exists(caminho_out):
-                os.remove(caminho_out)
-            resposta = client.audio.speech.create(model="tts-1", voice=voz, input=texto_limpo)
-            with open(caminho_out, "wb") as f:
-                for chunk in resposta.iter_bytes():
-                    f.write(chunk)
-            if os.path.exists(caminho_out) and os.path.getsize(caminho_out) > 1024:
-                return caminho_out
-        except Exception as e:
-            if "insufficient_quota" in str(e).lower():
-                raise RuntimeError("CRÍTICO: Saldo de API esgotado. Recarga necessária.")
-            time.sleep(1)
-    raise RuntimeError("Falha ao sintetizar áudio via OpenAI Studio.")
+            flowables.append(RLImage(capa_img_path, width=480, height=270))
+        except Exception:
+            pass
+
+    flowables.append(PageBreak())
+
+    # INTRODUÇÃO
+    flowables.append(Paragraph("Introdução Estratégica", estilo_h1))
+    flowables.append(Spacer(1, 10))
+    for p in dados.get("introducao", "").split("\n"):
+        if p.strip():
+            flowables.append(Paragraph(p.strip(), estilo_corpo))
+
+    flowables.append(PageBreak())
+
+    # CAPÍTULOS
+    for cap in dados.get("capitulos", []):
+        flowables.append(Paragraph(f"Módulo {cap.get('numero')}: {cap.get('titulo')}", estilo_h1))
+        flowables.append(Spacer(1, 8))
+
+        termo_cap = cap.get("termo_busca_foto", "")
+        if termo_cap:
+            cap_img_path = os.path.join(DIR_PEXELS, f"cap_{cap.get('numero')}_{int(time.time())}.jpg")
+            if buscar_foto_pexels(termo_cap, pexels_key, cap_img_path):
+                try:
+                    flowables.append(RLImage(cap_img_path, width=460, height=240))
+                    flowables.append(Spacer(1, 12))
+                except Exception:
+                    pass
+
+        for p_cap in cap.get("conteudo", "").split("\n"):
+            if p_cap.strip():
+                flowables.append(Paragraph(p_cap.strip(), estilo_corpo))
+
+        flowables.append(PageBreak())
+
+    doc.build(flowables)
+    return caminho_pdf
+
+# ==============================================================================
+# 5. PROCESSAMENTO DE VÍDEO (TTS, PEXELS & FFMPEG)
+# ==============================================================================
+def sintetizar_audio_tts(texto: str, output_path: str, voz: str = "onyx") -> bool:
+    if not OPENAI_API_KEY:
+        return False
+    try:
+        client = OpenAI(api_key=OPENAI_API_KEY)
+        resp = client.audio.speech.create(model="tts-1", voice=voz, input=texto)
+        resp.stream_to_file(output_path)
+        return True
+    except Exception:
+        return False
+
+def obter_duracao_audio(audio_path: str) -> float:
+    cmd = [
+        "ffprobe", "-v", "error", "-show_entries", "format=duration",
+        "-of", "default=noprint_wrappers=1:nokey=1", audio_path
+    ]
+    try:
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
+        return float(res.stdout.strip())
+    except Exception:
+        return 4.0
+
+def buscar_video_pexels(query: str, pexels_key: str, dest_path: str, vertical: bool = False) -> bool:
+    if not pexels_key or not query:
+        return False
+    orientacao = "portrait" if vertical else "landscape"
+    url = f"https://api.pexels.com/videos/search?query={requests.utils.quote(query)}&per_page=1&orientation={orientacao}"
+    headers = {"Authorization": pexels_key}
+    try:
+        res = requests.get(url, headers=headers, timeout=12)
+        if res.status_code == 200:
+            data = res.json()
+            if data.get("videos"):
+                video_files = data["videos"][0].get("video_files", [])
+                target_files = [v for v in video_files if v.get("width") and v.get("height")]
+                if target_files:
+                    target_files.sort(key=lambda x: x["width"] * x["height"], reverse=True)
+                    video_url = target_files[0]["link"]
+                    v_bytes = requests.get(video_url, timeout=20).content
+                    with open(dest_path, "wb") as f:
+                        f.write(v_bytes)
+                    return True
+    except Exception:
+        pass
+    return False
 
 def renderizar_vsl_completa(
-    frases: list[str],
+    frases: List[str],
     vertical: bool,
     voz: str,
     pexels_key: str,
-    perfil_personagem: str = "",
-    musica_fundo_path: str = None,
+    musica_fundo_path: Optional[str] = None,
     volume_musica: float = 0.08,
-    logo_path: str = None,
+    logo_path: Optional[str] = None,
     progress_bar = None
 ) -> str:
-    largura, altura = (1080, 1920) if vertical else (1920, 1080)
+    res_w, res_h = (1080, 1920) if vertical else (1920, 1080)
+    cenas_clipes = []
     total = len(frases)
-    cenas = []
-    job_id = f"{int(time.time())}_{random.randint(1000, 9999)}"
 
-    for i, frase in enumerate(frases):
-        idx = i + 1
-        c_audio = os.path.join(DIR_AUDIOS, f"{job_id}_p_{idx}.mp3")
-        c_cena = os.path.join(DIR_TEMP, f"{job_id}_cena_{idx}.mp4")
+    for idx, frase in enumerate(frases):
+        prefixo = f"cena_{idx}_{int(time.time())}"
+        a_path = os.path.join(DIR_AUDIOS, f"{prefixo}.mp3")
+        sintetizar_audio_tts(frase, a_path, voz=voz)
+        duracao = obter_duracao_audio(a_path)
 
-        sintetizar_voz_segura(frase, c_audio, voz)
-        duracao = obter_duracao_audio_ffmpeg(c_audio)
+        v_raw_path = os.path.join(DIR_PEXELS, f"{prefixo}_raw.mp4")
+        tem_video = buscar_video_pexels(frase, pexels_key, v_raw_path, vertical=vertical)
 
-        video_bg = None
-        if pexels_key:
-            termo = extrair_termo_broll_ia(frase, perfil_personagem)
-            video_bg = baixar_video_pexels(termo, pexels_key, vertical, f"{job_id}_broll_{idx}")
+        cena_out = os.path.join(DIR_VSL, f"{prefixo}_out.mp4")
 
-        if video_bg and os.path.exists(video_bg) and os.path.getsize(video_bg) > 10000:
-            vf = f"scale={largura}:{altura}:force_original_aspect_ratio=increase,crop={largura}:{altura},setsar=1,fps=24,format=yuv420p"
+        # Escapando o texto para o filtro drawtext do FFmpeg
+        txt_escapado = frase.replace(":", "\\:").replace("'", "").replace('"', '').replace("%", "\\%")
+
+        if tem_video and os.path.exists(v_raw_path):
+            vf = (
+                f"scale={res_w}:{res_h}:force_original_aspect_ratio=increase,"
+                f"crop={res_w}:{res_h},"
+                f"drawtext=text='{txt_escapado}':fontcolor=white:fontsize=48:box=1:boxcolor=black@0.65:"
+                f"boxborderw=14:x=(w-text_w)/2:y=h-(h*0.22)"
+            )
             cmd = [
-                FFMPEG_BIN, "-nostdin", "-y",
-                "-stream_loop", "-1",
-                "-i", video_bg,
-                "-i", c_audio,
-                "-vf", vf,
-                "-map", "0:v:0",
-                "-map", "1:a:0",
-                "-c:v", "libx264",
-                "-preset", "ultrafast",
-                "-pix_fmt", "yuv420p",
-                "-c:a", "aac",
-                "-b:a", "192k",
-                "-ar", "44100",
-                "-t", str(duracao),
-                "-avoid_negative_ts", "make_zero",
-                "-fflags", "+genpts",
-                c_cena
+                "ffmpeg", "-y", "-stream_loop", "-1", "-i", v_raw_path,
+                "-i", a_path, "-t", str(duracao),
+                "-vf", vf, "-c:v", "libx264", "-c:a", "aac", "-b:a", "192k",
+                "-pix_fmt", "yuv420p", "-shortest", cena_out
             ]
         else:
+            vf = (
+                f"drawtext=text='{txt_escapado}':fontcolor=white:fontsize=52:box=1:boxcolor=blue@0.65:"
+                f"boxborderw=18:x=(w-text_w)/2:y=(h-text_h)/2"
+            )
             cmd = [
-                FFMPEG_BIN, "-nostdin", "-y",
-                "-f", "lavfi", "-i", f"color=c=black:s={largura}x{altura}:r=24:d={duracao}",
-                "-i", c_audio,
-                "-map", "0:v:0",
-                "-map", "1:a:0",
-                "-c:v", "libx264",
-                "-preset", "ultrafast",
-                "-pix_fmt", "yuv420p",
-                "-c:a", "aac",
-                "-b:a", "192k",
-                "-ar", "44100",
-                "-t", str(duracao),
-                c_cena
+                "ffmpeg", "-y", "-f", "lavfi", "-i", f"color=c=0x1A202C:s={res_w}x{res_h}:d={duracao}",
+                "-i", a_path, "-vf", vf, "-c:v", "libx264", "-c:a", "aac",
+                "-b:a", "192k", "-pix_fmt", "yuv420p", "-shortest", cena_out
             ]
 
-        proc_cena = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=120)
-        if proc_cena.returncode != 0:
-            st.error(f"Erro ao renderizar a cena {idx} no FFmpeg:")
-            st.code(proc_cena.stderr)
-            st.stop()
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+        cenas_clipes.append(cena_out)
 
-        cenas.append(c_cena)
         if progress_bar:
-            progress_bar.progress(idx / (total + 2))
+            progress_bar.progress((idx + 0.8) / total)
 
-    inputs, fc_map = [], ""
-    for idx_c, c in enumerate(cenas):
-        inputs.extend(["-i", c])
-        fc_map += f"[{idx_c}:v][{idx_c}:a]"
+    # Concatenação das cenas
+    concat_txt_path = os.path.join(DIR_VSL, f"concat_{int(time.time())}.txt")
+    with open(concat_txt_path, "w", encoding="utf-8") as f:
+        for c in cenas_clipes:
+            f.write(f"file '{c.replace(os.sep, '/')}'\n")
 
-    fc = f"{fc_map}concat=n={total}:v=1:a=1[vcat][acat]"
-    v_concat = os.path.join(DIR_TEMP, f"{job_id}_concatenado.mp4")
+    vsl_sem_trilha = os.path.join(DIR_VSL, f"vsl_base_{int(time.time())}.mp4")
     cmd_concat = [
-        FFMPEG_BIN, "-nostdin", "-y"
-    ] + inputs + [
-        "-filter_complex", fc,
-        "-map", "[vcat]",
-        "-map", "[acat]",
-        "-c:v", "libx264",
-        "-preset", "ultrafast",
-        "-pix_fmt", "yuv420p",
-        "-c:a", "aac",
-        "-b:a", "192k",
-        "-ar", "44100",
-        v_concat
+        "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", concat_txt_path,
+        "-c", "copy", vsl_sem_trilha
     ]
+    subprocess.run(cmd_concat, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
 
-    proc_concat = subprocess.run(cmd_concat, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=180)
-    if proc_concat.returncode != 0:
-        st.error("Erro na concatenação das cenas no FFmpeg:")
-        st.code(proc_concat.stderr)
-        st.stop()
-
-    caminho_saida = os.path.join(DIR_OUTPUT, f"vsl_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4")
-    tem_musica = musica_fundo_path and os.path.exists(musica_fundo_path)
-    tem_logo = logo_path and os.path.exists(logo_path)
-
-    if not tem_musica and not tem_logo:
-        cmd_f = [FFMPEG_BIN, "-nostdin", "-y", "-i", v_concat, "-c", "copy", "-movflags", "+faststart", caminho_saida]
+    # Finalização: Trilha sonora e Logótipo
+    vsl_final = os.path.join(DIR_VSL, f"vsl_final_{int(time.time())}.mp4")
+    if musica_fundo_path and os.path.exists(musica_fundo_path):
+        cmd_final = [
+            "ffmpeg", "-y", "-i", vsl_sem_trilha, "-stream_loop", "-1", "-i", musica_fundo_path,
+            "-filter_complex",
+            f"[1:a]volume={volume_musica}[bg];[0:a][bg]amix=inputs=2:duration=first:dropout_transition=2[aout]",
+            "-map", "0:v", "-map", "[aout]", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
+            "-shortest", vsl_final
+        ]
+        subprocess.run(cmd_final, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
     else:
-        in_list = ["-i", v_concat]
-        fv, fa = [], []
-        iv, ia = "0:v", "0:a"
-        nxt = 1
-        if tem_logo:
-            in_list.extend(["-i", logo_path])
-            fv.append(f"[{nxt}:v]scale={int(largura * 0.16)}:-1[lg];[{iv}][lg]overlay=W-w-35:35[vout]")
-            iv = "vout"
-            nxt += 1
-        if tem_musica:
-            in_list.extend(["-stream_loop", "-1", "-i", musica_fundo_path])
-            fa.append(f"[{nxt}:a]volume={volume_musica}[bgm];[{ia}][bgm]amix=inputs=2:duration=first[aout]")
-            ia = "aout"
+        vsl_final = vsl_sem_trilha
 
-        cmd_f = [FFMPEG_BIN, "-nostdin", "-y"] + in_list
-        parts = fv + fa
-        if parts:
-            cmd_f.extend(["-filter_complex", ";".join(parts), "-map", f"[{iv}]", "-map", f"[{ia}]"])
-        else:
-            cmd_f.extend(["-map", "0:v", "-map", "0:a"])
+    return vsl_final
 
-        cmd_f.extend(["-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-shortest", "-movflags", "+faststart", caminho_saida])
+def dublar_roteiro_e_renderizar_vsl(
+    frases_originais: List[str],
+    idioma_alvo: str,
+    vertical: bool,
+    voz: str,
+    pexels_key: str,
+    musica_fundo_path: Optional[str] = None,
+    volume_musica: float = 0.08,
+    logo_path: Optional[str] = None,
+    progress_bar = None
+) -> Tuple[str, List[str]]:
+    frases_traduzidas = []
+    total_frases = len(frases_originais)
 
-    proc_final = subprocess.run(cmd_f, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=180)
-    if proc_final.returncode != 0:
-        st.error("Erro na mixagem e finalização do vídeo no FFmpeg:")
-        st.code(proc_final.stderr)
-        st.stop()
+    for idx_f, frase in enumerate(frases_originais):
+        prompt_tr_cena = f"""
+        Atue como locutor publicitário e copywriter no idioma '{idioma_alvo}'.
+        Traduza e adapte a seguinte frase de VSL para uma fala de alto impacto, natural e persuasiva:
+        "{frase}"
+        
+        Retorne estritamente a frase traduzida, sem aspas ou explicações.
+        """
+        texto_tr = traduzir_texto_ia(frase, idioma_alvo)
+        frases_traduzidas.append(texto_tr)
+        if progress_bar:
+            progress_bar.progress((idx_f + 1) / (total_frases * 2))
 
-    if progress_bar:
-        progress_bar.progress(1.0)
-    return caminho_saida
+    video_dublado = renderizar_vsl_completa(
+        frases=frases_traduzidas,
+        vertical=vertical,
+        voz=voz,
+        pexels_key=pexels_key,
+        musica_fundo_path=musica_fundo_path,
+        volume_musica=volume_musica,
+        logo_path=logo_path,
+        progress_bar=progress_bar
+    )
+    return video_dublado, frases_traduzidas
 
 # ==============================================================================
-# BARRA LATERAL
+# 6. INTERFACE STREAMLIT (SISTEMA CENTRALIZADO)
 # ==============================================================================
+
+# BARRA LATERAL (AUTENTICAÇÃO & SALDO)
 with st.sidebar:
-    st.header("👤 Sessão Ativa")
-    st.code(email_usuario)
-    st.metric(label="Saldo Disponível:", value=f"{st.session_state.saldo_creditos} Créditos")
+    st.markdown("## ⚡ Central DubfyAi & VSL")
+    st.caption("Automação de Produtos Digitais & Escala Internacional")
+    st.markdown("---")
 
-    if st.session_state.saldo_creditos == 0:
-        st.warning("⚠️ Saldo zerado. Realize sua recarga na aba 'Planos & Recargas'.")
+    email_usuario = st.text_input("Seu E-mail Cadastrado:", value="contato@meunegocio.com").lower().strip()
+    dados_user = obter_dados_usuario(email_usuario)
+    saldo_atual = dados_user["saldo"]
 
-    if st.button("🚪 Sair da Conta", use_container_width=True):
-        st.session_state.login_concluido = False
-        st.session_state.saved_email = ""
-        st.session_state.saldo_creditos = 0
-        st.session_state.total_compras = 0
-        st.rerun()
+    col_s1, col_s2 = st.columns(2)
+    with col_s1:
+        st.metric("Créditos", f"{saldo_atual} cr")
+    with col_s2:
+        st.metric("Compras", dados_user["total_compras"])
 
     st.markdown("---")
-    st.header("🎬 Configuração do Vídeo (VSL)")
-    vozes = {
-        "Onyx (Masculina - Impacto/Autoridade)": "onyx",
-        "Nova (Feminina - Alta Conversão)": "nova",
-        "Echo (Masculina - Narrativa Didática)": "echo",
-        "Shimmer (Feminina - Suave/Institucional)": "shimmer"
-    }
-    voz_sel = st.selectbox("Voz do Locutor:", list(vozes.keys()))
-    formato = st.radio("Proporção:", ("Vertical 9:16 (TikTok/Reels)", "Horizontal 16:9 (YouTube)"))
-    is_vertical = "Vertical" in formato
+    st.markdown("### 🛒 Recarga Automática Kiwify")
+    st.markdown("""
+    - **Starter VSL** (+160 cr / 320 novato)
+    - **Pro VSL** (+300 cr / 600 novato)
+    - **VIP Escala** (+500 cr / 1000 novato)
+    """)
+    st.info("💡 Pagamentos aprovados caem no seu saldo no mesmo segundo via Webhook.")
 
-    musica_up = st.file_uploader("Trilha Sonora (.mp3):", type=["mp3"])
-    vol_musica = st.slider("Volume do Fundo:", 0.02, 0.25, 0.07, 0.01)
-    logo_up = st.file_uploader("Logótipo (.png):", type=["png"])
+    st.markdown("---")
+    st.caption("Status das APIs:")
+    st.write("• Supabase:", "🟢 Ativo" if supabase_client else "🔴 Pendente")
+    st.write("• OpenAI:", "🟢 Ativo" if OPENAI_API_KEY else "🔴 Ausente")
+    st.write("• Gemini:", "🟢 Ativo" if GEMINI_API_KEY else "🔴 Ausente")
+    st.write("• Pexels:", "🟢 Ativo" if PEXELS_API_KEY else "🔴 Ausente")
 
-# ==============================================================================
-# ABAS DINÂMICAS: INCORPORAÇÃO DUBFYAI & BLINDAGEM DO ADMIN
-# ==============================================================================
-is_master_admin = email_usuario in ["ricardopintoedson@gmail.com", "erp61eng@gmail.com"]
-
-titulos_abas = [
-    "🚀 Criar VSL",
-    "📚 Gerar E-book PDF com Fotos",
-    "📡 Radar de Mercado",
-    "🎙️ DubfyAi & Tradução",
-    "💳 Planos & Recargas",
-    "📂 Galeria"
-]
-
-if is_master_admin:
-    titulos_abas.append("🔒 Gestão Master")
-
-abas = st.tabs(titulos_abas)
-
-aba_vsl     = abas[0]
-aba_ebook   = abas[1]
-aba_radar   = abas[2]
-aba_dubfy   = abas[3]
-aba_planos  = abas[4]
-aba_galeria = abas[5]
-
-if is_master_admin:
-    aba_admin = abas[6]
+# ABAS PRINCIPAIS DO SISTEMA
+tab_minerador, tab_vsl, tab_ebook, tab_master = st.tabs([
+    "🔍 1. Minerador & Google Ads",
+    "🚀 2. Criar VSL & Dublagem Global",
+    "📚 3. Criar E-book & Tradução Global",
+    "👑 4. Gestão Master"
+])
 
 # ------------------------------------------------------------------------------
-# ABA 1: VSL (IA OU MANUAL)
+# ABA 1: MINERADOR & GOOGLE ADS
 # ------------------------------------------------------------------------------
-with aba_vsl:
-    st.subheader("🚀 Gerador de Roteiro e Vídeo Limpo")
+with tab_minerador:
+    st.markdown("## 🔍 Minerador & Validador de Nichos com Kit Google Ads")
+    st.caption("Analise nichos comerciais, descubra dores ocultas e obtenha a campanha completa pronta para o Google Ads e YouTube Ads.")
 
-    modo_vsl = st.radio(
-        "Como deseja montar o seu roteiro?",
-        ["✍️ Digitar / Colar Manualmente (Sua Ideia)", "🤖 Gerar Automaticamente com IA"],
-        horizontal=True
-    )
+    NICHOS_PREDEFINIDOS = [
+        "🍞 Gastronomia & Pães Sem Glúten",
+        "🎂 Confeitaria Lucrativa & Bolos Caseiros",
+        "🐕 Adestramento Canino & Comportamento Pet",
+        "💰 Renda Extra & Milhas Aéreas",
+        "🌱 Jardinagem, Suculentas & Hortas em Apartamento",
+        "🛠️ Manutenção Residencial & Marido de Aluguel",
+        "💅 Estética, Cílios & Sobrancelhas",
+        "🧘 Saúde Natural, Chás Medicinais & Sono",
+        "✍️ Digitar Nicho Personalizado (Manual)..."
+    ]
 
-    if modo_vsl == "🤖 Gerar Automaticamente com IA":
-        c_v1, c_v2 = st.columns(2)
-        with c_v1:
-            prod_vsl = st.text_input("Nome do Produto / Oferta:", value=st.session_state.get("prod_nome", "Método Vendas Automáticas"))
-            pub_vsl = st.text_input("Público-Alvo e Dor:", value=st.session_state.get("pub_nome", "Pessoas comuns buscando escala sem aparecer"))
-        with c_v2:
-            ang_vsl = st.text_input("Gancho / Mecanismo Único:", value=st.session_state.get("ang_nome", "Método validado com automação simples"))
-            faixa_preco = st.radio("Formato do Roteiro:", ["🟢 Baixo (3 frases - 10 Créditos)", "🟡 Médio (5 frases - 20 Créditos)", "🔴 Alto (7 frases - 30 Créditos)"])
+    col_m1, col_m2 = st.columns([2, 1])
+    with col_m1:
+        nicho_sel = st.selectbox("Selecione um Nicho ou Digite o Seu:", NICHOS_PREDEFINIDOS)
+    with col_m2:
+        profundidade = st.selectbox("Profundidade da Análise:", ["Dossiê Completo de Lançamento", "Raio-X Rápido de Dores & Promessas"])
 
-        if st.button("⚡ Gerar Frases com IA", type="primary", use_container_width=True):
-            try:
-                st.session_state["roteiro"] = obter_roteiro_ia_por_ticket(
-                    prod_vsl, pub_vsl, ang_vsl, faixa_preco, st.session_state.get("canal_sel", "TikTok")
-                )
-                st.success("✅ Roteiro gerado pela IA! Ajuste qualquer frase abaixo se desejar:")
-            except Exception as e:
-                st.error("⚠️ Atenção: A IA está momentaneamente em manutenção preventiva para recarga. Tente novamente em alguns instantes.")
+    nicho_final = nicho_sel
+    if "Manual" in nicho_sel:
+        nicho_manual = st.text_input(
+            "Digite o Nicho ou Micronicho que deseja pesquisar:",
+            placeholder="Ex: Instalação e higienização de ar condicionado split",
+            help="Pode ser qualquer tema técnico, comercial ou de hobby."
+        )
+        if nicho_manual.strip():
+            nicho_final = nicho_manual.strip()
 
-    else:
-        st.info("💡 Digite cada frase do seu vídeo abaixo. Cada linha corresponderá a uma cena com voz e vídeo de fundo sincronizados:")
-        roteiro_padrao = "\n".join(st.session_state.get("roteiro", [
-            "Você continua perdendo tempo tentando vender do jeito tradicional?",
-            "Existe uma automação que valida os melhores produtos enquanto você dorme.",
-            "Toque no link abaixo e pegue o seu acesso antes que encerre."
-        ]))
-        texto_manual = st.text_area("Roteiro Completo (1 frase por linha):", value=roteiro_padrao, height=160)
+    st.info(f"🎯 **Nicho Selecionado para Mineração:** `{nicho_final}`")
 
-        if st.button("📌 Carregar Cenas para Renderização", use_container_width=True):
-            linhas_puras = [l.strip() for l in texto_manual.split("\n") if l.strip()]
-            if linhas_puras:
-                st.session_state["roteiro"] = linhas_puras
-                st.success(f"✅ {len(linhas_puras)} cenas carregadas e prontas para renderização!")
-            else:
-                st.error("Insira pelo menos uma linha de texto.")
-
-    if st.session_state.get("roteiro"):
-        st.divider()
-        st.markdown("#### 🎬 Cenas Prontas para Produção")
-        cenas_txt = []
-        for i, fr in enumerate(st.session_state["roteiro"]):
-            cenas_txt.append(st.text_input(f"Cena {i+1}:", value=fr, key=f"cena_{i}"))
-
-        custo = 10 if len(cenas_txt) <= 3 else (20 if len(cenas_txt) <= 5 else 30)
-        if st.button(f"🎬 Renderizar Vídeo ({custo} Créditos)", type="primary", use_container_width=True):
-            agora_vsl = time.time()
-            if agora_vsl - st.session_state.get("_ultimo_click_vsl", 0) < 15:
-                st.warning("⏳ Processamento em andamento. Aguarde antes de iniciar outra renderização.")
-                st.stop()
-            st.session_state["_ultimo_click_vsl"] = agora_vsl
-
-            saldo_antes = st.session_state.get("saldo_creditos", 0)
-            if saldo_antes < custo:
-                st.error(f"❌ Saldo insuficiente! Você precisa de {custo} créditos para renderizar este vídeo.")
-            else:
-                p_musica = os.path.join(DIR_MUSICAS, musica_up.name) if musica_up else None
-                if musica_up:
-                    with open(p_musica, "wb") as f:
-                        f.write(musica_up.getbuffer())
-
-                p_logo = os.path.join(DIR_LOGOS, logo_up.name) if logo_up else None
-                if logo_up:
-                    with open(p_logo, "wb") as f:
-                        f.write(logo_up.getbuffer())
-
-                prog = st.progress(0.0)
+    if st.button("🚀 Analisar Nicho & Gerar Kit Google Ads", type="primary"):
+        if not nicho_final or "Manual" in nicho_final:
+            st.warning("Por favor, informe um nicho válido.")
+        else:
+            with st.spinner("Analisando concorrência, intenção de busca e gerando campanhas do Google Ads..."):
                 try:
-                    v_final = renderizar_vsl_completa(
-                        frases=cenas_txt,
-                        vertical=is_vertical,
-                        voz=vozes[voz_sel],
-                        pexels_key=PEXELS_API_KEY,
-                        musica_fundo_path=p_musica,
-                        volume_musica=vol_musica,
-                        logo_path=p_logo,
-                        progress_bar=prog
-                    )
-                    debitar_creditos_cloud(email_usuario, f"Renderização ({len(cenas_txt)} Cenas)", custo)
-                    st.session_state["video_pronto"] = v_final
-                    disparar_comemoracao()
-                    st.rerun()
+                    resultado_dossie = minerar_nicho_profundo_ia(nicho_final, profundidade)
+                    st.session_state["resultado_pesquisa_nicho"] = resultado_dossie
+                    st.session_state["nicho_pesquisado_nome"] = nicho_final
                 except Exception as err:
-                    st.error("⚠️ Não foi possível sintetizar a locução no momento. Seus créditos NÃO foram debitados. Notificamos a equipe técnica.")
+                    st.error(f"Erro na análise: {err}")
 
-    if st.session_state.get("video_pronto") and os.path.exists(st.session_state["video_pronto"]):
-        st.video(st.session_state["video_pronto"])
-        with open(st.session_state["video_pronto"], "rb") as f:
-            st.download_button("⬇ Baixar Vídeo MP4", f, file_name=os.path.basename(st.session_state["video_pronto"]), mime="video/mp4")
+    if st.session_state.get("resultado_pesquisa_nicho"):
+        st.markdown("---")
+        st.markdown(f"### 📊 Dossiê Executivo: {st.session_state.get('nicho_pesquisado_nome')}")
 
-# ------------------------------------------------------------------------------
-# ABA 2: E-BOOK PROFISSIONAL COM FOTOS REAIS DO NICHO (MOTOR GEMINI PIPELINE)
-# ------------------------------------------------------------------------------
-with aba_ebook:
-    st.subheader("📚 Criação e Diagramação de E-books Profissionais com Fotos")
-
-    c_eb1, c_eb2 = st.columns(2)
-    with c_eb1:
-        nicho_eb = st.text_input("Nicho ou Nome do Produto:", value=st.session_state.get("prod_nome", "Manual Prático dos Pães Sem Glúten"))
-        eb_pub = st.text_area("Público e Dores:", value=st.session_state.get("pub_nome", "Pessoas com intolerância ou em busca de alimentação saudável que sofrem com pães secos, duros e que esfarelam."), height=90)
-    with c_eb2:
-        eb_ang = st.text_area("Promessa e Solução:", value=st.session_state.get("ang_nome", "O segredo da combinação exata de farinhas e hidratação para pães macios, fofos e elásticos como os tradicionais."), height=90)
-
-    if st.button("⚡ Redigir Manual Completo com Gemini (15 Créditos)", type="primary", use_container_width=True):
-        agora = time.time()
-        if agora - st.session_state.get("_ultimo_click_eb", 0) < 12:
-            st.warning("⏳ Aguarde alguns segundos antes de solicitar nova compilação.")
-            st.stop()
-        st.session_state["_ultimo_click_eb"] = agora
-
-        with st.spinner("🤖 O Google Gemini está aprofundando o conteúdo técnico e gerando fichas completas..."):
-            try:
-                dados_gerados = gerar_conteudo_ebook_gemini(nicho_eb, eb_pub, eb_ang)
-                if not debitar_creditos_cloud(email_usuario, "Geração de E-book Gemini", 15):
-                    st.error("❌ Saldo insuficiente! Você precisa de 15 créditos.")
-                else:
-                    st.session_state["eb_dados_sessao"] = dados_gerados
-                    st.session_state["in_eb_tit"] = dados_gerados.get("titulo", "")
-                    st.session_state["in_eb_sub"] = dados_gerados.get("subtitulo", "")
-                    st.session_state["in_eb_intro"] = dados_gerados.get("introducao", "")
-                    st.session_state["in_eb_capa_term"] = dados_gerados.get("termo_capa", "")
-                    for idx_c, cap_g in enumerate(dados_gerados.get("capitulos", [])):
-                        st.session_state[f"t_cap_mod_{idx_c}"] = cap_g.get("titulo", "")
-                        st.session_state[f"foto_cap_mod_{idx_c}"] = cap_g.get("termo_busca_foto", "")
-                        st.session_state[f"txt_cap_mod_{idx_c}"] = cap_g.get("conteudo", "")
-                    st.success("✅ Livro técnico gerado com sucesso! Revise os módulos e compile em alta acessibilidade.")
-                    st.rerun()
-            except Exception as erro:
-                st.error("⚠️ Atenção: A IA está temporariamente em manutenção para ajuste de cota. Tente em alguns instantes sem perda de créditos.")
-
-    st.divider()
-
-    tem_conteudo = "eb_dados_sessao" in st.session_state and st.session_state["eb_dados_sessao"]
-
-    if not tem_conteudo:
-        st.info("💡 Insira o Nicho e a Promessa acima e clique em **⚡ Redigir Manual Completo com Gemini (15 Créditos)** para gerar o manual operacional com scripts e checklists.")
-    else:
-        st.markdown("### 📝 Editor e Configuração das Fotos por Módulo")
-        eb_atual = st.session_state["eb_dados_sessao"]
-        col_t1, col_t2 = st.columns([1, 1])
-        with col_t1:
-            tit_edit = st.text_input("Título do Livro:", value=st.session_state.get("in_eb_tit", eb_atual.get("titulo", "")), key="in_eb_tit")
-            termo_capa_edit = st.text_input("Foto da Capa (Termo em Inglês no Pexels):", value=st.session_state.get("in_eb_capa_term", eb_atual.get("termo_capa", "vibrant gourmet food presentation")), key="in_eb_capa_term")
-        with col_t2:
-            sub_edit = st.text_input("Subtítulo Persuasivo:", value=st.session_state.get("in_eb_sub", eb_atual.get("subtitulo", "")), key="in_eb_sub")
-
-        intro_edit = st.text_area("Introdução Estratégica:", value=st.session_state.get("in_eb_intro", eb_atual.get("introducao", "")), height=150, key="in_eb_intro")
-
-        caps_editados = []
-        st.markdown("#### 📖 Módulos e Fotos Temáticas:")
-        for c_idx, cap in enumerate(eb_atual.get("capitulos", [])):
-            with st.expander(f"Módulo {c_idx+1}: {cap.get('titulo', '')}", expanded=(c_idx == 0)):
-                c_m1, c_m2 = st.columns([2, 1])
-                with c_m1:
-                    t_cap = st.text_input(f"Título do Módulo {c_idx+1}:", value=st.session_state.get(f"t_cap_mod_{c_idx}", cap.get("titulo", "")), key=f"t_cap_mod_{c_idx}")
-                with c_m2:
-                    foto_term = st.text_input(f"Termo da Foto (Pexels):", value=st.session_state.get(f"foto_cap_mod_{c_idx}", cap.get("termo_busca_foto", "colorful culinary dish plating")), key=f"foto_cap_mod_{c_idx}")
-                txt_cap = st.text_area(f"Conteúdo do Módulo {c_idx+1}:", value=st.session_state.get(f"txt_cap_mod_{c_idx}", cap.get("conteudo", "")), height=260, key=f"txt_cap_mod_{c_idx}")
-                caps_editados.append({
-                    "numero": c_idx+1,
-                    "titulo": t_cap,
-                    "termo_busca_foto": foto_term,
-                    "conteudo": txt_cap
-                })
-
-        st.write("")
-        if st.button("📄 Compilar e Gerar PDF com Fonte Grande e Fotos", type="primary", use_container_width=True):
-            dados_compilacao = {
-                "titulo": tit_edit,
-                "subtitulo": sub_edit,
-                "termo_capa": termo_capa_edit,
-                "introducao": intro_edit,
-                "capitulos": caps_editados
-            }
-            st.session_state["eb_dados_sessao"] = dados_compilacao
-
-            nome_arquivo = f"manual_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-            caminho_pdf = os.path.join(DIR_EBOOKS, nome_arquivo)
-
-            with st.spinner("📥 Baixando fotos vibrantes no Pexels e diagramando em formato acessível..."):
-                compilar_pdf_ebook_com_fotos(dados_compilacao, PEXELS_API_KEY, caminho_pdf)
-                st.session_state["pdf_pronto"] = caminho_pdf
-                st.session_state["pdf_nome"] = nome_arquivo
-                disparar_comemoracao()
-                st.rerun()
-
-    # ÁREA DE DOWNLOAD DO PDF E GERAÇÃO DIRETA DE VSL COM OS MESMOS DADOS
-    if st.session_state.get("pdf_pronto") and os.path.exists(st.session_state["pdf_pronto"]):
-        st.success(f"✅ Arquivo compilado em tipografia ampla e fotos de alta resolução: `{st.session_state.get('pdf_nome')}`")
-        with open(st.session_state["pdf_pronto"], "rb") as f:
+        aba_d1, aba_d2 = st.tabs(["📑 Raio-X & Estrutura do Produto", "👑 Kit Pronto: O Patrão Google Ads"])
+        with aba_d1:
+            st.markdown(st.session_state["resultado_pesquisa_nicho"])
+        with aba_d2:
+            st.info("💡 **Campanha Pronta para Copiar e Colar:** Títulos, descrições RSA, negativas e gancho para YouTube Ads.")
+            st.text_area(
+                "📋 Conteúdo do Dossiê e Palavras-chave:",
+                value=st.session_state["resultado_pesquisa_nicho"],
+                height=350
+            )
+            nome_arq_txt = f"campanha_google_ads_{re.sub(r'[^a-zA-Z0-9]', '_', st.session_state.get('nicho_pesquisado_nome', 'nicho').lower())}.txt"
             st.download_button(
-                label=f"⬇️ BAIXAR LIVRO EM PDF ({st.session_state.get('pdf_nome')})",
-                data=f,
-                file_name=st.session_state.get("pdf_nome", "ebook.pdf"),
-                mime="application/pdf",
-                type="primary",
+                "⬇️ Baixar Kit de Campanha (.txt)",
+                data=st.session_state["resultado_pesquisa_nicho"],
+                file_name=nome_arq_txt,
+                mime="text/plain",
                 use_container_width=True
             )
 
+# ------------------------------------------------------------------------------
+# ABA 2: CRIAR VSL & DUBLAGEM GLOBAL
+# ------------------------------------------------------------------------------
+with tab_vsl:
+    st.markdown("## 🚀 Criador de Vídeo de Vendas (VSL) & Dublagem Global")
+    st.caption("Gere roteiros persuasivos, renderize com cortes de B-roll e duble em 36 idiomas com sincronização completa.")
+
+    col_v1, col_v2 = st.columns(2)
+    with col_v1:
+        tema_vsl = st.text_input("Tema / Produto da VSL:", "Pães Artesanais Sem Glúten")
+        promessa_vsl = st.text_input("Grande Promessa:", "Faça pães perfeitos e fature R$ 3.000 da cozinha de casa")
+    with col_v2:
+        publico_vsl = st.text_input("Público-Alvo:", "Mulheres e mães que buscam renda extra")
+        qtd_cenas = st.slider("Quantidade de Cenas (Cortes Dinâmicos):", 3, 10, 5)
+
+    col_opt1, col_opt2, col_opt3 = st.columns(3)
+    with col_opt1:
+        formato_vertical = st.checkbox("Formato Vertical 9:16 (Reels/TikTok/Shorts)", value=False)
+    with col_opt2:
+        voz_sel = st.selectbox("Locução (OpenAI TTS):", ["onyx (Forte/Masculina)", "alloy (Neutra)", "nova (Energética/Feminina)", "echo (Suave)"])
+        voz_codigo = voz_sel.split()[0]
+    with col_opt3:
+        musica_up = st.file_uploader("Trilha Sonora (.mp3 opcional):", type=["mp3"])
+
+    if st.button("🎬 Gerar Roteiro e Renderizar VSL Original (20 cr)", type="primary"):
+        if saldo_atual < 20:
+            st.error("❌ Saldo insuficiente! Você precisa de 20 créditos.")
+        else:
+            barra_vsl = st.progress(0.0)
+            with st.spinner("Gerando roteiro magnético e compilando cenas no FFmpeg..."):
+                try:
+                    roteiro_frases = gerar_roteiro_vsl_ia(tema_vsl, promessa_vsl, publico_vsl, qtd_cenas)
+                    st.session_state["roteiro_vsl"] = roteiro_frases
+
+                    p_musica = None
+                    if musica_up:
+                        p_musica = os.path.join(DIR_MUSICAS, musica_up.name)
+                        with open(p_musica, "wb") as f_m:
+                            f_m.write(musica_up.getbuffer())
+
+                    video_pronto = renderizar_vsl_completa(
+                        frases=roteiro_frases,
+                        vertical=formato_vertical,
+                        voz=voz_codigo,
+                        pexels_key=PEXELS_API_KEY,
+                        musica_fundo_path=p_musica,
+                        progress_bar=barra_vsl
+                    )
+
+                    debitar_creditos_cloud(email_usuario, f"Criação VSL ({tema_vsl})", 20)
+                    st.session_state["video_vsl_pronto"] = video_pronto
+                    st.success("✅ VSL original renderizada com sucesso!")
+                    st.rerun()
+                except Exception as e_vsl:
+                    st.error(f"Erro na renderização da VSL: {e_vsl}")
+
+    # Exibição do Vídeo Original e Botão de Dublagem
+    if st.session_state.get("video_vsl_pronto") and os.path.exists(st.session_state["video_vsl_pronto"]):
         st.markdown("---")
-        st.markdown("### 🎬 Criar e Renderizar VSL de Vendas Deste E-book")
-        st.caption("Converta instantaneamente o conteúdo, promessa e ganchos deste e-book em um vídeo de alta conversão sincronizado com voz e cenas.")
+        st.markdown("### 🎬 Vídeo VSL Finalizado:")
+        st.video(st.session_state["video_vsl_pronto"])
 
-        col_vsl_eb1, col_vsl_eb2 = st.columns([1, 1])
+        with open(st.session_state["video_vsl_pronto"], "rb") as f_v:
+            st.download_button(
+                "⬇️ Baixar VSL Original (.mp4)",
+                data=f_v,
+                file_name=os.path.basename(st.session_state["video_vsl_pronto"]),
+                mime="video/mp4",
+                use_container_width=True
+            )
 
-        with col_vsl_eb1:
-            if st.button("⚡ Gerar e Renderizar VSL Agora (20 Créditos)", type="primary", use_container_width=True):
-                agora_vsl_eb = time.time()
-                if agora_vsl_eb - st.session_state.get("_ultimo_click_vsl_eb", 0) < 15:
-                    st.warning("⏳ Renderização em processamento. Aguarde alguns instantes.")
-                    st.stop()
-                st.session_state["_ultimo_click_vsl_eb"] = agora_vsl_eb
+        # MÓDULO DE DUBLAGEM GLOBAL PARA 36 IDIOMAS
+        st.markdown("---")
+        with st.container(border=True):
+            st.markdown("### 🌐 Dublar VSL em 36 Idiomas (DubfyAi Global)")
+            st.caption("Traduza a narração, gere novas vozes nativas e re-sincronize as durações dos cortes automaticamente.")
 
-                saldo_antes = st.session_state.get("saldo_creditos", 0)
-                if saldo_antes < 20:
-                    st.error("❌ Saldo insuficiente! Você precisa de 20 créditos para renderizar esta VSL.")
+            col_d1, col_d2 = st.columns([2, 1])
+            with col_d1:
+                idioma_dub_sel = st.selectbox("Selecione o Idioma para Dublar:", list(IDIOMAS_SISTEMA_36.keys()))
+            with col_d2:
+                st.write("")
+                st.caption("Custo: 20 Créditos")
+                btn_dub = st.button("🎙️ Dublar Vídeo Agora (20 cr)", type="primary", use_container_width=True)
+
+            if btn_dub:
+                if saldo_atual < 20:
+                    st.error("❌ Saldo insuficiente para dublagem internacional.")
+                elif not st.session_state.get("roteiro_vsl"):
+                    st.error("Roteiro original não encontrado na sessão.")
                 else:
-                    with st.spinner("🤖 Gerando roteiro magnético e renderizando VSL sincronizada com FFmpeg..."):
+                    nome_lingua_dub = IDIOMAS_SISTEMA_36[idioma_dub_sel]
+                    barra_dub = st.progress(0.0)
+                    with st.spinner(f"Traduzindo roteiro e sintetizando dublagem nativa para {idioma_dub_sel}..."):
                         try:
-                            frases_ebook = gerar_roteiro_vsl_de_ebook(st.session_state["eb_dados_sessao"])
-                            st.session_state["roteiro"] = frases_ebook
-
                             p_musica = os.path.join(DIR_MUSICAS, musica_up.name) if musica_up else None
-                            if musica_up:
-                                with open(p_musica, "wb") as f:
-                                    f.write(musica_up.getbuffer())
-
-                            p_logo = os.path.join(DIR_LOGOS, logo_up.name) if logo_up else None
-                            if logo_up:
-                                with open(p_logo, "wb") as f:
-                                    f.write(logo_up.getbuffer())
-
-                            prog_eb_vsl = st.progress(0.0)
-                            v_eb_final = renderizar_vsl_completa(
-                                frases=frases_ebook,
-                                vertical=is_vertical,
-                                voz=vozes[voz_sel],
+                            v_dublado, rot_tr = dublar_roteiro_e_renderizar_vsl(
+                                frases_originais=st.session_state["roteiro_vsl"],
+                                idioma_alvo=nome_lingua_dub,
+                                vertical=formato_vertical,
+                                voz=voz_codigo,
                                 pexels_key=PEXELS_API_KEY,
                                 musica_fundo_path=p_musica,
-                                volume_musica=vol_musica,
-                                logo_path=p_logo,
-                                progress_bar=prog_eb_vsl
+                                progress_bar=barra_dub
                             )
-                            debitar_creditos_cloud(email_usuario, f"VSL Direta ({st.session_state['eb_dados_sessao'].get('titulo', '')[:20]})", 20)
-                            st.session_state["vsl_ebook_pronta"] = v_eb_final
-                            st.session_state["video_pronto"] = v_eb_final
-                            disparar_comemoracao()
-                            st.success("✅ VSL do E-book gerada e renderizada com sucesso!")
+                            debitar_creditos_cloud(email_usuario, f"Dublagem VSL ({nome_lingua_dub})", 20)
+                            st.session_state["video_dublado_pronto"] = v_dublado
+                            st.session_state["video_dublado_idioma"] = idioma_dub_sel
+                            st.session_state["video_dublado_roteiro"] = rot_tr
+                            st.success(f"✅ VSL dublada com sucesso para {idioma_dub_sel}!")
                             st.rerun()
-                        except Exception as e:
-                            st.error("⚠️ Manutenção técnica temporária na síntese de áudio. Seus créditos NÃO foram debitados.")
-
-        with col_vsl_eb2:
-            if st.button("📝 Carregar Roteiro na Aba VSL para Editar (0 Créditos)", use_container_width=True):
-                frases_ebook = gerar_roteiro_vsl_de_ebook(st.session_state["eb_dados_sessao"])
-                st.session_state["roteiro"] = frases_ebook
-                st.session_state["prod_nome"] = st.session_state["eb_dados_sessao"].get("titulo", "")
-                st.session_state["pub_nome"] = st.session_state["eb_dados_sessao"].get("subtitulo", "")
-                st.session_state["ang_nome"] = st.session_state["eb_dados_sessao"].get("introducao", "")[:100]
-                st.success("✅ Roteiro gerado e carregado na aba '🚀 Criar VSL'! Você pode revisá-lo lá agora.")
-
-        if st.session_state.get("vsl_ebook_pronta") and os.path.exists(st.session_state["vsl_ebook_pronta"]):
-            st.markdown("#### 🎥 VSL de Vendas Produzida:")
-            st.video(st.session_state["vsl_ebook_pronta"])
-            with open(st.session_state["vsl_ebook_pronta"], "rb") as f_vsl_eb:
-                st.download_button(
-                    label="⬇️ Baixar VSL do E-book (.mp4)",
-                    data=f_vsl_eb,
-                    file_name=os.path.basename(st.session_state["vsl_ebook_pronta"]),
-                    mime="video/mp4",
-                    type="primary",
-                    use_container_width=True
-                )
-
-# ------------------------------------------------------------------------------
-# ABA 3: RADAR (MINERAÇÃO DE MERCADO)
-# ------------------------------------------------------------------------------
-with aba_radar:
-    st.subheader("🔍 Espião de Tendências & Cadastro de Oportunidades")
-
-    modo_radar = st.radio(
-        "Como deseja registrar a oportunidade de mercado?",
-        ["🤖 Minerar Buscas e Sugerir com IA (2 Créditos)", "✍️ Cadastrar Manualmente (Minha Própria Ideia)"],
-        horizontal=True
-    )
-
-    if modo_radar == "🤖 Minerar Buscas e Sugerir com IA (2 Créditos)":
-        col_p1, col_p2, col_p3 = st.columns([2, 2, 1])
-        with col_p1:
-            plat_sel = st.selectbox("Plataforma:", list(PLATAFORMAS_CONFIG.keys()))
-        with col_p2:
-            angulo_pesq = st.selectbox("Ângulo:", ["como ganhar dinheiro com", "como acabar com", "metodo para", "como resolver"])
-        with col_p3:
-            st.write("")
-            st.caption("Custo: 2 cr")
-            btn_rastrear = st.button("📡 Rastrear", use_container_width=True)
-
-        if btn_rastrear:
-            with st.spinner(f"📡 Rastreando buscas reais em {plat_sel}..."):
-                buscas = minerar_buscas_plataforma(angulo_pesq, plat_sel)
-                if buscas:
-                    oportunidades = analisar_oportunidades_ia(buscas, plat_sel)
-                    if oportunidades:
-                        if not debitar_creditos_cloud(email_usuario, f"Radar ({plat_sel})", 2):
-                            st.error("❌ Saldo insuficiente! Adquira créditos na aba de Planos.")
-                        else:
-                            st.session_state["radar_oportunidades"] = oportunidades
-                            st.session_state["plat_ativa"] = plat_sel
-                            st.rerun()
-                    else:
-                        st.error("❌ A IA não conseguiu gerar oportunidades a partir dos dados. Tente novamente.")
-                else:
-                    st.error("❌ Falha ao minerar termos. Tente outro ângulo ou plataforma.")
-
-        if st.session_state.get("radar_oportunidades"):
-            for idx, op in enumerate(st.session_state["radar_oportunidades"]):
-                with st.container(border=True):
-                    st.markdown(f"#### 🏷️ {op.get('produto', '')}")
-                    st.write(f"**Público:** {op.get('publico', '')}")
-                    st.write(f"**Gancho:** {op.get('angulo', '')}")
-                    if st.button("✅ Usar Esta Ideia nos Geradores", key=f"sel_{idx}"):
-                        st.session_state["prod_nome"] = op.get("produto", "")
-                        st.session_state["pub_nome"] = op.get("publico", "")
-                        st.session_state["ang_nome"] = op.get("angulo", "")
-                        st.session_state["canal_sel"] = st.session_state.get("plat_ativa", "TikTok")
-                        st.toast("Ideia carregada com sucesso!")
-
-    else:
-        st.info("💡 Insira diretamente a ideia validada por você para preencher automaticamente as abas de VSL e E-book:")
-        col_m1, col_m2 = st.columns(2)
-        with col_m1:
-            nome_manual = st.text_input("Nome do Produto / Oferta:", placeholder="Ex: Protocolo Queima 21D")
-            pub_manual = st.text_input("Público-Alvo e Dores:", placeholder="Ex: Mães após o parto sem tempo de ir à academia")
-        with col_m2:
-            ang_manual = st.text_input("Ângulo de Venda / Mecanismo:", placeholder="Ex: Treinos de 12 minutos em casa sem equipamentos")
-            canal_manual = st.selectbox("Canal Principal de Tráfego:", list(PLATAFORMAS_CONFIG.keys()))
-
-        if st.button("📌 Salvar e Carregar Ideia nos Geradores (0 Créditos)", type="primary", use_container_width=True):
-            if nome_manual.strip():
-                st.session_state["prod_nome"] = nome_manual.strip()
-                st.session_state["pub_nome"] = pub_manual.strip()
-                st.session_state["ang_nome"] = ang_manual.strip()
-                st.session_state["canal_sel"] = canal_manual
-                st.success("✅ Ideia carregada para as abas '🚀 Criar VSL' e '📚 Gerar E-book PDF com Fotos'.")
-            else:
-                st.error("Informe pelo menos o nome do produto.")
-
-# ------------------------------------------------------------------------------
-# ABA 4: DUBFYAI - CENTRAL DE DUBLAGEM & TRADUÇÃO ONLINE EM TEMPO REAL
-# ------------------------------------------------------------------------------
-with aba_dubfy:
-    st.subheader("🎙️ DubfyAi: Dublagem de Vídeos & Intérprete Online")
-
-    sub_dub_1, sub_dub_2, sub_dub_3 = st.tabs([
-        "🎬 Dublagem de Vídeo (IA)",
-        "🌐 Tradução Online & Intérprete",
-        "📦 Planos de Assinatura DubfyAi"
-    ])
-
-    # 1. DUBLADOR COMPLETO DE VÍDEO
-    with sub_dub_1:
-        st.markdown("#### 🎬 Dublagem com Clonagem Vocal & Sincronia")
-        st.caption("Envie um vídeo em MP4 (com voz humana). O motor transcreve, traduz e substitui a locução no idioma alvo.")
-
-        video_up = st.file_uploader("Selecione o Vídeo Original (.mp4):", type=["mp4"], key="up_dub_video")
-        col_db1, col_db2 = st.columns([1, 1])
-        with col_db1:
-            idioma_alvo_dub = st.selectbox("Traduzir & Dublar Para:", list(IDIOMAS_DUBLAGEM.keys()), index=0)
-        with col_db2:
-            cfg_id = IDIOMAS_DUBLAGEM[idioma_alvo_dub]
-            voz_dub_sel = st.selectbox("Timbre Vocal:", ["onyx (Forte/Masculino)", "nova (Feminina/Impacto)", "echo (Didático)", "shimmer (Suave)"])
-            voz_dub_cod = voz_dub_sel.split(" ")[0]
-
-        if video_up is not None:
-            st.video(video_up)
-
-            if st.button("🚀 Iniciar Dublagem Automática (25 Créditos)", type="primary", use_container_width=True):
-                saldo_antes = st.session_state.get("saldo_creditos", 0)
-                if saldo_antes < 25:
-                    st.error("❌ Saldo insuficiente! Você precisa de 25 créditos para dublar este vídeo.")
-                else:
-                    with st.spinner("⏳ Extraindo áudio, transcrevendo com Whisper e traduzindo..."):
-                        try:
-                            c_temp_video = os.path.join(DIR_TEMP, f"orig_{int(time.time())}.mp4")
-                            with open(c_temp_video, "wb") as f:
-                                f.write(video_up.getbuffer())
-
-                            c_temp_audio = os.path.join(DIR_TEMP, f"audio_{int(time.time())}.mp3")
-                            extrair_audio_de_video(c_temp_video, c_temp_audio)
-
-                            texto_transcrito = transcrever_audio_whisper(c_temp_audio)
-                            st.info(f"🗣️ **Texto Detectado:** {texto_transcrito[:200]}...")
-
-                            texto_traduzido = traduzir_texto_ia(texto_transcrito, idioma_alvo_dub)
-                            st.success(f"🌐 **Tradução:** {texto_traduzido[:200]}...")
-
-                            c_audio_dublado = os.path.join(DIR_TEMP, f"dub_{int(time.time())}.mp3")
-                            sintetizar_fala_dublada(texto_traduzido, c_audio_dublado, voz_dub_cod)
-
-                            c_video_final_dub = os.path.join(DIR_DUBLAGENS, f"dublado_{int(time.time())}_{cfg_id['codigo']}.mp4")
-                            if mesclar_audio_dublado_em_video(c_temp_video, c_audio_dublado, c_video_final_dub):
-                                debitar_creditos_cloud(email_usuario, f"Dublagem ({idioma_alvo_dub})", 25)
-                                st.session_state["video_dublado_pronto"] = c_video_final_dub
-                                disparar_comemoracao()
-                                st.rerun()
-                            else:
-                                st.error("Erro na renderização final do vídeo dublado via FFmpeg.")
-                        except Exception as e:
-                            st.error(f"Erro no processamento da dublagem: {e}")
+                        except Exception as e_dub:
+                            st.error(f"Erro na dublagem da VSL: {e_dub}")
 
         if st.session_state.get("video_dublado_pronto") and os.path.exists(st.session_state["video_dublado_pronto"]):
-            st.markdown("#### ✅ Vídeo Dublado com Sucesso:")
+            st.markdown(f"#### 🎬 Vídeo Dublado em {st.session_state.get('video_dublado_idioma')}:")
             st.video(st.session_state["video_dublado_pronto"])
-            with open(st.session_state["video_dublado_pronto"], "rb") as f_db:
+            with open(st.session_state["video_dublado_pronto"], "rb") as f_vd:
                 st.download_button(
-                    label="⬇️ Baixar Vídeo Dublado (.mp4)",
-                    data=f_db,
+                    f"⬇️ BAIXAR VSL DUBLADA EM {st.session_state.get('video_dublado_idioma').upper()} (.MP4)",
+                    data=f_vd,
                     file_name=os.path.basename(st.session_state["video_dublado_pronto"]),
                     mime="video/mp4",
                     type="primary",
                     use_container_width=True
                 )
 
-    # 2. INTÉRPRETE / TRADUÇÃO ONLINE EM TEMPO REAL
-    with sub_dub_2:
-        st.markdown("#### 🌐 Intérprete de Bolso & Tradutor de Voz Instantâneo")
-        st.caption("Digite ou cole uma frase em qualquer idioma. O sistema traduz instantaneamente e fala com voz fluida.")
-
-        col_tr1, col_tr2 = st.columns([2, 1])
-        with col_tr1:
-            texto_para_traduzir = st.text_area("Texto / Fala para Traduzir:", placeholder="Ex: Olá! Sejam muito bem-vindos ao nosso treinamento prático de infoprodutos.", height=110)
-        with col_tr2:
-            idioma_online = st.selectbox("Idioma de Destino:", list(IDIOMAS_DUBLAGEM.keys()), index=0, key="sel_id_online")
-            voz_online = st.selectbox("Voz da Fala:", ["nova", "onyx", "echo", "shimmer"], key="sel_voz_online")
-
-        if st.button("⚡ Traduzir e Falar Agora (5 Créditos)", type="primary", use_container_width=True):
-            if not texto_para_traduzir.strip():
-                st.error("Digite algum texto para traduzir.")
-            else:
-                saldo_antes = st.session_state.get("saldo_creditos", 0)
-                if saldo_antes < 5:
-                    st.error("❌ Saldo insuficiente! Você precisa de 5 créditos.")
-                else:
-                    with st.spinner("🤖 Traduzindo e gerando áudio no idioma nativo..."):
-                        try:
-                            traducao_resultado = traduzir_texto_ia(texto_para_traduzir, idioma_online)
-                            c_audio_pocket = os.path.join(DIR_TEMP, f"pocket_{int(time.time())}.mp3")
-                            sintetizar_fala_dublada(traducao_resultado, c_audio_pocket, voz_online)
-                            
-                            debitar_creditos_cloud(email_usuario, f"Tradução Online ({idioma_online})", 5)
-                            st.session_state["txt_traduzido_pocket"] = traducao_resultado
-                            st.session_state["aud_pocket_pronto"] = c_audio_pocket
-                            st.rerun()
-                        except Exception as err:
-                            st.error(f"Erro na tradução: {err}")
-
-        if st.session_state.get("txt_traduzido_pocket"):
-            st.write("---")
-            st.markdown("### 🗣️ Resultado da Tradução:")
-            st.success(st.session_state["txt_traduzido_pocket"])
-            if st.session_state.get("aud_pocket_pronto") and os.path.exists(st.session_state["aud_pocket_pronto"]):
-                st.audio(st.session_state["aud_pocket_pronto"])
-                with open(st.session_state["aud_pocket_pronto"], "rb") as f_aud_p:
-                    st.download_button("⬇️ Baixar Áudio da Tradução (.mp3)", data=f_aud_p, file_name="traducao_dublada.mp3", mime="audio/mp3")
-
-    # 3. PLANOS DE MONETIZAÇÃO DUBFYAI
-    with sub_dub_3:
-        st.markdown("#### 📦 Assinaturas Oficiais DubfyAi (Kiwify)")
-        email_param = urllib.parse.quote(email_usuario.strip().lower())
-        link_dub_starter  = f"https://pay.kiwify.com.br/LjmQ4tP?email={email_param}"
-        link_dub_business = f"https://pay.kiwify.com.br/YkL0BlH?email={email_param}"
-        link_dub_pro      = f"https://pay.kiwify.com.br/0KDE74Q?email={email_param}"
-
-        col_d1, col_d2, col_d3 = st.columns(3)
-        with col_d1:
-            with st.container(border=True):
-                st.markdown("### 🟢 Starter Dublagem\n## R$ 45,00")
-                st.write("• Dublagem de vídeos curtos\n• Tradução sincronizada\n• Exportação em alta qualidade")
-                st.link_button("💳 ASSINAR STARTER (R$ 45)", url=link_dub_starter, use_container_width=True)
-
-        with col_d2:
-            with st.container(border=True):
-                st.markdown("### 🔵 Business Dublagem\n## R$ 119,00")
-                st.write("• Alto volume de minutos\n• Clonagem vocal e timing profissional\n• Uso comercial liberado")
-                st.link_button("🚀 ASSINAR BUSINESS (R$ 119)", url=link_dub_business, use_container_width=True, type="primary")
-
-        with col_d3:
-            with st.container(border=True):
-                st.markdown("### 👑 Pro Dublagem\n## R$ 219,00")
-                st.write("• Escala máxima para agências e canais dark\n• Renderização prioritária\n• Suporte VIP dedicado")
-                st.link_button("👑 ASSINAR PRO (R$ 219)", url=link_dub_pro, use_container_width=True)
-
 # ------------------------------------------------------------------------------
-# ABA 5: PLANOS & RECARGAS (COM BÔNUS DE 1ª COMPRA EM DOBRO)
+# ABA 3: CRIAR E-BOOK & TRADUÇÃO GLOBAL
 # ------------------------------------------------------------------------------
-with aba_planos:
-    st.subheader("💎 Recargas Oficiais de Créditos (VSL & E-books)")
+with tab_ebook:
+    st.markdown("## 📚 Criador de E-book com Fotos Reais & Tradução Global")
+    st.caption("Escreva manuais completos com fotos do Pexels e traduza o livro inteiro para 36 idiomas em 1 clique.")
 
-    email_param = urllib.parse.quote(email_usuario.strip().lower())
-    link_vsl_starter = f"https://pay.kiwify.com.br/8kCGDA3?email={email_param}"
-    link_vsl_pro     = f"https://pay.kiwify.com.br/PkPTG8J?email={email_param}"
-    link_vsl_vip     = f"https://pay.kiwify.com.br/4bqIXRN?email={email_param}"
+    col_e1, col_e2 = st.columns(2)
+    with col_e1:
+        tema_ebook = st.text_input("Tema do E-book:", "Manual Definitivo dos Pães Sem Glúten")
+    with col_e2:
+        publico_ebook = st.text_input("Público-Alvo:", "Pessoas com restrição alimentar e empreendedoras")
 
-    eh_novato = st.session_state.get("total_compras", 0) == 0
-
-    if eh_novato:
-        st.markdown("""
-            <div style="background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); padding: 18px; border-radius: 12px; border: 2px solid #f59e0b; text-align: center; margin-bottom: 22px;">
-                <h3 style="color: #fbbf24; margin: 0; font-size: 22px; font-weight: 900;">🎁 BÔNUS DE BOAS-VINDAS: CRÉDITOS EM DOBRO NA 1ª COMPRA!</h3>
-                <p style="color: #ffffff; margin: 6px 0 0 0; font-size: 15px;">
-                    Identificamos que você ainda não realizou compras nesta conta. Qualquer pacote que escolher agora entregará automaticamente o <b>DOBRO DE CRÉDITOS</b>!
-                </p>
-            </div>
-        """, unsafe_allow_html=True)
-
-    col_v1, col_v2, col_v3 = st.columns(3)
-
-    with col_v1:
-        with st.container(border=True):
-            if eh_novato:
-                st.markdown("### 🟢 Starter VSL\n## R$ 57,00\n🔥 **320 CRÉDITOS** *(160 + 160 Bônus)*")
-            else:
-                st.markdown("### 🟢 Starter VSL\n## R$ 57,00\n**(160 créditos)**")
-            st.write("• VSLs Curtas e Médias\n• E-books operacionais com fotos\n• Mineração de Radar")
-            st.link_button("💳 COMPRAR STARTER (R$ 57)", url=link_vsl_starter, use_container_width=True)
-
-    with col_v2:
-        with st.container(border=True):
-            if eh_novato:
-                st.markdown("### 🟡 Pro VSL\n## R$ 87,00\n🔥 **600 CRÉDITOS** *(300 + 300 Bônus)*")
-            else:
-                st.markdown("### 🟡 Pro VSL\n## R$ 87,00\n**(300 créditos)**")
-            st.write("• Volume ideal para testes e validação\n• E-books com scripts e checklists\n• Fila prioritária de renderização")
-            st.link_button("🚀 COMPRAR PRO (R$ 87)", url=link_vsl_pro, use_container_width=True, type="primary")
-
-    with col_v3:
-        with st.container(border=True):
-            if eh_novato:
-                st.markdown("### 🔴 VIP Escala\n## R$ 117,00\n🔥 **1.000 CRÉDITOS** *(500 + 500 Bônus)*")
-            else:
-                st.markdown("### 🔴 VIP Escala\n## R$ 117,00\n**(500 créditos)**")
-            st.write("• Escala máxima para infoprodutores\n• Produção em massa de VSLs e manuais\n• Processamento prioritário com IA")
-            st.link_button("👑 ASSINAR VIP (R$ 117)", url=link_vsl_vip, use_container_width=True)
-
-# ------------------------------------------------------------------------------
-# ABA 6: GALERIA LOCAL
-# ------------------------------------------------------------------------------
-with aba_galeria:
-    st.subheader("📂 Ficheiros Armazenados Localmente")
-    tab_v, tab_e, tab_f, tab_d = st.tabs(["Vídeos VSL (.mp4)", "E-books (.pdf)", "Fotos do Nicho (.jpg)", "Vídeos Dublados (.mp4)"])
-    with tab_v:
-        for v in sorted(os.listdir(DIR_OUTPUT), reverse=True):
-            if v.endswith(".mp4"):
-                st.write(f"🎬 `{v}`")
-    with tab_e:
-        for e in sorted(os.listdir(DIR_EBOOKS), reverse=True):
-            if e.endswith(".pdf"):
-                st.write(f"📚 `{e}`")
-    with tab_f:
-        for f in sorted(os.listdir(DIR_FOTOS), reverse=True):
-            if f.endswith(".jpg"):
-                st.write(f"🖼 `{f}`")
-    with tab_d:
-        for d in sorted(os.listdir(DIR_DUBLAGENS), reverse=True):
-            if d.endswith(".mp4"):
-                st.write(f"🎙️ `{d}`")
-
-# ------------------------------------------------------------------------------
-# ABA 7: GESTÃO MASTER (BALANÇO EMPRESARIAL, SUPRIMENTO & STATUS DAS IAs)
-# ------------------------------------------------------------------------------
-if is_master_admin:
-    with aba_admin:
-        st.subheader("🔒 Gestão Master: Balanço da Empresa & Suprimento aos Clientes")
-        st.caption("Visão do Dono do SaaS: monitoramento de receitas, garantia de entrega e status de infraestrutura.")
-
-        relatorio_atual = auditar_infraestrutura()
-        fin = relatorio_atual["financeiro"]
-
-        # QUADRO FINANCEIRO DE SUPRIMENTO E OBRIGAÇÕES
-        st.markdown("### 🏢 Balanço Operacional da Sua Empresa vs. Passivo de Clientes")
-        c_emp1, c_emp2, c_emp3, c_emp4 = st.columns(4)
-
-        with c_emp1:
-            with st.container(border=True):
-                st.markdown("💰 **Faturamento Kiwify**")
-                st.markdown(f"## R$ {fin['total_faturado_kiwify']:.2f}")
-                st.caption(f"{fin['pedidos_aprovados']} compras registradas no banco")
-
-        with c_emp2:
-            with st.container(border=True):
-                st.markdown("👥 **Créditos com Clientes**")
-                st.markdown(f"## {fin['creditos_clientes']} cr")
-                st.caption("Saldo total ativo na mão dos compradores")
-
-        with c_emp3:
-            with st.container(border=True):
-                st.markdown("🛡️ **Custo Real de IA p/ Suprir**")
-                st.markdown(f"## R$ {fin['custo_ia_estimado_brl']:.2f}")
-                st.caption(f"Aprox. $ {fin['custo_ia_estimado_usd']:.2f} USD na OpenAI + Google")
-
-        with c_emp4:
-            with st.container(border=True):
-                st.markdown("👑 **Seu Saldo como Dono**")
-                st.markdown(f"## {st.session_state.saldo_creditos} cr")
-                if st.button("⚡ Resetar Meu Saldo (10.000 cr)", use_container_width=True):
-                    supabase.table("usuarios").update({"saldo_creditos": 10000, "creditos": 10000}).eq("email", email_usuario).execute()
-                    st.session_state.saldo_creditos = 10000
-                    st.toast("Seu saldo master foi renovado para 10.000 créditos!")
-                    st.rerun()
-
-        st.info(
-            f"💡 **Regra de Blindagem:** Para suprir 100% dos **{fin['creditos_clientes']} créditos** que estão com seus clientes caso todos decidam gerar e-books, VSLs e dublagens ao mesmo tempo, você precisa ter no mínimo **R$ {max(30.0, fin['custo_ia_estimado_brl'] * 1.5):.2f}** de saldo somado entre sua OpenAI ($ 5 USD) e Google Cloud. Como sua conta Google já fatura R$ 100/mês, o ecossistema está **100% blindado**!"
-        )
-
-        st.divider()
-
-        # STATUS TÉCNICO DAS IAs
-        st.markdown("### 📡 Conectividade e Saúde das APIs")
-        col_st1, col_st2, col_st3, col_st4 = st.columns(4)
-        with col_st1:
-            with st.container(border=True):
-                st.markdown(f"**OpenAI (TTS/Whisper)**")
-                if relatorio_atual["openai"]["ok"]:
-                    st.success(relatorio_atual["openai"]["status"])
-                else:
-                    st.error(relatorio_atual["openai"]["status"])
-                st.caption(relatorio_atual["openai"]["detalhes"])
-
-        with col_st2:
-            with st.container(border=True):
-                st.markdown(f"**Google Gemini (E-books)**")
-                if relatorio_atual["gemini"]["ok"]:
-                    st.success(relatorio_atual["gemini"]["status"])
-                else:
-                    st.error(relatorio_atual["gemini"]["status"])
-                st.caption(relatorio_atual["gemini"]["detalhes"])
-
-        with col_st3:
-            with st.container(border=True):
-                st.markdown(f"**ElevenLabs (Dublagem)**")
-                if relatorio_atual["elevenlabs"]["ok"]:
-                    st.success(relatorio_atual["elevenlabs"]["status"])
-                else:
-                    st.warning(relatorio_atual["elevenlabs"]["status"])
-                st.caption(relatorio_atual["elevenlabs"]["detalhes"])
-
-        with col_st4:
-            with st.container(border=True):
-                st.markdown(f"**Supabase (Banco)**")
-                st.info(f"{relatorio_atual['supabase']['usuarios']} Cadastros")
-                st.caption(f"{relatorio_atual['supabase']['creditos_circulando']} cr total no sistema")
-
-        st.write("")
-        col_wpp1, col_wpp2 = st.columns([1, 1])
-
-        with col_wpp1:
-            if st.button("📲 Disparar Relatório Contábil no Meu WhatsApp", type="primary", use_container_width=True):
-                sucesso, resposta_wpp = disparar_relatorio_whatsapp(relatorio_atual)
-                if sucesso:
-                    st.success(resposta_wpp)
-                else:
-                    st.warning("⚠️ CallMeBot não configurado nos secrets. Use o botão ao lado para abrir direto no WhatsApp.")
-                    st.session_state["link_wpp_manual"] = resposta_wpp
-
-        with col_wpp2:
-            if st.session_state.get("link_wpp_manual"):
-                st.link_button("👉 Abrir Relatório no WhatsApp Web / App", url=st.session_state["link_wpp_manual"], use_container_width=True)
-            else:
-                link_pronto = f"https://api.whatsapp.com/send?text={urllib.parse.quote('Fechamento financeiro e de APIs verificado no painel.')}"
-                st.link_button("💬 Enviar Relatório Manualmente", url=link_pronto, use_container_width=True)
-
-        st.divider()
-        st.markdown("### ⚡ Injeção Manual de Créditos a Clientes")
-        col_ad1, col_ad2 = st.columns([2, 1])
-        with col_ad1:
-            email_alvo = st.text_input("E-mail do Cliente para Injeção:", placeholder="cliente@exemplo.com")
-        with col_ad2:
-            qtd_creditos_adm = st.number_input("Créditos a Injetar:", min_value=1, max_value=10000, value=300, step=50)
-
-        if st.button("⚡ Confirmar Injeção de Créditos", type="primary"):
-            if not email_alvo:
-                st.error("Informe o e-mail do cliente.")
-            else:
+    if st.button("📖 Gerar E-book Completo com Fotos (.PDF) (10 cr)", type="primary"):
+        if saldo_atual < 10:
+            st.error("❌ Saldo insuficiente! Você precisa de 10 créditos.")
+        else:
+            with st.spinner("Estruturando capítulos, baixando fotos em HD e gerando PDF..."):
                 try:
-                    res_user = supabase.table("usuarios").select("*").eq("email", email_alvo.strip().lower()).execute()
-                    if res_user.data:
-                        val_atual = res_user.data[0].get("saldo_creditos", res_user.data[0].get("creditos", 0)) or 0
-                        n_saldo = val_atual + qtd_creditos_adm
-                        supabase.table("usuarios").update({"saldo_creditos": n_saldo, "creditos": n_saldo}).eq("email", email_alvo.strip().lower()).execute()
-                    else:
-                        supabase.table("usuarios").insert([{
-                            "email": email_alvo.strip().lower(),
-                            "saldo_creditos": qtd_creditos_adm,
-                            "creditos": qtd_creditos_adm,
-                            "total_compras": 1
-                        }]).execute()
-                        n_saldo = qtd_creditos_adm
-                    st.success(f"✅ Injetados {qtd_creditos_adm} créditos para {email_alvo}. Novo saldo: {n_saldo}.")
+                    dados_eb = gerar_conteudo_ebook_ia(tema_ebook, publico_ebook)
+                    st.session_state["dados_ebook_sessao"] = dados_eb
+
+                    nome_pdf = f"ebook_{int(time.time())}.pdf"
+                    caminho_pdf = os.path.join(DIR_EBOOKS, nome_pdf)
+                    compilar_pdf_ebook_com_fotos(dados_eb, PEXELS_API_KEY, caminho_pdf)
+
+                    debitar_creditos_cloud(email_usuario, f"Criação E-book ({tema_ebook})", 10)
+                    st.session_state["pdf_ebook_pronto"] = caminho_pdf
+                    st.session_state["pdf_ebook_nome"] = nome_pdf
+                    st.success("✅ E-book gerado e compilado com sucesso!")
                     st.rerun()
-                except Exception as err:
-                    st.error(f"Erro ao injetar créditos: {err}")
+                except Exception as e_eb:
+                    st.error(f"Erro na compilação do E-book: {e_eb}")
+
+    # Exibição do E-book Pronto e Expansão Global
+    if st.session_state.get("pdf_ebook_pronto") and os.path.exists(st.session_state["pdf_ebook_pronto"]):
+        st.markdown("---")
+        st.markdown("### 📥 Seu E-book Original em Português:")
+        with open(st.session_state["pdf_ebook_pronto"], "rb") as f_eb:
+            st.download_button(
+                "⬇️ Baixar E-book Original (.PDF)",
+                data=f_eb,
+                file_name=st.session_state.get("pdf_ebook_nome", "ebook.pdf"),
+                mime="application/pdf",
+                use_container_width=True
+            )
+
+        # TRADUÇÃO GLOBAL NAS 36 LÍNGUAS
+        st.markdown("---")
+        with st.container(border=True):
+            st.markdown("### 🌐 Tradução Global do E-book (36 Idiomas)")
+            st.caption("Internacionalize seu livro mantendo a estrutura de capítulos, imagens em alta resolução e paginação profissional.")
+
+            col_tr1, col_tr2 = st.columns([2, 1])
+            with col_tr1:
+                idioma_eb_sel = st.selectbox("Selecione o Idioma de Destino:", list(IDIOMAS_SISTEMA_36.keys()))
+            with col_tr2:
+                st.write("")
+                st.caption("Custo: 10 Créditos")
+                btn_trad_eb = st.button("🌍 Traduzir E-book Completo (10 cr)", type="primary", use_container_width=True)
+
+            if btn_trad_eb:
+                if saldo_atual < 10:
+                    st.error("❌ Saldo insuficiente para internacionalização.")
+                elif not st.session_state.get("dados_ebook_sessao"):
+                    st.error("Dados originais do e-book não encontrados.")
+                else:
+                    nome_lingua_eb = IDIOMAS_SISTEMA_36[idioma_eb_sel]
+                    barra_eb_tr = st.progress(0.0)
+                    with st.spinner(f"Traduzindo capa, introdução e todos os módulos para {idioma_eb_sel}..."):
+                        try:
+                            dados_tr = traduzir_ebook_completo_ia(
+                                st.session_state["dados_ebook_sessao"],
+                                nome_lingua_eb,
+                                progress_bar=barra_eb_tr
+                            )
+                            cod_idioma = re.sub(r'[^a-zA-Z0-9]', '_', nome_lingua_eb.lower())
+                            nome_pdf_tr = f"manual_{cod_idioma}_{int(time.time())}.pdf"
+                            caminho_pdf_tr = os.path.join(DIR_EBOOKS, nome_pdf_tr)
+
+                            compilar_pdf_ebook_com_fotos(dados_tr, PEXELS_API_KEY, caminho_pdf_tr)
+                            debitar_creditos_cloud(email_usuario, f"Tradução E-book ({nome_lingua_eb})", 10)
+
+                            st.session_state["pdf_global_pronto"] = caminho_pdf_tr
+                            st.session_state["pdf_global_nome"] = nome_pdf_tr
+                            st.session_state["pdf_global_lingua"] = idioma_eb_sel
+                            st.success(f"✅ E-book traduzido com sucesso para {idioma_eb_sel}!")
+                            st.rerun()
+                        except Exception as e_tr:
+                            st.error(f"Erro na tradução do e-book: {e_tr}")
+
+        if st.session_state.get("pdf_global_pronto") and os.path.exists(st.session_state["pdf_global_pronto"]):
+            st.success(f"✅ Arquivo internacionalizado pronto: **{st.session_state.get('pdf_global_lingua')}**")
+            with open(st.session_state["pdf_global_pronto"], "rb") as f_tr_eb:
+                st.download_button(
+                    label=f"⬇️ BAIXAR E-BOOK EM {st.session_state.get('pdf_global_lingua').upper()} (.PDF)",
+                    data=f_tr_eb,
+                    file_name=st.session_state.get("pdf_global_nome", "ebook_global.pdf"),
+                    mime="application/pdf",
+                    type="primary",
+                    use_container_width=True
+                )
+
+# ------------------------------------------------------------------------------
+# ABA 4: GESTÃO MASTER
+# ------------------------------------------------------------------------------
+with tab_master:
+    st.markdown("## 👑 Painel de Gestão Master")
+    st.caption("Visão geral de faturamento, volume de usuários e integridade do sistema.")
+
+    if not supabase_client:
+        st.warning("Conexão com o Supabase inativa ou chaves não configuradas.")
+    else:
+        try:
+            res_users = supabase_client.from_("usuarios").select("*").execute()
+            usuarios_lista = res_users.data if res_users.data else []
+
+            res_pedidos = supabase_client.from_("pedidos_kiwify").select("*").execute()
+            pedidos_lista = res_pedidos.data if res_pedidos.data else []
+
+            faturamento_total = sum(float(p.get("valor_pago", 0)) for p in pedidos_lista)
+            total_clientes = len(usuarios_lista)
+            saldo_circulante = sum(u.get("saldo_creditos", u.get("creditos", 0)) for u in usuarios_lista)
+
+            cm1, cm2, cm3 = st.columns(3)
+            with cm1:
+                st.metric("Faturamento Kiwify", f"R$ {faturamento_total:,.2f}")
+            with cm2:
+                st.metric("Total de Clientes", total_clientes)
+            with cm3:
+                st.metric("Passivo de Créditos", f"{saldo_circulante} cr")
+
+            st.markdown("---")
+            st.markdown("### 📋 Últimos Pedidos Recebidos da Kiwify:")
+            if pedidos_lista:
+                st.dataframe(pedidos_lista, use_container_width=True)
+            else:
+                st.info("Nenhum pedido registrado até o momento.")
+
+        except Exception as e_master:
+            st.error(f"Erro ao carregar dados administrativos: {e_master}")
