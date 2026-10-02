@@ -589,7 +589,6 @@ def renderizar_vsl_completa(
 
         cena_out = os.path.join(DIR_VSL, f"{prefixo}_out.mp4")
 
-        # Legenda limpa e com quebra de linha
         legenda_txt = os.path.join(DIR_VSL, f"{prefixo}_legenda.txt")
         criar_arquivo_legenda(frase, legenda_txt, vertical=vertical)
         legenda_path_escapado = legenda_txt.replace(os.sep, "/").replace(":", "\\:")
@@ -606,8 +605,6 @@ def renderizar_vsl_completa(
                 f"box=1:boxcolor=black@0.75:boxborderw=16:line_spacing=12:"
                 f"x=(w-text_w)/2:y=h-text_h-90"
             )
-            # -map 0:v:0 -> PEGA APENAS A IMAGEM DO PEXELS
-            # -map 1:a:0 -> PEGA APENAS A VOZ DA OPENAI (ELIMINA 100% O SOM DE MÁQUINA DO PEXELS)
             cmd = [
                 "ffmpeg", "-y",
                 "-stream_loop", "-1", "-i", v_raw_path,
@@ -648,7 +645,6 @@ def renderizar_vsl_completa(
         if progress_bar:
             progress_bar.progress((idx + 0.8) / total)
 
-    # Concatenação fluida de todas as cenas
     concat_txt_path = os.path.join(DIR_VSL, f"concat_{int(time.time())}.txt")
     with open(concat_txt_path, "w", encoding="utf-8") as f:
         for c in cenas_clipes:
@@ -663,7 +659,6 @@ def renderizar_vsl_completa(
     ]
     subprocess.run(cmd_concat, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
 
-    # Mixagem de música de fundo (se o usuário tiver feito upload)
     vsl_final = os.path.join(DIR_VSL, f"vsl_final_{int(time.time())}.mp4")
     if musica_fundo_path and os.path.exists(musica_fundo_path):
         cmd_final = [
@@ -754,7 +749,20 @@ with st.sidebar:
     st.caption("Automação de Produtos Digitais & Escala Internacional")
     st.markdown("---")
 
-    email_usuario = st.text_input("Seu E-mail Cadastrado:", value="contato@meunegocio.com").lower().strip()
+    # CONTROLE DE SESSÃO: Mantém sempre o último e-mail ativo na tela (padrão erp61eng@gmail.com)
+    if "email_usuario_ativo" not in st.session_state:
+        st.session_state["email_usuario_ativo"] = "erp61eng@gmail.com"
+
+    email_digitado = st.text_input(
+        "Seu E-mail Cadastrado:",
+        value=st.session_state["email_usuario_ativo"]
+    ).lower().strip()
+
+    if email_digitado and email_digitado != st.session_state["email_usuario_ativo"]:
+        st.session_state["email_usuario_ativo"] = email_digitado
+
+    email_usuario = st.session_state["email_usuario_ativo"]
+
     dados_user = obter_dados_usuario(email_usuario)
     saldo_atual = dados_user["saldo"]
 
@@ -1082,7 +1090,7 @@ with tab_ebook:
             st.success(f"✅ Arquivo internacionalizado pronto: **{st.session_state.get('pdf_global_lingua')}**")
             with open(st.session_state["pdf_global_pronto"], "rb") as f_tr_eb:
                 st.download_button(
-                    label=f"⬇️️ BAIXAR E-BOOK EM {st.session_state.get('pdf_global_lingua').upper()} (.PDF)",
+                    label=f"⬇️ BAIXAR E-BOOK EM {st.session_state.get('pdf_global_lingua').upper()} (.PDF)",
                     data=f_tr_eb,
                     file_name=st.session_state.get("pdf_global_nome", "ebook_global.pdf"),
                     mime="application/pdf",
