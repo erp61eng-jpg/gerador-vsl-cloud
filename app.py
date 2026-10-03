@@ -212,6 +212,9 @@ def minerar_nicho_profundo_ia(nicho: str, profundidade: str) -> str:
     ### 1. 🎯 PÚBLICO-ALVO & NÍVEL DE CONSCIÊNCIA
     ### 2. ⚡ AS 3 MAIORES DORES OCULTAS & AS 3 PRINCIPAIS OBJEÇÕES
     ### 3. 💎 ARQUITETURA DO PRODUTO & MECANISMO ÚNICO
+    - **Nome Sugerido do Produto:** (Nome comercial de alto impacto).
+    - **A Grande Promessa:** (1 frase visceral de transformação).
+    - **Mecanismo Único:** O método por trás da solução.
     ### 4. 👑 O PATRÃO GOOGLE ADS (KIT COMPLETO DE CAMPANHA)
     #### A) Palavras-Chave de Fundo de Funil (Correspondência de Frase e Exata)
     #### B) Lista de 10 Palavras-Chave Negativas Obrigatórias
@@ -223,16 +226,16 @@ def minerar_nicho_profundo_ia(nicho: str, profundidade: str) -> str:
 
 def gerar_roteiro_vsl_ia(nicho: str, promessa: str, publico: str, num_cenas: int = 5) -> List[Dict[str, str]]:
     prompt = f"""
-    Atue como Diretor de Criação de VSL de alta conversão.
-    Crie um roteiro persuasivo sobre:
+    Atue como Diretor de Criação de VSL de alta conversão especializado no nicho: '{nicho}'.
+    Crie um roteiro persuasivo e magnético sobre:
     - Nicho: {nicho}
-    - Promessa: {promessa}
-    - Público: {publico}
+    - Promessa Principal: {promessa}
+    - Público-Alvo: {publico}
     
-    Gere exatamente {num_cenas} cenas.
+    Gere exatamente {num_cenas} cenas cronológicas (atenção, dor, virada, benefício, CTA).
     Para cada cena:
-    1. "fala": Frase falada em português (direta, 10 a 16 palavras).
-    2. "termo_video": Termo em INGLÊS de 2 a 4 palavras para buscar vídeos em HD no Pexels (ex: "artisan sourdough bread", "kneading bread dough", "fresh bread baking oven").
+    1. "fala": Frase falada em português (curta, de 10 a 16 palavras, impactante).
+    2. "termo_video": Termo em INGLÊS de 2 a 4 palavras para buscar vídeos em HD no Pexels que retratem exatamente o nicho '{nicho}' (Ex: se for cachorro: "dog training park", "obedient dog trainer"; se for ar condicionado: "air conditioner technician repair"; se for confeitaria: "decorating cake pastry chef"). NUNCA use termos de outros nichos.
     
     Retorne estritamente um JSON:
     {{
@@ -242,6 +245,7 @@ def gerar_roteiro_vsl_ia(nicho: str, promessa: str, publico: str, num_cenas: int
     }}
     """
     resp = executar_prompt_ia(prompt, formato_json=True, temperatura=0.4)
+    termo_generico_nicho = re.sub(r'[^a-zA-Z0-9\s]', '', nicho).strip()
     try:
         dados = json.loads(resp)
         cenas_raw = dados.get("cenas", [])
@@ -249,141 +253,122 @@ def gerar_roteiro_vsl_ia(nicho: str, promessa: str, publico: str, num_cenas: int
         for c in cenas_raw:
             if isinstance(c, dict):
                 fala = c.get("fala", "").strip()
-                termo = c.get("termo_video", "artisan bread").strip()
+                termo = c.get("termo_video", termo_generico_nicho).strip()
                 if fala:
                     cenas_limpas.append({"fala": fala, "termo_video": termo})
-        return cenas_limpas if cenas_limpas else [{"fala": promessa, "termo_video": "artisan bread"}]
+        return cenas_limpas if cenas_limpas else [{"fala": promessa, "termo_video": termo_generico_nicho}]
     except Exception:
         return [
-            {"fala": f"Descubra o segredo prático para dominar {nicho}.", "termo_video": "artisan bread baking"},
-            {"fala": promessa, "termo_video": "fresh bread oven"},
-            {"fala": "Aprenda o método testado para ter resultados reais.", "termo_video": "woman baker kitchen"}
+            {"fala": f"Descubra o método definitivo sobre {nicho}.", "termo_video": termo_generico_nicho},
+            {"fala": promessa, "termo_video": f"{termo_generico_nicho} professional"},
+            {"fala": "Aprenda o passo a passo testado para ter resultados reais.", "termo_video": f"{termo_generico_nicho} lifestyle"}
         ]
 
 def gerar_conteudo_ebook_ia(tema: str, publico: str) -> dict:
     prompt = f"""
-    Atue como Engenheiro de Alimentos Sênior, Mestre Padeiro e Consultor de Panificação Artesanal Sem Glúten.
-    Escreva um MANUAL TÉCNICO E COMERCIAL AVANÇADO, DENSO E COM DUPLA ILUSTRAÇÃO sobre:
+    Atue como Especialista de Elite, Autoridade Sênior e Consultor Master no tema: '{tema}'.
+    Escreva um MANUAL TÉCNICO E PRÁTICO AVANÇADO, DENSO E COM DUPLA ILUSTRAÇÃO sobre:
     - TEMA: {tema}
     - PÚBLICO: {publico}
 
-    DIRETRIZES DE EXTREMO RIGOR (PRODUTO COMERCIAL DE ALTO VALOR PERCEBIDO):
-    1. PROIBIDO TEXTO SUPERFICIAL OU RESUMINHOS. Escreva como um livro profissional de gastronomia.
-    2. Cada módulo deve ter uma base teórica sólida (ciência da retrogradação do amido, retenção de gases sem glúten, ação do psyllium e da goma xantana, hidratação da massa entre 85% e 105%).
-    3. Para CADA capítulo, forneça DOIS termos de busca em inglês para o Pexels:
-       - "termo_busca_foto_processo": Ação/preparo (ex: "kneading dough flour baking")
-       - "termo_busca_foto_resultado": Produto pronto irresistível (ex: "crusty sliced artisan bread loaf on wooden board")
-       - "legenda_resultado": Frase técnica sobre o acabamento visual (ex: "Resultado esperado: casca dourada crocante com miolo arejado e alvéolos abertos.")
-    4. RECEITAS COMPLETAS: Devem conter tabela com ingredientes em GRAMAS exatas e função de cada ingrediente, tempo de hidratação, ponto da massa ao toque, temperatura do forno (ºC) e vapor.
-    5. CUSTO E PRECIFICAÇÃO: Cálculo de CMV, tempo de forno e precificação para obter de 80% a 150% de lucro real.
+    DIRETRIZES DE EXTREMO RIGOR:
+    1. PROIBIDO TEXTO SUPERFICIAL OU RESUMINHOS. Seja um manual comercial de alto valor.
+    2. O conteúdo deve ser 100% PERSONALIZADO para '{tema}'.
+       - Se for Pet/Cães: foco em comportamento canino, reforço positivo, comandos e resolução de desobediência.
+       - Se for Técnico/Serviços: ferramentas, procedimentos passo a passo, diagnósticos de defeito e segurança.
+       - Se for Culinária: insumos exatos em gramas, reações físico-químicas, temperaturas e ponto de textura.
+       - Se for Negócios: estratégias, métricas, planilhas e plano de ação.
+    3. Para CADA capítulo, forneça DOIS termos de busca em inglês para o Pexels FOCADOS EXCLUSIVAMENTE em '{tema}':
+       - "termo_busca_foto_processo": Ação/preparo/treinamento/trabalho no nicho '{tema}'.
+       - "termo_busca_foto_resultado": O resultado final de sucesso no nicho '{tema}'.
+       - "legenda_resultado": Frase técnica sobre o resultado visual esperado.
+    4. Crie uma TABELA TÉCNICA ESTRUTURADA por capítulo com parâmetros objetivos (ex: Insumos/Ferramentas/Comandos, Medidas/Doses/Tempos, e Impacto Prático).
+    5. No Módulo 4, inclua Diagnóstico de Erros Comuns e Precificação/Monetização no mercado de '{tema}'.
 
     Retorne ESTRITAMENTE um JSON estruturado com o seguinte esquema:
     {{
-        "titulo": "Manual Definitivo da Panificação Sem Glúten Profissional",
-        "subtitulo": "Ciência, Fórmulas de Balança e Técnicas de Padaria para Pães Estruturados e Lucrativos",
-        "termo_capa": "artisan rustic sourdough loaf baking",
-        "introducao": "Texto denso e detalhado de introdução desmistificando o glúten, explicando o comportamento físico-químico dos amidos, a importância da água e o novo paradigma da panificação inclusiva...",
+        "titulo": "Título Comercial Magnético para {tema}",
+        "subtitulo": "Subtítulo de Transformação e Método Prático",
+        "termo_capa": "Termo em inglês de 2 a 4 palavras para foto de capa no Pexels sobre {tema}",
+        "introducao": "Texto denso e detalhado de introdução explicando as bases sólidas e o método prático...",
         "capitulos": [
             {{
                 "numero": 1,
-                "titulo": "A Engenharia das Farinhas Sem Glúten & Estruturação de Redes",
-                "termo_busca_foto_processo": "flour blend bowls baking kitchen",
-                "termo_busca_foto_resultado": "rustic bread loaf flour dusted table",
-                "legenda_resultado": "Pão base perfeitamente assentado com casca firme e estrutura aerada.",
-                "alerta_tecnico": "O maior erro do iniciante é tentar usar farinhas isoladas. Sem a trindade de Estrutura + Amido + Aglutinante Hidrofílico, o pão vira um bloco pesado e solado.",
-                "conteudo": "Aprofundamento sobre as 3 classes essenciais de insumos: 1) Farinhas Estruturais (Arroz, Aveia SG, Sarraceno) que dão sustentação mecânica; 2) Amidos e Féculas (Polvilho Doce, Fécula de Batata) responsáveis pela aeração e formação da casca; 3) Aglutinantes Hidrocoloides (Psyllium e Goma Xantana), que criam uma malha viscoelástica capaz de reter o CO2 da fermentação. Farinhas sem glúten ricas em psyllium exigem hidratação entre 85% e 105% sobre o peso dos secos para garantir salto de forno sem ressecar o miolo.",
-                "receita_nome": "Fórmula do Mix Universal para Pães de Estrutura Firme",
+                "titulo": "Fundamentos Estratégicos & Pilares Iniciais",
+                "termo_busca_foto_processo": "termo em inglês de ação sobre {tema}",
+                "termo_busca_foto_resultado": "termo em inglês de resultado sobre {tema}",
+                "legenda_resultado": "Resultado visual da primeira etapa bem executada.",
+                "alerta_tecnico": "O erro mais comum cometido por iniciantes neste tema e como evitar.",
+                "conteudo": "Explicação técnica densa e aprofundada dos fundamentos...",
+                "receita_nome": "Ficha Técnica / Protocolo Operacional Padrão",
                 "tabela_ingredientes": [
-                    {{"ingrediente": "Farinha de Arroz Branco Fina", "quantidade": "400g", "funcao": "Base estrutural neutra e miolo firme"}},
-                    {{"ingrediente": "Polvilho Doce", "quantidade": "300g", "funcao": "Elasticidade, expansão e maciez"}},
-                    {{"ingrediente": "Fécula de Batata", "quantidade": "200g", "funcao": "Retenção de umidade e aeração do miolo"}},
-                    {{"ingrediente": "Farinha de Grão-de-Bico ou Sarraceno", "quantidade": "100g", "funcao": "Proteína para suporte de estrutura"}},
-                    {{"ingrediente": "Psyllium Puro em Pó", "quantidade": "25g", "funcao": "Gel de retenção hídrica e flexibilidade"}},
-                    {{"ingrediente": "Goma Xantana", "quantidade": "8g", "funcao": "Agente estabilizante anti-esfarelamento"}}
+                    {{"ingrediente": "Item / Ferramenta / Insumo 1", "quantidade": "Dose / Medida / Tempo", "funcao": "Função prática e impacto no resultado"}},
+                    {{"ingrediente": "Item / Ferramenta / Insumo 2", "quantidade": "Dose / Medida / Tempo", "funcao": "Função prática e impacto no resultado"}},
+                    {{"ingrediente": "Item / Ferramenta / Insumo 3", "quantidade": "Dose / Medida / Tempo", "funcao": "Função prática e impacto no resultado"}},
+                    {{"ingrediente": "Item / Ferramenta / Insumo 4", "quantidade": "Dose / Medida / Tempo", "funcao": "Função prática e impacto no resultado"}}
                 ],
                 "passos_preparo": [
-                    "Pese rigorosamente cada item em balança digital; variações de 3g de hidrocoloide alteram o miolo.",
-                    "Peneire as farinhas em tigela ampla três vezes para garantir dispersão homogênea do psyllium e da xantana.",
-                    "Armazene a mistura em pote de vidro com fechamento hermético em local seco por até 90 dias."
+                    "Passo 1 detalhado com técnica e cuidado.",
+                    "Passo 2 com tempo e parâmetro exato.",
+                    "Passo 3 de finalização e conferência."
                 ]
             }},
             {{
                 "numero": 2,
-                "titulo": "Pão Francês de Pestana Aberta & Pães Rústicos de Crosta Estalada",
-                "termo_busca_foto_processo": "baker scoring bread dough razor",
-                "termo_busca_foto_resultado": "crusty artisan bread oven fresh",
-                "legenda_resultado": "Pestana aberta com salto de forno vigoroso e crosta fina e estalada.",
-                "alerta_tecnico": "Sem vapor abundante nos primeiros 15 minutos de forno, a casca seca precocemente e a pestana nunca abre.",
-                "conteudo": "A dinâmica do salto de forno (oven spring). Como criar vapor em fornos residenciais utilizando pedras refratárias e formas de ferro pré-aquecidas com pedras vulcânicas ou cubos de gelo. O controle da temperatura interna da massa ao sair do forno: o miolo atinge a estabilidade térmica ideal aos 95°C no núcleo.",
-                "receita_nome": "Baguette e Pão Rústico de Casca Crocante",
+                "titulo": "Aplicação Prática Avançada & Execução do Método",
+                "termo_busca_foto_processo": "termo em inglês de ação avançada sobre {tema}",
+                "termo_busca_foto_resultado": "termo em inglês de resultado avançado sobre {tema}",
+                "legenda_resultado": "Execução perfeita do método com estabilidade.",
+                "alerta_tecnico": "Ponto crítico onde a maioria falha e como blindar a execução.",
+                "conteudo": "Metodologia prática detalhada passo a passo sem esconder nada...",
+                "receita_nome": "Protocolo Master de Execução",
                 "tabela_ingredientes": [
-                    {{"ingrediente": "Mix Universal de Farinhas", "quantidade": "350g", "funcao": "Base estrutural balanceada"}},
-                    {{"ingrediente": "Água Mineral Morna (36°C)", "quantidade": "320ml", "funcao": "Ativação do gel de psyllium"}},
-                    {{"ingrediente": "Fermento Biológico Seco", "quantidade": "8g", "funcao": "Geração vigorosa de gás carbônico"}},
-                    {{"ingrediente": "Açúcar Mascavo ou Mel", "quantidade": "12g", "funcao": "Alimento da levedura e cor de casca"}},
-                    {{"ingrediente": "Sal Marinho Moído", "quantidade": "7g", "funcao": "Sabor e controle fermentativo"}},
-                    {{"ingrediente": "Azeite de Oliva Extravirgem", "quantidade": "20ml", "funcao": "Extensibilidade e crocância"}}
+                    {{"ingrediente": "Parâmetro Principal", "quantidade": "Especificação Técnica", "funcao": "Estabilidade e eficiência"}},
+                    {{"ingrediente": "Parâmetro Secundário", "quantidade": "Especificação Técnica", "funcao": "Acabamento e durabilidade"}}
                 ],
                 "passos_preparo": [
-                    "Dissolva o fermento na água morna com açúcar e aguarde 10 minutos até espumar.",
-                    "Verta os líquidos sobre o mix seco e mexa com espátula pesada por 5 minutos até obter massa lisa e pegajosa.",
-                    "Deixe descansar 20 minutos coberta para que o psyllium atinja pico de hidratação e permita modelagem.",
-                    "Modele os pães com as mãos untadas em azeite e acomode em tapete de silicone enfarinhado.",
-                    "Fermente em ambiente fechado por 45 a 55 minutos até crescer 60% a 70% do volume.",
-                    "Faça um corte longitudinal firme com lâmina afiada inclinada a 45 graus.",
-                    "Asse a 230°C por 40 minutos com 80ml de água fervente na bandeja do fundo para vapor."
+                    "Etapa de preparação e alinhamento.",
+                    "Etapa de aplicação e controle.",
+                    "Etapa de validação prática."
                 ]
             }},
             {{
                 "numero": 3,
-                "titulo": "Pão de Forma Super Macio & Conservação de Longa Duração",
-                "termo_busca_foto_processo": "bread dough in loaf pan kitchen",
-                "termo_busca_foto_resultado": "sliced sandwich bread loaf table",
-                "legenda_resultado": "Fatias elásticas e flexíveis que não esfarelam ao passar manteiga ou fatiar.",
-                "alerta_tecnico": "O segredo para a fatia não esfarelar é a combinação de ovos (lecitina natural) e gordura vegetal equilibrada.",
-                "conteudo": "Métodos práticos contra a retrogradação acelerada do amido sem glúten. A utilização de gorduras saudáveis e emulsão prévia líquida para manter as fatias flexíveis, úmidas e aptas para montagem de sanduíches por até 5 dias sem ressecar.",
-                "receita_nome": "Pão de Forma Tradicional Macio Tipo Brioche",
+                "titulo": "Refinamento, Escala & Maximização de Resultados",
+                "termo_busca_foto_processo": "termo em inglês de escala sobre {tema}",
+                "termo_busca_foto_resultado": "termo em inglês de perfeição sobre {tema}",
+                "legenda_resultado": "Padrão de excelência final alcançado com consistência.",
+                "alerta_tecnico": "Segredo profissional para manter a consistência de longo prazo.",
+                "conteudo": "Técnicas avançadas de manutenção de qualidade e consistência...",
+                "receita_nome": "Checklist de Alta Performance",
                 "tabela_ingredientes": [
-                    {{"ingrediente": "Farinha de Arroz Branco", "quantidade": "220g", "funcao": "Corpo macio e miolo uniforme"}},
-                    {{"ingrediente": "Polvilho Doce", "quantidade": "100g", "funcao": "Elasticidade da fatia"}},
-                    {{"ingrediente": "Amido de Milho ou Fécula", "quantidade": "60g", "funcao": "Leveza e esponjosidade"}},
-                    {{"ingrediente": "Psyllium em Pó", "quantidade": "15g", "funcao": "Gel anti-esfarelamento"}},
-                    {{"ingrediente": "Goma Xantana", "quantidade": "4g", "funcao": "Ligação molecular contínua"}},
-                    {{"ingrediente": "Ovos Médios Inteiros", "quantidade": "2 un (100g)", "funcao": "Lecitina e aeração"}},
-                    {{"ingrediente": "Manteiga Ghee ou Óleo de Girassol", "quantidade": "45ml", "funcao": "Maciez do miolo"}},
-                    {{"ingrediente": "Água Morna", "quantidade": "220ml", "funcao": "Hidratação do gel"}},
-                    {{"ingrediente": "Açúcar Demerara", "quantidade": "20g", "funcao": "Fermentação e caramelização"}},
-                    {{"ingrediente": "Sal", "quantidade": "6g", "funcao": "Equilíbrio de sabor"}}
+                    {{"ingrediente": "Controle de Qualidade", "quantidade": "Diário / Semanal", "funcao": "Evitar regressão de resultados"}},
+                    {{"ingrediente": "Otimização Contínua", "quantidade": "Periódico", "funcao": "Aceleração de desempenho"}}
                 ],
                 "passos_preparo": [
-                    "Bata ovos, água, gordura, sal e açúcar até obter emulsão espumosa.",
-                    "Adicione os secos peneirados e bata com batedor ou colher pesada por 4 minutos até massa homogênea.",
-                    "Transfira para forma inglesa (22x10cm) untada e nivele com as costas de uma colher molhada.",
-                    "Deixe crescer em local abafado por 50 minutos até quase alcançar a borda da forma.",
-                    "Asse a 190°C por 35 a 40 minutos. Esfrie sobre grade por no mínimo 2 horas antes de fatiar."
+                    "Procedimento de monitoramento.",
+                    "Ajuste fino de parâmetros.",
+                    "Consolidação dos ganhos."
                 ]
             }},
             {{
                 "numero": 4,
-                "titulo": "Dossiê Clínico de Resolução de Falhas & Engenharia de Custos",
-                "termo_busca_foto_processo": "baker weighing ingredients scale bakery",
-                "termo_busca_foto_resultado": "bread loaves packaging paper bags bakery",
-                "legenda_resultado": "Pães padronizados e embalados em sacos microperfurados prontos para comercialização.",
-                "alerta_tecnico": "Jamais corte um pão sem glúten quente: o vapor interno conclui o cozimento do miolo fora do forno.",
-                "conteudo": "Diagnóstico de falhas: 1) Pão solado ou gomoso: excesso de água ou forno abaixo de 200°C; 2) Pão que afunda no topo: excesso de fermentação ou excesso de fermento; 3) Miolo quebradiço: falta de psyllium ou pesagem imprecisa da xantana; 4) Crosta pálida: falta de açúcar para reação de Maillard. Inclui cálculo preciso de CMV (Custo de Mercadoria Vendida), embalagem e margem para venda direta com lucro de 100% a 150%.",
-                "receita_nome": "Tabela de Precificação e Ficha de Custo Unitário",
+                "titulo": "Dossiê Clínico de Resolução de Erros & Monetização",
+                "termo_busca_foto_processo": "termo em inglês de diagnóstico sobre {tema}",
+                "termo_busca_foto_resultado": "termo em inglês de negócio sucesso sobre {tema}",
+                "legenda_resultado": "Estrutura final validada, lucrativa e livre de falhas.",
+                "alerta_tecnico": "Atenção aos sinais prematuros de falha e como agir de imediato.",
+                "conteudo": "Guia de Troubleshooting (o que fazer quando algo der errado) e estratégia comercial para precificar serviços ou produtos no nicho de {tema}.",
+                "receita_nome": "Ficha Financeira e Matriz de Resolução de Problemas",
                 "tabela_ingredientes": [
-                    {{"ingrediente": "Insumos Secos Pesados (Farinhas e Psyllium)", "quantidade": "R$ 6,20", "funcao": "Base nobre de farinhas"}},
-                    {{"ingrediente": "Insumos Úmidos (Ovos, Azeite, Fermento)", "quantidade": "R$ 3,10", "funcao": "Enriquecedores de massa"}},
-                    {{"ingrediente": "Energia / Gás de Forno por Ciclo", "quantidade": "R$ 1,80", "funcao": "Custo de cocção"}},
-                    {{"ingrediente": "Embalagem Kraft com Janela Visor & Selo", "quantidade": "R$ 1,50", "funcao": "Apresentação e barreira"}},
-                    {{"ingrediente": "Custo Total de Produção por Pão", "quantidade": "R$ 12,60", "funcao": "Custo Base Real"}},
-                    {{"ingrediente": "Preço de Venda Sugerido (Margem 140%)", "quantidade": "R$ 30,00 a R$ 35,00", "funcao": "Lucro Líquido: R$ 17,40 a R$ 22,40 por unidade"}}
+                    {{"ingrediente": "Custo de Implementação / Insumos", "quantidade": "Valor médio estimado", "funcao": "Base de custo real"}},
+                    {{"ingrediente": "Preço de Cobrança / Venda Sugerido", "quantidade": "Margem de 100% a 150%", "funcao": "Lucro líquido sustentável"}},
+                    {{"ingrediente": "Garantia de Satisfação do Cliente", "quantidade": "Procedimento padrão", "funcao": "Retenção e indicação orgânica"}}
                 ],
                 "passos_preparo": [
-                    "Registre em planilha o preço por quilo de cada farinha para atualizar o CMV todo mês.",
-                    "Asse no mínimo 3 pães simultâneos por ciclo de forno para otimizar custo de energia/gás.",
-                    "Embale os pães frios em sacos microperfurados para preservar a casca crocante por até 3 dias."
+                    "Identifique o sintoma do problema antes de tentar qualquer correção.",
+                    "Aplique a solução indicada no checklist de contingência.",
+                    "Calcule o retorno sobre investimento (ROI) da operação."
                 ]
             }}
         ]
@@ -502,7 +487,6 @@ def buscar_foto_pexels(query: str, pexels_key: str, dest_path: str) -> bool:
     return False
 
 def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_pdf: str) -> str:
-    # Margens balanceadas em 36pt (área útil de largura = 540pt)
     doc = SimpleDocTemplate(
         caminho_pdf,
         pagesize=letter,
@@ -616,12 +600,12 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_pdf: str)
 
     flowables = []
 
-    # ==================== CAPA ====================
+    # CAPA
     flowables.append(Spacer(1, 20))
     flowables.append(Paragraph(dados.get("titulo", "Manual Técnico Profissional"), estilo_capa_tit))
     flowables.append(Paragraph(dados.get("subtitulo", "Guia Técnico & Comercial"), estilo_capa_sub))
 
-    termo_capa = dados.get("termo_capa", "artisan bread")
+    termo_capa = dados.get("termo_capa", "business strategy")
     capa_img_path = os.path.join(DIR_PEXELS, f"capa_{int(time.time())}.jpg")
     if buscar_foto_pexels(termo_capa, pexels_key, capa_img_path):
         try:
@@ -631,8 +615,8 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_pdf: str)
 
     flowables.append(PageBreak())
 
-    # ==================== INTRODUÇÃO ====================
-    flowables.append(Paragraph("Introdução Técnica & Fundamentos da Panificação", estilo_h1))
+    # INTRODUÇÃO
+    flowables.append(Paragraph("Introdução Técnica & Fundamentos do Método", estilo_h1))
     flowables.append(Spacer(1, 4))
     for p in dados.get("introducao", "").split("\n"):
         if p.strip():
@@ -641,13 +625,13 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_pdf: str)
     flowables.append(Spacer(1, 8))
     flowables.append(HRFlowable(width="100%", thickness=0.8, color=colors.HexColor("#CBD5E1"), spaceAfter=10))
 
-    # ==================== CAPÍTULOS TÉCNICOS COM DUPLA FOTO ====================
+    # CAPÍTULOS TÉCNICOS COM DUPLA FOTO
     for cap in dados.get("capitulos", []):
         flowables.append(Paragraph(f"Módulo {cap.get('numero')}: {cap.get('titulo')}", estilo_h1))
         flowables.append(Spacer(1, 3))
 
-        # FOTO 1: Ação / Processo / Mão na Massa (Banner no Topo)
-        termo_proc = cap.get("termo_busca_foto_processo", cap.get("termo_busca_foto", "kneading dough"))
+        # FOTO 1: Ação / Preparo / Mão na Massa
+        termo_proc = cap.get("termo_busca_foto_processo", cap.get("termo_busca_foto", "working process"))
         if termo_proc:
             proc_img_path = os.path.join(DIR_PEXELS, f"proc_{cap.get('numero')}_{int(time.time())}.jpg")
             if buscar_foto_pexels(termo_proc, pexels_key, proc_img_path):
@@ -677,7 +661,7 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_pdf: str)
             if p_cap.strip():
                 flowables.append(Paragraph(p_cap.strip(), estilo_corpo))
 
-        # Ficha Técnica com Tabela de Balança
+        # Ficha Técnica com Tabela Universal
         receita_nome = cap.get("receita_nome", "")
         if receita_nome:
             flowables.append(Paragraph(f"📋 Ficha Técnica: {receita_nome}", estilo_h2))
@@ -686,9 +670,9 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_pdf: str)
             if itens_tabela:
                 dados_tabela = [
                     [
-                        Paragraph("<b>Ingrediente / Insumo</b>", estilo_celula_header),
-                        Paragraph("<b>Peso / Medida</b>", estilo_celula_header),
-                        Paragraph("<b>Função Mecânica / Química</b>", estilo_celula_header)
+                        Paragraph("<b>Insumo / Ferramenta / Etapa</b>", estilo_celula_header),
+                        Paragraph("<b>Dose / Medida / Parâmetro</b>", estilo_celula_header),
+                        Paragraph("<b>Função Prática / Impacto Técnico</b>", estilo_celula_header)
                     ]
                 ]
                 for item in itens_tabela:
@@ -716,15 +700,15 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_pdf: str)
                 for idx_p, passo in enumerate(passos, 1):
                     flowables.append(Paragraph(f"<b>{idx_p}.</b> {passo}", estilo_item))
 
-        # FOTO 2: O Resultado Final Perfeito (Preenche o rodapé eliminando o vácuo)
-        termo_res = cap.get("termo_busca_foto_resultado", "artisan bread sliced loaf")
+        # FOTO 2: O Resultado Final Perfeito
+        termo_res = cap.get("termo_busca_foto_resultado", "success professional result")
         if termo_res:
             res_img_path = os.path.join(DIR_PEXELS, f"res_{cap.get('numero')}_{int(time.time())}.jpg")
             if buscar_foto_pexels(termo_res, pexels_key, res_img_path):
                 try:
                     flowables.append(Spacer(1, 3))
                     flowables.append(RLImage(res_img_path, width=540, height=95))
-                    legenda = cap.get("legenda_resultado", "Resultado visual do produto finalizado e pronto para consumo.")
+                    legenda = cap.get("legenda_resultado", "Resultado visual do processo concluído com sucesso.")
                     flowables.append(Paragraph(f"📷 <b>Resultado Esperado:</b> {legenda}", estilo_legenda_foto))
                 except Exception:
                     pass
@@ -765,9 +749,16 @@ def buscar_video_pexels(query: str, pexels_key: str, dest_path: str, vertical: b
     if not pexels_key:
         return False
 
-    termos_tentativa = [query, "artisan sourdough bread", "baking bread kitchen", "bakery chef display"]
     orientacao = "portrait" if vertical else "landscape"
     headers = {"Authorization": pexels_key}
+
+    termos_tentativa = [
+        query,
+        f"{query} tutorial",
+        f"{query} close up",
+        "professional hands at work",
+        "business modern lifestyle"
+    ]
 
     for termo in termos_tentativa:
         termo_limpo = re.sub(r'[^a-zA-Z0-9\s]', '', str(termo)).strip()
@@ -823,7 +814,7 @@ def renderizar_vsl_completa(
 
     for idx, item in enumerate(cenas):
         frase = item.get("fala", "") if isinstance(item, dict) else str(item)
-        termo_video = item.get("termo_video", "artisan bread") if isinstance(item, dict) else "artisan bread"
+        termo_video = item.get("termo_video", "business tutorial") if isinstance(item, dict) else "business tutorial"
 
         prefixo = f"cena_{idx}_{int(time.time())}"
         a_path = os.path.join(DIR_AUDIOS, f"{prefixo}.mp3")
@@ -936,7 +927,7 @@ def dublar_roteiro_e_renderizar_vsl(
 
     for idx_f, cena in enumerate(cenas_originais):
         fala_orig = cena.get("fala", "") if isinstance(cena, dict) else str(cena)
-        termo_orig = cena.get("termo_video", "artisan bread") if isinstance(cena, dict) else "artisan bread"
+        termo_orig = cena.get("termo_video", "business tutorial") if isinstance(cena, dict) else "business tutorial"
 
         texto_tr = traduzir_texto_ia(fala_orig, idioma_alvo)
         cenas_traduzidas.append({"fala": texto_tr, "termo_video": termo_orig})
@@ -956,7 +947,7 @@ def dublar_roteiro_e_renderizar_vsl(
     return video_dublado, cenas_traduzidas
 
 # ==============================================================================
-# 6. INTERFACE STREAMLIT (SISTEMA CENTRALIZADO)
+# 6. INTERFACE STREAMLIT (SISTEMA CENTRALIZADO & INTEGRADO)
 # ==============================================================================
 
 # BARRA LATERAL
@@ -1042,16 +1033,16 @@ tab_minerador, tab_vsl, tab_ebook, tab_master = st.tabs([
 ])
 
 # ------------------------------------------------------------------------------
-# ABA 1: MINERADOR & GOOGLE ADS
+# ABA 1: MINERADOR & GOOGLE ADS (COM PROPAGAÇÃO AUTOMÁTICA DE NICHO)
 # ------------------------------------------------------------------------------
 with tab_minerador:
     st.markdown("## 🔍 Minerador & Validador de Nichos com Kit Google Ads")
     st.caption("Analise nichos comerciais, descubra dores ocultas e obtenha a campanha completa pronta para o Google Ads e YouTube Ads.")
 
     NICHOS_PREDEFINIDOS = [
+        "🐕 Adestramento Canino & Comportamento Pet",
         "🍞 Gastronomia & Pães Sem Glúten",
         "🎂 Confeitaria Lucrativa & Bolos Caseiros",
-        "🐕 Adestramento Canino & Comportamento Pet",
         "💰 Renda Extra & Milhas Aéreas",
         "🌱 Jardinagem, Suculentas & Hortas em Apartamento",
         "🛠️ Manutenção Residencial & Marido de Aluguel",
@@ -1086,6 +1077,14 @@ with tab_minerador:
                     resultado_dossie = minerar_nicho_profundo_ia(nicho_final, profundidade)
                     st.session_state["resultado_pesquisa_nicho"] = resultado_dossie
                     st.session_state["nicho_pesquisado_nome"] = nicho_final
+                    
+                    # INTEGRAÇÃO INSTANTÂNEA COM AS OUTRAS ABAS
+                    st.session_state["tema_vsl_ativo"] = nicho_final
+                    st.session_state["promessa_vsl_ativo"] = f"Aprenda o método definitivo e comprovado sobre {nicho_final}"
+                    st.session_state["tema_ebook_ativo"] = f"Manual Prático e Definitivo: {nicho_final}"
+                    st.session_state["publico_ativo"] = "Pessoas e profissionais que buscam resultados rápidos e comprovados"
+
+                    st.success(f"✅ Dossiê concluído! O nicho '{nicho_final}' já foi integrado automaticamente às abas de VSL e E-book.")
                 except Exception as err:
                     st.error(f"Erro na análise: {err}")
 
@@ -1113,18 +1112,27 @@ with tab_minerador:
             )
 
 # ------------------------------------------------------------------------------
-# ABA 2: CRIAR VSL & DUBLAGEM GLOBAL
+# ABA 2: CRIAR VSL & DUBLAGEM GLOBAL (CONECTADA AO NICHO ATIVO)
 # ------------------------------------------------------------------------------
 with tab_vsl:
     st.markdown("## 🚀 Criador de Vídeo de Vendas (VSL) & Dublagem Global")
-    st.caption("Gere roteiros persuasivos, renderize com cortes de B-roll e duble em 36 idiomas com sincronização completa.")
+    
+    nicho_integrado = st.session_state.get("nicho_pesquisado_nome")
+    if nicho_integrado:
+        st.success(f"🎯 **Nicho Conectado da Mineração:** `{nicho_integrado}`")
+    else:
+        st.caption("Dica: você pode minerar um nicho na Aba 1 para preencher tudo automaticamente aqui.")
 
     col_v1, col_v2 = st.columns(2)
     with col_v1:
-        tema_vsl = st.text_input("Tema / Produto da VSL:", "Pães Artesanais Sem Glúten")
-        promessa_vsl = st.text_input("Grande Promessa:", "Faça pães perfeitos e fature R$ 3.000 da cozinha de casa")
+        tema_vsl_padrao = st.session_state.get("tema_vsl_ativo", "Adestramento Canino & Comportamento Pet")
+        tema_vsl = st.text_input("Tema / Produto da VSL:", value=tema_vsl_padrao)
+        
+        promessa_padrao = st.session_state.get("promessa_vsl_ativo", "Elimine maus comportamentos e tenha um cão obediente em 15 dias")
+        promessa_vsl = st.text_input("Grande Promessa:", value=promessa_padrao)
     with col_v2:
-        publico_vsl = st.text_input("Público-Alvo:", "Mulheres e mães que buscam renda extra")
+        publico_padrao = st.session_state.get("publico_ativo", "Tutores de cães de primeira viagem e famílias com pets")
+        publico_vsl = st.text_input("Público-Alvo:", value=publico_padrao)
         qtd_cenas = st.slider("Quantidade de Cenas (Cortes Dinâmicos):", 3, 10, 5)
 
     col_opt1, col_opt2, col_opt3 = st.columns(3)
@@ -1141,7 +1149,7 @@ with tab_vsl:
             st.error("❌ Saldo insuficiente! Você precisa de 20 créditos.")
         else:
             barra_vsl = st.progress(0.0)
-            with st.spinner("Criando cenas com visuais do Pexels, áudio sincronizado e cortes dinâmicos..."):
+            with st.spinner(f"Criando cenas visuais de '{tema_vsl}' no Pexels, áudio sincronizado e cortes dinâmicos..."):
                 try:
                     cenas_estruturadas = gerar_roteiro_vsl_ia(tema_vsl, promessa_vsl, publico_vsl, qtd_cenas)
                     st.session_state["roteiro_vsl"] = cenas_estruturadas
@@ -1163,7 +1171,7 @@ with tab_vsl:
 
                     debitar_creditos_cloud(email_usuario, f"Criação VSL ({tema_vsl})", 20)
                     st.session_state["video_vsl_pronto"] = video_pronto
-                    st.success("✅ VSL renderizada com cortes dinâmicos e narração sincronizada!")
+                    st.success(f"✅ VSL de '{tema_vsl}' renderizada com sucesso!")
                     st.rerun()
                 except Exception as e_vsl:
                     st.error(f"Erro na renderização da VSL: {e_vsl}")
@@ -1238,35 +1246,42 @@ with tab_vsl:
                 )
 
 # ------------------------------------------------------------------------------
-# ABA 3: CRIAR E-BOOK & TRADUÇÃO GLOBAL (DUPLA ILUSTRAÇÃO & ZERO VÁCUO)
+# ABA 3: CRIAR E-BOOK & TRADUÇÃO GLOBAL (CONECTADO AO NICHO ATIVO)
 # ------------------------------------------------------------------------------
 with tab_ebook:
     st.markdown("## 📚 Criador de E-book Comercial & Diagramação Editorial")
-    st.caption("Páginas 100% preenchidas: foto de preparo no topo, tabelas exatas em gramas e foto do produto pronto no rodapé.")
+    
+    nicho_integrado = st.session_state.get("nicho_pesquisado_nome")
+    if nicho_integrado:
+        st.success(f"🎯 **Nicho Conectado da Mineração:** `{nicho_integrado}`")
+    else:
+        st.caption("Páginas 100% preenchidas com dupla fotografia e tabelas sob medida para qualquer nicho.")
 
     col_e1, col_e2 = st.columns(2)
     with col_e1:
-        tema_ebook = st.text_input("Tema do E-book:", "Manual Definitivo dos Pães Sem Glúten")
+        tema_ebook_padrao = st.session_state.get("tema_ebook_ativo", "Manual Definitivo de Adestramento Canino")
+        tema_ebook = st.text_input("Tema do E-book:", value=tema_ebook_padrao)
     with col_e2:
-        publico_ebook = st.text_input("Público-Alvo:", "Pessoas com restrição alimentar e empreendedoras de confeitaria")
+        publico_ebook_padrao = st.session_state.get("publico_ativo", "Tutores de cães de primeira viagem e famílias com pets")
+        publico_ebook = st.text_input("Público-Alvo:", value=publico_ebook_padrao)
 
     if st.button("📖 Gerar E-book Profissional Completo (.PDF) (10 cr)", type="primary"):
         if saldo_atual < 10:
             st.error("❌ Saldo insuficiente! Você precisa de 10 créditos.")
         else:
-            with st.spinner("Construindo receitas completas, buscando fotos de preparo e resultado e diagramando PDF..."):
+            with st.spinner(f"Construindo manual completo de '{tema_ebook}' com fotos e tabelas personalizadas..."):
                 try:
                     dados_eb = gerar_conteudo_ebook_ia(tema_ebook, publico_ebook)
                     st.session_state["dados_ebook_sessao"] = dados_eb
 
-                    nome_pdf = f"manual_comercial_{int(time.time())}.pdf"
+                    nome_pdf = f"manual_{re.sub(r'[^a-zA-Z0-9]', '_', tema_ebook.lower())[:20]}_{int(time.time())}.pdf"
                     caminho_pdf = os.path.join(DIR_EBOOKS, nome_pdf)
                     compilar_pdf_ebook_com_fotos(dados_eb, PEXELS_API_KEY, caminho_pdf)
 
                     debitar_creditos_cloud(email_usuario, f"Criação E-book ({tema_ebook})", 10)
                     st.session_state["pdf_ebook_pronto"] = caminho_pdf
                     st.session_state["pdf_ebook_nome"] = nome_pdf
-                    st.success("✅ E-book gerado com layout editorial completo e dupla ilustração!")
+                    st.success(f"✅ E-book de '{tema_ebook}' gerado com layout editorial completo!")
                     st.rerun()
                 except Exception as e_eb:
                     st.error(f"Erro na compilação do E-book: {e_eb}")
