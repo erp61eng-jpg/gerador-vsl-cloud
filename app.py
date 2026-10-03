@@ -459,7 +459,7 @@ def pipeline_geracao_livro_completo(tema: str, publico: str, gerar_bump: bool = 
     blueprint = gerar_blueprint_ebook_ia(tema, publico)
     
     if status_placeholder:
-        status_placeholder.write("✍️ [2/6] Escrevendo introdução técnica aprofundada...")
+        status_placeholder.write("✍️️ [2/6] Escrevendo introdução técnica aprofundada...")
     if progress_bar:
         progress_bar.progress(0.20)
     
@@ -741,7 +741,7 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
     cor_alerta_border = colors.HexColor("#FCA5A5")
     cor_alerta_text = colors.HexColor("#991B1B")
 
-    # Escala tipográfica restabelecida para o padrão de leitura confortável
+    # Escala tipográfica generosa para leitura fluida
     estilo_capa_tit = ParagraphStyle(
         'CapaTitulo',
         parent=styles['Normal'],
@@ -766,57 +766,57 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
         'TitCap',
         parent=styles['Heading1'],
         fontName='Helvetica-Bold',
-        fontSize=17,
-        leading=22,
+        fontSize=20,
+        leading=25,
         textColor=cor_azul,
-        spaceBefore=10,
-        spaceAfter=6,
+        spaceBefore=12,
+        spaceAfter=8,
         keepWithNext=True
     )
     estilo_h2 = ParagraphStyle(
         'TitSec',
         parent=styles['Heading2'],
         fontName='Helvetica-Bold',
-        fontSize=12.5,
-        leading=16.5,
+        fontSize=14,
+        leading=18.5,
         textColor=cor_primaria,
-        spaceBefore=8,
-        spaceAfter=4,
+        spaceBefore=10,
+        spaceAfter=5,
         keepWithNext=True
     )
     estilo_corpo = ParagraphStyle(
         'CorpoTexto',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=10.5,
-        leading=15,
+        fontSize=12,
+        leading=17,
         textColor=colors.HexColor("#1E293B"),
-        spaceAfter=6,
+        spaceAfter=8,
         alignment=4
     )
     estilo_item = ParagraphStyle(
         'ItemPasso',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=10,
-        leading=14,
+        fontSize=11.5,
+        leading=16,
         textColor=cor_primaria,
-        spaceAfter=3
+        spaceAfter=4
     )
     estilo_alerta = ParagraphStyle(
         'BoxAlerta',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=9.5,
-        leading=13.5,
+        fontSize=11,
+        leading=15,
         textColor=cor_alerta_text
     )
     estilo_legenda_foto = ParagraphStyle(
         'LegendaFoto',
         parent=styles['Normal'],
         fontName='Helvetica-Oblique',
-        fontSize=8.5,
-        leading=11,
+        fontSize=9.5,
+        leading=12.5,
         textColor=colors.HexColor("#64748B"),
         alignment=1,
         spaceBefore=3,
@@ -826,16 +826,16 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
         'CelulaTab',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=9,
-        leading=12,
+        fontSize=10,
+        leading=13.5,
         textColor=cor_primaria
     )
     estilo_celula_header = ParagraphStyle(
         'CelulaHeader',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=9.5,
-        leading=12.5,
+        fontSize=10.5,
+        leading=14,
         textColor=colors.white
     )
 
@@ -875,7 +875,7 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
         ])
     sumario_data.append([Paragraph("<b>Apêndice</b>", estilo_celula), Paragraph("Dossiê de Falhas & Engenharia de Custos", estilo_celula)])
 
-    tab_sumario = Table(sumario_data, colWidths=[100, 440])
+    tab_sumario = Table(sumario_data, colWidths=[110, 430])
     tab_sumario.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), cor_azul),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
@@ -921,7 +921,7 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
             tabela_alerta.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, -1), cor_alerta_bg),
                 ('BOX', (0, 0), (-1, -1), 1, cor_alerta_border),
-                ('PADDING', (0, 0), (-1, -1), 6),
+                ('PADDING', (0, 0), (-1, -1), 6.5),
             ]))
             flowables.append(tabela_alerta)
             flowables.append(Spacer(1, 8))
@@ -957,7 +957,7 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
                 ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
                 ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
                 ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
-                ('PADDING', (0, 0), (-1, -1), 4.5),
+                ('PADDING', (0, 0), (-1, -1), 5),
             ]))
             flowables.append(tab_param)
             flowables.append(Spacer(1, 8))
@@ -1010,7 +1010,7 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#334155")),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
-            ('PADDING', (0, 0), (-1, -1), 4.5),
+            ('PADDING', (0, 0), (-1, -1), 5),
         ]))
         flowables.append(tab_f)
         flowables.append(Spacer(1, 10))
@@ -1036,7 +1036,7 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
             ('BACKGROUND', (0, 0), (-1, 0), cor_azul),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
-            ('PADDING', (0, 0), (-1, -1), 4.5),
+            ('PADDING', (0, 0), (-1, -1), 5),
         ]))
         flowables.append(tab_c)
         flowables.append(Spacer(1, 10))
@@ -1068,8 +1068,8 @@ def compilar_pdf_order_bump(dados_bump: dict, pexels_key: str, caminho_pdf: str)
         'TitBump',
         parent=styles['Heading1'],
         fontName='Helvetica-Bold',
-        fontSize=19,
-        leading=23,
+        fontSize=21,
+        leading=25,
         textColor=cor_verde,
         alignment=1,
         spaceAfter=6
@@ -1078,8 +1078,8 @@ def compilar_pdf_order_bump(dados_bump: dict, pexels_key: str, caminho_pdf: str)
         'SubBump',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=11.5,
-        leading=15.5,
+        fontSize=13,
+        leading=17,
         textColor=cor_primaria,
         alignment=1,
         spaceAfter=14
@@ -1088,8 +1088,8 @@ def compilar_pdf_order_bump(dados_bump: dict, pexels_key: str, caminho_pdf: str)
         'SecBump',
         parent=styles['Heading2'],
         fontName='Helvetica-Bold',
-        fontSize=12.5,
-        leading=16.5,
+        fontSize=14,
+        leading=18,
         textColor=cor_primaria,
         spaceBefore=10,
         spaceAfter=6,
@@ -1099,16 +1099,16 @@ def compilar_pdf_order_bump(dados_bump: dict, pexels_key: str, caminho_pdf: str)
         'CelBump',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=9,
-        leading=12,
+        fontSize=10,
+        leading=13.5,
         textColor=cor_primaria
     )
     estilo_celula_h = ParagraphStyle(
         'CelHBump',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=9.5,
-        leading=12.5,
+        fontSize=10.5,
+        leading=14,
         textColor=colors.white
     )
 
@@ -1151,7 +1151,7 @@ def compilar_pdf_order_bump(dados_bump: dict, pexels_key: str, caminho_pdf: str)
             ('BACKGROUND', (0, 0), (-1, 0), cor_verde),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
-            ('PADDING', (0, 0), (-1, -1), 5),
+            ('PADDING', (0, 0), (-1, -1), 5.5),
         ]))
         flowables.append(tab_chk)
         flowables.append(Spacer(1, 12))
@@ -1179,7 +1179,7 @@ def compilar_pdf_order_bump(dados_bump: dict, pexels_key: str, caminho_pdf: str)
             ('BACKGROUND', (0, 0), (-1, 0), cor_vermelho),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
-            ('PADDING', (0, 0), (-1, -1), 5),
+            ('PADDING', (0, 0), (-1, -1), 5.5),
         ]))
         flowables.append(tab_em)
 
@@ -1726,7 +1726,7 @@ with tab_vsl:
             st.video(st.session_state["video_dublado_pronto"])
             with open(st.session_state["video_dublado_pronto"], "rb") as f_vd:
                 st.download_button(
-                    f"⬇️ BAIXAR VSL DUBLADA EM {st.session_state.get('video_dublado_idioma').upper()} (.MP4)",
+                    f"⬇️️ BAIXAR VSL DUBLADA EM {st.session_state.get('video_dublado_idioma').upper()} (.MP4)",
                     data=f_vd,
                     file_name=os.path.basename(st.session_state["video_dublado_pronto"]),
                     mime="video/mp4",
@@ -1839,7 +1839,7 @@ with tab_ebook:
             b_info = st.session_state["dados_livro_sessao"]["order_bump"]
             with st.expander("📋 Ver Copy Pronta para a caixinha de Order Bump na Kiwify / Checkout"):
                 st.markdown(f"**Título da Oferta:** `{b_info.get('titulo_bump')}`")
-                st.markdown(f"**Preço Recomendado:** `R$ 19,90 ou R$ 27,00`")
+                st.markdown(f"**Preço Recomendado:** `R$ 19,90 ou R$ 24,90`")
                 st.text_area("Texto de Chamada do Checkout:", value=b_info.get("copy_oferta_kiwify", ""), height=100)
 
         st.markdown("---")
