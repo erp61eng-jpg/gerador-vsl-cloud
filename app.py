@@ -406,7 +406,7 @@ def gerar_apendice_economico_ia(tema: str, publico: str) -> dict:
     return json.loads(resp)
 
 # ==============================================================================
-# 5. ENGENHARIA DO PRODUTO COMPLEMENTAR (ORDER BUMP / ACELERADOR DE CAMPO)
+# 5. ENGENHARIA DO PRODUTO COMPLEMENTAR (ORDER BUMP)
 # ==============================================================================
 def gerar_order_bump_ia(tema: str, publico: str, titulo_principal: str) -> dict:
     prompt = f"""
@@ -416,10 +416,10 @@ def gerar_order_bump_ia(tema: str, publico: str, titulo_principal: str) -> dict:
     PÚBLICO: {publico}
 
     O Order Bump deve ser um material de consulta rápida e execução imediata:
-    1. "titulo_bump": Nome magnético (Ex: "Checklist de Bolso & Protocolo de Ação Imediata: {tema}").
+    1. "titulo_bump": Nome magnético.
     2. "subtitulo_bump": Subtítulo curto de transformação instantânea.
-    3. "copy_oferta_kiwify": Texto curto de persuasão (3 linhas) para colocar na caixinha de Order Bump da Kiwify por R$ 19,90 a R$ 29,90.
-    4. "checklist_rotina": 10 itens objetivos de verificação pré-execução / auditoria de conformidade.
+    3. "copy_oferta_kiwify": Texto curto de persuasão (3 linhas) para a caixinha de Order Bump da Kiwify.
+    4. "checklist_rotina": 10 itens objetivos de verificação pré-execução / auditoria.
     5. "tabela_emergencia": 4 situações críticas de erro comum e o comando de ação em menos de 5 minutos.
     6. "termo_capa": Termo em inglês para imagem de capa (2 a 3 palavras).
 
@@ -486,7 +486,7 @@ def pipeline_geracao_livro_completo(tema: str, publico: str, gerar_bump: bool = 
     dados_bump = None
     if gerar_bump:
         if status_placeholder:
-            status_placeholder.write("🎁 [5/6] Construindo Produto Complementar de Order Bump (Checklist de Campo & Protocolos)...")
+            status_placeholder.write("🎁 [5/6] Construindo Produto Complementar de Order Bump...")
         dados_bump = gerar_order_bump_ia(tema, publico, blueprint.get("titulo"))
         if progress_bar:
             progress_bar.progress(0.90)
@@ -627,7 +627,7 @@ def traduzir_livro_completo_ia(dados_livro: dict, idioma_destino: str, progress_
     }
 
 # ==============================================================================
-# 6. DIAGRAMAÇÃO EDITORIAL DO LIVRO E DO ORDER BUMP (REPORTLAB)
+# 6. DIAGRAMAÇÃO EDITORIAL COM FONTES DE ALTA LEGIBILIDADE (REPORTLAB)
 # ==============================================================================
 class NumeradorPaginas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
@@ -649,7 +649,7 @@ class NumeradorPaginas(canvas.Canvas):
     def draw_footer(self, page_count):
         if self._pageNumber > 1:
             self.saveState()
-            self.setFont("Helvetica-Bold", 8)
+            self.setFont("Helvetica-Bold", 8.5)
             self.setFillColor(colors.HexColor("#64748B"))
             self.drawString(36, 20, "MANUAL DE ENGENHARIA & PROCEDIMENTOS | EDIÇÃO PROFISSIONAL")
             texto_pag = f"Página {self._pageNumber} de {page_count}"
@@ -658,7 +658,7 @@ class NumeradorPaginas(canvas.Canvas):
             self.setLineWidth(0.6)
             self.line(36, 30, 576, 30)
 
-            self.setFont("Helvetica", 7.5)
+            self.setFont("Helvetica", 8)
             self.setFillColor(colors.HexColor("#94A3B8"))
             self.drawString(36, 762, "PROTOCOLO TÉCNICO PADRONIZADO")
             self.line(36, 756, 576, 756)
@@ -683,7 +683,7 @@ class NumeradorPaginasBump(canvas.Canvas):
 
     def draw_footer(self, page_count):
         self.saveState()
-        self.setFont("Helvetica-Bold", 8)
+        self.setFont("Helvetica-Bold", 8.5)
         self.setFillColor(colors.HexColor("#64748B"))
         self.drawString(36, 18, "CADERNO DE EXECUÇÃO & CHECKLIST OPERACIONAL | USO PRÁTICO")
         texto_pag = f"Pág. {self._pageNumber} de {page_count}"
@@ -741,12 +741,13 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
     cor_alerta_border = colors.HexColor("#FCA5A5")
     cor_alerta_text = colors.HexColor("#991B1B")
 
+    # Escala tipográfica restabelecida para o padrão de leitura confortável
     estilo_capa_tit = ParagraphStyle(
         'CapaTitulo',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=26,
-        leading=32,
+        fontSize=28,
+        leading=34,
         textColor=cor_azul,
         alignment=1,
         spaceAfter=12
@@ -755,8 +756,8 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
         'CapaSub',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=13,
-        leading=17,
+        fontSize=13.5,
+        leading=18,
         textColor=cor_primaria,
         alignment=1,
         spaceAfter=22
@@ -765,10 +766,10 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
         'TitCap',
         parent=styles['Heading1'],
         fontName='Helvetica-Bold',
-        fontSize=16,
-        leading=20,
+        fontSize=17,
+        leading=22,
         textColor=cor_azul,
-        spaceBefore=8,
+        spaceBefore=10,
         spaceAfter=6,
         keepWithNext=True
     )
@@ -776,8 +777,8 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
         'TitSec',
         parent=styles['Heading2'],
         fontName='Helvetica-Bold',
-        fontSize=11,
-        leading=15,
+        fontSize=12.5,
+        leading=16.5,
         textColor=cor_primaria,
         spaceBefore=8,
         spaceAfter=4,
@@ -787,8 +788,8 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
         'CorpoTexto',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=9,
-        leading=14,
+        fontSize=10.5,
+        leading=15,
         textColor=colors.HexColor("#1E293B"),
         spaceAfter=6,
         alignment=4
@@ -797,8 +798,8 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
         'ItemPasso',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=8.5,
-        leading=12.5,
+        fontSize=10,
+        leading=14,
         textColor=cor_primaria,
         spaceAfter=3
     )
@@ -806,16 +807,16 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
         'BoxAlerta',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=8.5,
-        leading=12.5,
+        fontSize=9.5,
+        leading=13.5,
         textColor=cor_alerta_text
     )
     estilo_legenda_foto = ParagraphStyle(
         'LegendaFoto',
         parent=styles['Normal'],
         fontName='Helvetica-Oblique',
-        fontSize=7.5,
-        leading=10,
+        fontSize=8.5,
+        leading=11,
         textColor=colors.HexColor("#64748B"),
         alignment=1,
         spaceBefore=3,
@@ -825,23 +826,23 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
         'CelulaTab',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=8,
-        leading=11,
+        fontSize=9,
+        leading=12,
         textColor=cor_primaria
     )
     estilo_celula_header = ParagraphStyle(
         'CelulaHeader',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=8,
-        leading=11,
+        fontSize=9.5,
+        leading=12.5,
         textColor=colors.white
     )
 
     flowables = []
 
     # CAPA
-    flowables.append(Spacer(1, 40))
+    flowables.append(Spacer(1, 35))
     flowables.append(Paragraph(dados_livro.get("titulo", "Manual Técnico Profissional"), estilo_capa_tit))
     flowables.append(Paragraph(dados_livro.get("subtitulo", "Guia Técnico Avançado"), estilo_capa_sub))
 
@@ -855,7 +856,7 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
             except Exception:
                 pass
 
-    flowables.append(Spacer(1, 30))
+    flowables.append(Spacer(1, 25))
     flowables.append(Paragraph("<b>AUTORIA:</b> DEPARTAMENTO DE ENGENHARIA DE PROCESSOS & DESENVOLVIMENTO", estilo_legenda_foto))
     flowables.append(PageBreak())
 
@@ -874,7 +875,7 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
         ])
     sumario_data.append([Paragraph("<b>Apêndice</b>", estilo_celula), Paragraph("Dossiê de Falhas & Engenharia de Custos", estilo_celula)])
 
-    tab_sumario = Table(sumario_data, colWidths=[90, 450])
+    tab_sumario = Table(sumario_data, colWidths=[100, 440])
     tab_sumario.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), cor_azul),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
@@ -950,13 +951,13 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
                     Paragraph(item.get("funcao", ""), estilo_celula)
                 ])
 
-            tab_param = Table(dados_t, colWidths=[180, 110, 250])
+            tab_param = Table(dados_t, colWidths=[170, 110, 260])
             tab_param.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), cor_azul),
                 ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
                 ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
                 ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
-                ('PADDING', (0, 0), (-1, -1), 4),
+                ('PADDING', (0, 0), (-1, -1), 4.5),
             ]))
             flowables.append(tab_param)
             flowables.append(Spacer(1, 8))
@@ -1009,7 +1010,7 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#334155")),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
-            ('PADDING', (0, 0), (-1, -1), 4),
+            ('PADDING', (0, 0), (-1, -1), 4.5),
         ]))
         flowables.append(tab_f)
         flowables.append(Spacer(1, 10))
@@ -1030,12 +1031,12 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
                 Paragraph(c.get("valor_estimado", ""), estilo_celula),
                 Paragraph(c.get("detalhe", ""), estilo_celula)
             ])
-        tab_c = Table(dados_c, colWidths=[180, 130, 230])
+        tab_c = Table(dados_c, colWidths=[170, 130, 240])
         tab_c.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), cor_azul),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
-            ('PADDING', (0, 0), (-1, -1), 4),
+            ('PADDING', (0, 0), (-1, -1), 4.5),
         ]))
         flowables.append(tab_c)
         flowables.append(Spacer(1, 10))
@@ -1067,8 +1068,8 @@ def compilar_pdf_order_bump(dados_bump: dict, pexels_key: str, caminho_pdf: str)
         'TitBump',
         parent=styles['Heading1'],
         fontName='Helvetica-Bold',
-        fontSize=18,
-        leading=22,
+        fontSize=19,
+        leading=23,
         textColor=cor_verde,
         alignment=1,
         spaceAfter=6
@@ -1077,8 +1078,8 @@ def compilar_pdf_order_bump(dados_bump: dict, pexels_key: str, caminho_pdf: str)
         'SubBump',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=11,
-        leading=15,
+        fontSize=11.5,
+        leading=15.5,
         textColor=cor_primaria,
         alignment=1,
         spaceAfter=14
@@ -1087,8 +1088,8 @@ def compilar_pdf_order_bump(dados_bump: dict, pexels_key: str, caminho_pdf: str)
         'SecBump',
         parent=styles['Heading2'],
         fontName='Helvetica-Bold',
-        fontSize=12,
-        leading=16,
+        fontSize=12.5,
+        leading=16.5,
         textColor=cor_primaria,
         spaceBefore=10,
         spaceAfter=6,
@@ -1098,16 +1099,16 @@ def compilar_pdf_order_bump(dados_bump: dict, pexels_key: str, caminho_pdf: str)
         'CelBump',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=8,
-        leading=11,
+        fontSize=9,
+        leading=12,
         textColor=cor_primaria
     )
     estilo_celula_h = ParagraphStyle(
         'CelHBump',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=8,
-        leading=11,
+        fontSize=9.5,
+        leading=12.5,
         textColor=colors.white
     )
 
@@ -1150,7 +1151,7 @@ def compilar_pdf_order_bump(dados_bump: dict, pexels_key: str, caminho_pdf: str)
             ('BACKGROUND', (0, 0), (-1, 0), cor_verde),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
-            ('PADDING', (0, 0), (-1, -1), 4.5),
+            ('PADDING', (0, 0), (-1, -1), 5),
         ]))
         flowables.append(tab_chk)
         flowables.append(Spacer(1, 12))
@@ -1178,7 +1179,7 @@ def compilar_pdf_order_bump(dados_bump: dict, pexels_key: str, caminho_pdf: str)
             ('BACKGROUND', (0, 0), (-1, 0), cor_vermelho),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
-            ('PADDING', (0, 0), (-1, -1), 4.5),
+            ('PADDING', (0, 0), (-1, -1), 5),
         ]))
         flowables.append(tab_em)
 
@@ -1747,7 +1748,6 @@ with tab_ebook:
     with col_e2:
         publico_ebook = st.text_input("Público-Alvo / Perfil Técnico:", key="ebook_input_publico")
 
-    # Opção para ativar ou desativar o produto complementar
     gerar_bump_opt = st.checkbox(
         "🎁 Gerar também o Produto Complementar (Order Bump / Checklist Operacional de Alta Conversão)",
         value=True,
@@ -1770,7 +1770,6 @@ with tab_ebook:
                 )
                 st.session_state["dados_livro_sessao"] = dados_livro
 
-                # Compilar Livro Principal
                 status_box.write("📑 Diagramando Manual Técnico Principal com ReportLab...")
                 nome_pdf = f"manual_tecnico_{re.sub(r'[^a-zA-Z0-9]', '_', tema_ebook.lower())[:22]}_{int(time.time())}.pdf"
                 caminho_pdf = os.path.join(DIR_EBOOKS, nome_pdf)
@@ -1779,7 +1778,6 @@ with tab_ebook:
                 st.session_state["pdf_ebook_pronto"] = caminho_pdf
                 st.session_state["pdf_ebook_nome"] = nome_pdf
 
-                # Compilar Order Bump se solicitado
                 if gerar_bump_opt and dados_livro.get("order_bump"):
                     status_box.write("🎁 Diagramando Caderno de Campo / Order Bump...")
                     nome_bump_pdf = f"order_bump_{re.sub(r'[^a-zA-Z0-9]', '_', tema_ebook.lower())[:20]}_{int(time.time())}.pdf"
@@ -1800,7 +1798,6 @@ with tab_ebook:
             except Exception as e_eb:
                 st.error(f"Erro na compilação do Kit: {e_eb}")
 
-    # Exibição dos Downloads
     if st.session_state.get("pdf_ebook_pronto") and os.path.exists(st.session_state["pdf_ebook_pronto"]):
         st.markdown("---")
         st.markdown("### 📦 Seus Produtos Digitais Prontos para Venda:")
@@ -1838,7 +1835,6 @@ with tab_ebook:
             else:
                 st.info("💡 A opção de produto complementar não foi selecionada nesta compilação.")
 
-        # Oferta do Order Bump para a Kiwify
         if st.session_state.get("dados_livro_sessao", {}).get("order_bump"):
             b_info = st.session_state["dados_livro_sessao"]["order_bump"]
             with st.expander("📋 Ver Copy Pronta para a caixinha de Order Bump na Kiwify / Checkout"):
@@ -1846,7 +1842,6 @@ with tab_ebook:
                 st.markdown(f"**Preço Recomendado:** `R$ 19,90 ou R$ 27,00`")
                 st.text_area("Texto de Chamada do Checkout:", value=b_info.get("copy_oferta_kiwify", ""), height=100)
 
-        # Seção de Internacionalização
         st.markdown("---")
         with st.container(border=True):
             st.markdown("### 🌐 Tradução Global do Kit (36 Idiomas)")
@@ -1877,7 +1872,6 @@ with tab_ebook:
                             )
                             cod_idioma = re.sub(r'[^a-zA-Z0-9]', '_', nome_lingua_eb.lower())
                             
-                            # Traduzir Livro
                             nome_pdf_tr = f"manual_{cod_idioma}_{int(time.time())}.pdf"
                             caminho_pdf_tr = os.path.join(DIR_EBOOKS, nome_pdf_tr)
                             compilar_pdf_livro_tecnico(dados_tr, PEXELS_API_KEY, caminho_pdf_tr)
@@ -1886,7 +1880,6 @@ with tab_ebook:
                             st.session_state["pdf_global_nome"] = nome_pdf_tr
                             st.session_state["pdf_global_lingua"] = idioma_eb_sel
 
-                            # Traduzir Order Bump se houver
                             if dados_tr.get("order_bump"):
                                 nome_bump_tr = f"order_bump_{cod_idioma}_{int(time.time())}.pdf"
                                 caminho_bump_tr = os.path.join(DIR_EBOOKS, nome_bump_tr)
