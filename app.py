@@ -16,7 +16,7 @@ from PIL import Image as PILImage, ImageOps
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Image as RLImage, PageBreak, Table, TableStyle, HRFlowable
+    SimpleDocTemplate, Paragraph, Spacer, Image as RLImage, PageBreak, Table, TableStyle, HRFlowable, KeepTogether
 )
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.pdfgen import canvas
@@ -184,10 +184,8 @@ def traduzir_texto_ia(texto: str, idioma_destino: str) -> str:
 
     REGRA DE OURO - LOCALIZAÇÃO FINANCEIRA & MOEDA:
     1. NUNCA mantenha valores em 'Reais' ou 'R$' para outros idiomas.
-    2. NUNCA faça conversão 1 para 1 cega (ex: NÃO transforme R$ 3.000 em 3.000 Euros ou Dólares).
-    3. Adapte valores para paridade crível de mercado:
-       - Espanhol/Europeu: R$ 3.000 vira "entre 600€ e 1.000€ mensais de renda extra".
-       - Inglês/Dólar: R$ 3.000 vira "$600 a $1.200 USD de renda extra".
+    2. NUNCA faça conversão 1 para 1 cega.
+    3. Adapte valores para paridade crível de mercado (ex: US$ ou Euros para tickets médios realistas).
     4. Elimine gírias ou expressões locais brasileiras.
 
     Texto:
@@ -202,10 +200,10 @@ def traduzir_texto_ia(texto: str, idioma_destino: str) -> str:
 
 def minerar_nicho_profundo_ia(nicho: str, profundidade: str) -> str:
     prompt = f"""
-    Atue como Diretor de Aquisição e Especialista Sênior em Tráfego Pago, Copywriting e Validação de Produtos Digitais.
+    Atue como Diretor de Aquisição e Especialista Sênior em Tráfego Pago, Copywriting e Engenharia de Produtos Digitais.
     Domínio absoluto de: Google Ads, Meta Ads, Kiwify e plataformas internacionais.
     
-    Analise o seguinte nicho:
+    Analise o seguinte nicho com rigor técnico:
     NICHO: "{nicho}"
     NÍVEL DE PROFUNDIDADE: {profundidade}
     
@@ -234,10 +232,10 @@ def gerar_roteiro_vsl_ia(nicho: str, promessa: str, publico: str, num_cenas: int
     - Promessa Principal: {promessa}
     - Público-Alvo: {publico}
     
-    Gere exatamente {num_cenas} cenas cronológicas (atenção, dor, virada, benefício, CTA).
+    Gere exatamente {num_cenas} cenas cronológicas.
     Para cada cena:
     1. "fala": Frase falada em português (curta, de 10 a 16 palavras, impactante).
-    2. "termo_video": Termo em INGLÊS de 2 a 4 palavras para buscar vídeos em HD no Pexels que retratem exatamente o nicho '{nicho}'. NUNCA use termos desconexos.
+    2. "termo_video": Termo em INGLÊS de 2 a 4 palavras para buscar vídeos em HD no Pexels que retratem exatamente o nicho '{nicho}'.
     
     Retorne estritamente um JSON:
     {{
@@ -247,7 +245,7 @@ def gerar_roteiro_vsl_ia(nicho: str, promessa: str, publico: str, num_cenas: int
     }}
     """
     resp = executar_prompt_ia(prompt, formato_json=True, temperatura=0.4)
-    termo_generico_nicho = re.sub(r'[^a-zA-Z0-9\s]', '', nicho).strip()
+    termo_generico = re.sub(r'[^a-zA-Z0-9\s]', '', nicho).strip()
     try:
         dados = json.loads(resp)
         cenas_raw = dados.get("cenas", [])
@@ -255,119 +253,72 @@ def gerar_roteiro_vsl_ia(nicho: str, promessa: str, publico: str, num_cenas: int
         for c in cenas_raw:
             if isinstance(c, dict):
                 fala = c.get("fala", "").strip()
-                termo = c.get("termo_video", termo_generico_nicho).strip()
+                termo = c.get("termo_video", termo_generico).strip()
                 if fala:
                     cenas_limpas.append({"fala": fala, "termo_video": termo})
-        return cenas_limpas if cenas_limpas else [{"fala": promessa, "termo_video": termo_generico_nicho}]
+        return cenas_limpas if cenas_limpas else [{"fala": promessa, "termo_video": termo_generico}]
     except Exception:
         return [
-            {"fala": f"Descubra o método definitivo sobre {nicho}.", "termo_video": termo_generico_nicho},
-            {"fala": promessa, "termo_video": f"{termo_generico_nicho} professional"},
-            {"fala": "Aprenda o passo a passo testado para ter resultados reais.", "termo_video": f"{termo_generico_nicho} lifestyle"}
+            {"fala": f"Descubra o método definitivo sobre {nicho}.", "termo_video": termo_generico},
+            {"fala": promessa, "termo_video": f"{termo_generico} professional"},
+            {"fala": "Aprenda o passo a passo testado para ter resultados reais.", "termo_video": f"{termo_generico} lifestyle"}
         ]
 
-def gerar_conteudo_ebook_ia(tema: str, publico: str) -> dict:
+# ==============================================================================
+# 4. ENGENHARIA DE GERAÇÃO MODULAR DE E-BOOK (DEEP CHAPTER PIPELINE)
+# ==============================================================================
+def gerar_blueprint_ebook_ia(tema: str, publico: str) -> dict:
     prompt = f"""
-    Atue como Especialista de Elite, Autoridade Sênior e Consultor Master no tema: '{tema}'.
-    Escreva um MANUAL TÉCNICO E PRÁTICO AVANÇADO, DENSO E COM DUPLA ILUSTRAÇÃO sobre:
-    - TEMA: {tema}
-    - PÚBLICO: {publico}
+    Atue como Autoridade Máxima, Consultor Técnico Sênior e Escritor de Livros Técnicos e Comerciais no tema: '{tema}'.
+    Público-alvo: {publico}
 
-    DIRETRIZES DE EXTREMO RIGOR:
-    1. PROIBIDO TEXTO SUPERFICIAL OU RESUMINHOS. Seja um manual comercial de alto valor.
-    2. O conteúdo deve ser 100% PERSONALIZADO para '{tema}'.
-    3. Para CADA capítulo, forneça DOIS termos de busca em inglês para o Pexels FOCADOS EXCLUSIVAMENTE em '{tema}':
-       - "termo_busca_foto_processo": Ação/preparo/trabalho prático no nicho '{tema}'.
-       - "termo_busca_foto_resultado": O resultado final de sucesso e excelência no nicho '{tema}'.
-       - "legenda_resultado": Frase técnica sobre o resultado visual esperado.
-    4. Crie uma TABELA TÉCNICA ESTRUTURADA por capítulo com parâmetros objetivos (ex: Insumos/Ferramentas/Comandos, Medidas/Doses/Tempos, e Impacto Prático).
-    5. No Módulo 4, inclua Diagnóstico de Erros Comuns e Precificação/Monetização no mercado de '{tema}'.
+    Planeje a ARQUITETURA MESTRA (Blueprint) de um MANUAL TÉCNICO E COMERCIAL AVANÇADO com rigor profissional.
+    O livro terá exatamente 5 Módulos Temáticos de alta densidade técnica.
+    
+    Defina:
+    1. Título e subtítulo magnéticos com forte autoridade.
+    2. Termo de busca em inglês para a foto da capa no Pexels.
+    3. Para cada um dos 5 Módulos:
+       - Número (1 a 5)
+       - Título Técnico do Módulo
+       - Objetivo Prático do Módulo
+       - 3 Tópicos Obrigatórios a serem dissecados em profundidade
 
-    Retorne ESTRITAMENTE um JSON estruturado com o seguinte esquema:
+    Retorne ESTRITAMENTE o JSON:
     {{
-        "titulo": "Título Comercial Magnético para {tema}",
-        "subtitulo": "Subtítulo de Transformação e Método Prático",
-        "termo_capa": "Termo em inglês de 2 a 4 palavras para foto de capa no Pexels sobre {tema}",
-        "introducao": "Texto denso e detalhado de introdução explicando as bases sólidas e o método prático...",
-        "capitulos": [
+        "titulo": "...",
+        "subtitulo": "...",
+        "termo_capa": "...",
+        "modulos": [
             {{
                 "numero": 1,
-                "titulo": "Fundamentos Estratégicos & Pilares Iniciais",
-                "termo_busca_foto_processo": "termo em inglês de ação sobre {tema}",
-                "termo_busca_foto_resultado": "termo em inglês de resultado sobre {tema}",
-                "legenda_resultado": "Resultado visual da primeira etapa bem executada.",
-                "alerta_tecnico": "O erro mais comum cometido por iniciantes neste tema e como evitar.",
-                "conteudo": "Explicação técnica densa e aprofundada dos fundamentos...",
-                "receita_nome": "Ficha Técnica / Protocolo Operacional Padrão",
-                "tabela_ingredientes": [
-                    {{"ingrediente": "Item / Ferramenta / Insumo 1", "quantidade": "Dose / Medida / Tempo", "funcao": "Função prática e impacto no resultado"}},
-                    {{"ingrediente": "Item / Ferramenta / Insumo 2", "quantidade": "Dose / Medida / Tempo", "funcao": "Função prática e impacto no resultado"}},
-                    {{"ingrediente": "Item / Ferramenta / Insumo 3", "quantidade": "Dose / Medida / Tempo", "funcao": "Função prática e impacto no resultado"}},
-                    {{"ingrediente": "Item / Ferramenta / Insumo 4", "quantidade": "Dose / Medida / Tempo", "funcao": "Função prática e impacto no resultado"}}
-                ],
-                "passos_preparo": [
-                    "Passo 1 detalhado com técnica e cuidado.",
-                    "Passo 2 com tempo e parâmetro exato.",
-                    "Passo 3 de finalização e conferência."
-                ]
+                "titulo": "...",
+                "objetivo": "...",
+                "topicos": ["...", "...", "..."]
             }},
             {{
                 "numero": 2,
-                "titulo": "Aplicação Prática Avançada & Execução do Método",
-                "termo_busca_foto_processo": "termo em inglês de ação avançada sobre {tema}",
-                "termo_busca_foto_resultado": "termo em inglês de resultado avançado sobre {tema}",
-                "legenda_resultado": "Execução perfeita do método com estabilidade.",
-                "alerta_tecnico": "Ponto crítico onde a maioria falha e como blindar a execução.",
-                "conteudo": "Metodologia prática detalhada passo a passo sem esconder nada...",
-                "receita_nome": "Protocolo Master de Execução",
-                "tabela_ingredientes": [
-                    {{"ingrediente": "Parâmetro Principal", "quantidade": "Especificação Técnica", "funcao": "Estabilidade e eficiência"}},
-                    {{"ingrediente": "Parâmetro Secundário", "quantidade": "Especificação Técnica", "funcao": "Acabamento e durabilidade"}}
-                ],
-                "passos_preparo": [
-                    "Etapa de preparação e alinhamento.",
-                    "Etapa de aplicação e controle.",
-                    "Etapa de validação prática."
-                ]
+                "titulo": "...",
+                "objetivo": "...",
+                "topicos": ["...", "...", "..."]
             }},
             {{
                 "numero": 3,
-                "titulo": "Refinamento, Escala & Maximização de Resultados",
-                "termo_busca_foto_processo": "termo em inglês de escala sobre {tema}",
-                "termo_busca_foto_resultado": "termo em inglês de perfeição sobre {tema}",
-                "legenda_resultado": "Padrão de excelência final alcançado com consistência.",
-                "alerta_tecnico": "Segredo profissional para manter a consistência de longo prazo.",
-                "conteudo": "Técnicas avançadas de manutenção de qualidade e consistência...",
-                "receita_nome": "Checklist de Alta Performance",
-                "tabela_ingredientes": [
-                    {{"ingrediente": "Controle de Qualidade", "quantidade": "Diário / Semanal", "funcao": "Evitar regressão de resultados"}},
-                    {{"ingrediente": "Otimização Contínua", "quantidade": "Periódico", "funcao": "Aceleração de desempenho"}}
-                ],
-                "passos_preparo": [
-                    "Procedimento de monitoramento.",
-                    "Ajuste fino de parâmetros.",
-                    "Consolidação dos ganhos."
-                ]
+                "titulo": "...",
+                "objetivo": "...",
+                "topicos": ["...", "...", "..."]
             }},
             {{
                 "numero": 4,
-                "titulo": "Dossiê Clínico de Resolução de Erros & Monetização",
-                "termo_busca_foto_processo": "termo em inglês de diagnóstico sobre {tema}",
-                "termo_busca_foto_resultado": "termo em inglês de negócio sucesso sobre {tema}",
-                "legenda_resultado": "Estrutura final validada, lucrativa e livre de falhas.",
-                "alerta_tecnico": "Atenção aos sinais prematuros de falha e como agir de imediato.",
-                "conteudo": "Guia de Troubleshooting e estratégia comercial para precificar serviços ou produtos no nicho de {tema}.",
-                "receita_nome": "Ficha Financeira e Matriz de Resolução de Problemas",
-                "tabela_ingredientes": [
-                    {{"ingrediente": "Custo de Implementação / Insumos", "quantidade": "Valor médio estimado", "funcao": "Base de custo real"}},
-                    {{"ingrediente": "Preço de Cobrança / Venda Sugerido", "quantidade": "Margem de 100% a 150%", "funcao": "Lucro líquido sustentável"}},
-                    {{"ingrediente": "Garantia de Satisfação do Cliente", "quantidade": "Procedimento padrão", "funcao": "Retenção e indicação orgânica"}}
-                ],
-                "passos_preparo": [
-                    "Identifique o sintoma do problema antes de tentar qualquer correção.",
-                    "Aplique a solução indicada no checklist de contingência.",
-                    "Calcule o retorno sobre investimento (ROI) da operação."
-                ]
+                "titulo": "...",
+                "objetivo": "...",
+                "topicos": ["...", "...", "..."]
+            }},
+            {{
+                "numero": 5,
+                "titulo": "...",
+                "objetivo": "...",
+                "topicos": ["...", "...", "..."]
             }}
         ]
     }}
@@ -375,65 +326,237 @@ def gerar_conteudo_ebook_ia(tema: str, publico: str) -> dict:
     resp = executar_prompt_ia(prompt, formato_json=True, temperatura=0.3)
     return json.loads(resp)
 
-def traduzir_ebook_completo_ia(dados_ebook: dict, idioma_destino: str, progress_bar=None) -> dict:
-    total_etapas = 2 + len(dados_ebook.get("capitulos", []))
-    etapa_atual = 0
+def gerar_introducao_profunda_ia(tema: str, publico: str, blueprint: dict) -> str:
+    prompt = f"""
+    Escreva a INTRODUÇÃO TÉCNICA E EXECUTIVA do manual: '{blueprint.get('titulo')}'.
+    TEMA: {tema}
+    PÚBLICO: {publico}
 
-    titulo_tr = traduzir_texto_ia(dados_ebook.get("titulo", ""), idioma_destino)
-    subtitulo_tr = traduzir_texto_ia(dados_ebook.get("subtitulo", ""), idioma_destino)
-    etapa_atual += 1
+    EXIGÊNCIAS:
+    1. Texto denso, analítico e sem clichês (entre 400 e 600 palavras).
+    2. Apresente os fundamentos científicos/lógicos do método.
+    3. Demonstre por que a maioria falha ao tentar aplicar métodos amadores.
+    4. Explique como a abordagem deste manual resolve a raiz do problema com previsibilidade.
+
+    Retorne APENAS o texto puro em parágrafos separados por duas quebras de linha.
+    """
+    return executar_prompt_ia(prompt, formato_json=False, temperatura=0.3)
+
+def gerar_capitulo_individual_ia(tema: str, publico: str, modulo_info: dict) -> dict:
+    prompt = f"""
+    Atue como Especialista de Campo e Consultor de Elite no tema '{tema}'.
+    Escreva o CONTEÚDO TÉCNICO EXAUSTIVO DO MÓDULO {modulo_info.get('numero')}: '{modulo_info.get('titulo')}'.
+    Tópicos a cobrir com rigor: {', '.join(modulo_info.get('topicos', []))}.
+    Público: {publico}
+
+    DIRETRIZES DE EXTREMA DENSIDADE:
+    1. PROIBIDO RESUMOS OU GENERALIDADES. Escreva com vocabulário de quem domina as variáveis reais do processo.
+    2. Desenvolva 3 subseções ricas em detalhes técnicos explicativos.
+    3. Crie uma TABELA DE PARÂMETROS / MATRIZ OPERACIONAL contendo 4 a 6 linhas técnicas com parâmetros mensuráveis (pesos, tolerâncias, tempos, ferramentas ou métricas exatas) e o impacto mecânico/prático de cada item.
+    4. Crie um Procedimento Operacional Padrão (POP) passo a passo (mínimo 5 passos detalhados).
+    5. Destaque um ALERTA TÉCNICO CRÍTICO sobre a falha mais grave cometida nesta etapa e como blindar a operação.
+    6. Forneça 2 termos em inglês para o Pexels:
+       - "termo_busca_foto_processo": Ação/execução precisa deste módulo.
+       - "termo_busca_foto_resultado": Produto/resultado final impecável deste módulo.
+       - "legenda_resultado": Comentário técnico sobre os indicadores visuais de sucesso.
+
+    Retorne ESTRITAMENTE o JSON:
+    {{
+        "numero": {modulo_info.get('numero')},
+        "titulo": "{modulo_info.get('titulo')}",
+        "alerta_tecnico": "Texto cirúrgico do alerta crítico...",
+        "subsecoes": [
+            {{"subtitulo": "...", "conteudo": "Parágrafo técnico extenso e analítico com mínimo de 140 palavras..."}},
+            {{"subtitulo": "...", "conteudo": "Parágrafo técnico extenso e analítico com mínimo de 140 palavras..."}},
+            {{"subtitulo": "...", "conteudo": "Parágrafo técnico extenso e analítico com mínimo de 140 palavras..."}}
+        ],
+        "nome_tabela": "Matriz Técnica de Especificações e Parâmetros",
+        "tabela_parametros": [
+            {{"item": "...", "parametro": "...", "funcao": "..."}},
+            {{"item": "...", "parametro": "...", "funcao": "..."}},
+            {{"item": "...", "parametro": "...", "funcao": "..."}},
+            {{"item": "...", "parametro": "...", "funcao": "..."}}
+        ],
+        "passos_operacionais": [
+            "Passo 1 detalhado...",
+            "Passo 2 detalhado...",
+            "Passo 3 detalhado...",
+            "Passo 4 detalhado...",
+            "Passo 5 detalhado..."
+        ],
+        "termo_busca_foto_processo": "termo em inglês de 2 a 3 palavras",
+        "termo_busca_foto_resultado": "termo em inglês de 2 a 3 palavras",
+        "legenda_resultado": "Legenda analítica do resultado visual..."
+    }}
+    """
+    resp = executar_prompt_ia(prompt, formato_json=True, temperatura=0.3)
+    return json.loads(resp)
+
+def gerar_apendice_economico_ia(tema: str, publico: str) -> dict:
+    prompt = f"""
+    Escreva a seção final de 'DOSSIÊ CLÍNICO DE FALHAS & ENGENHARIA DE PRECIFICAÇÃO' para: '{tema}'.
+    Público: {publico}
+
+    Exigências:
+    1. Troubleshooting de 3 falhas graves frequentes com Diagnóstico de Causa Raiz e Ação Corretiva Imediata.
+    2. Matriz Financeira de Custos, Precificação sugerida e Margem Líquida Real.
+
+    Retorne ESTRITAMENTE o JSON:
+    {{
+        "titulo": "Dossiê Clínico de Resolução de Falhas & Engenharia de Lucro",
+        "falhas": [
+            {{"defeito": "...", "causa_raiz": "...", "correcao": "..."}},
+            {{"defeito": "...", "causa_raiz": "...", "correcao": "..."}},
+            {{"defeito": "...", "causa_raiz": "...", "correcao": "..."}}
+        ],
+        "custos_matriz": [
+            {{"componente": "Insumos Base / Custos Diretos", "valor_estimado": "Valor médio realista", "detalhe": "Composição básica"}},
+            {{"componente": "Custos Operacionais e Energia/Tempo", "valor_estimado": "Valor médio realista", "detalhe": "Rateio técnico"}},
+            {{"componente": "Preço de Comercialização Sugerido", "valor_estimado": "Margem de 100% a 180%", "detalhe": "Posicionamento premium"}}
+        ],
+        "conclusao_executiva": "Texto técnico e motivador de encerramento com foco em consistência operacional."
+    }}
+    """
+    resp = executar_prompt_ia(prompt, formato_json=True, temperatura=0.3)
+    return json.loads(resp)
+
+def pipeline_geracao_livro_completo(tema: str, publico: str, status_placeholder=None, progress_bar=None) -> dict:
+    """Pipeline orquestrado em cadeia com múltiplas chamadas atômicas de tokens."""
+    if status_placeholder:
+        status_placeholder.write("📐 [1/5] Projetando arquitetura técnica e ementa do livro...")
     if progress_bar:
-        progress_bar.progress(etapa_atual / total_etapas)
-
-    intro_tr = traduzir_texto_ia(dados_ebook.get("introducao", ""), idioma_destino)
-    etapa_atual += 1
+        progress_bar.progress(0.10)
+    
+    blueprint = gerar_blueprint_ebook_ia(tema, publico)
+    
+    if status_placeholder:
+        status_placeholder.write("✍️ [2/5] Escrevendo introdução técnica aprofundada...")
     if progress_bar:
-        progress_bar.progress(etapa_atual / total_etapas)
+        progress_bar.progress(0.20)
+    
+    introducao = gerar_introducao_profunda_ia(tema, publico, blueprint)
+    
+    modulos_completos = []
+    total_mod = len(blueprint.get("modulos", []))
+    for idx_m, mod in enumerate(blueprint.get("modulos", [])):
+        if status_placeholder:
+            status_placeholder.write(f"🔬 [3/5] Redigindo Módulo {mod.get('numero')} ({mod.get('titulo')}) com matriz e POP...")
+        cap_dados = gerar_capitulo_individual_ia(tema, publico, mod)
+        modulos_completos.append(cap_dados)
+        if progress_bar:
+            prog = 0.20 + ((idx_m + 1) / total_mod) * 0.55
+            progress_bar.progress(prog)
 
-    capitulos_tr = []
-    for cap in dados_ebook.get("capitulos", []):
-        t_cap_tr = traduzir_texto_ia(cap.get("titulo", ""), idioma_destino)
-        c_cap_tr = traduzir_texto_ia(cap.get("conteudo", ""), idioma_destino)
-        alerta_tr = traduzir_texto_ia(cap.get("alerta_tecnico", ""), idioma_destino)
-        r_nome_tr = traduzir_texto_ia(cap.get("receita_nome", ""), idioma_destino)
-        legenda_tr = traduzir_texto_ia(cap.get("legenda_resultado", ""), idioma_destino)
+    if status_placeholder:
+        status_placeholder.write("📊 [4/5] Compilando matriz de Troubleshooting e Engenharia Financeira...")
+    if progress_bar:
+        progress_bar.progress(0.85)
+
+    apendice = gerar_apendice_economico_ia(tema, publico)
+
+    if progress_bar:
+        progress_bar.progress(0.95)
+
+    return {
+        "titulo": blueprint.get("titulo"),
+        "subtitulo": blueprint.get("subtitulo"),
+        "termo_capa": blueprint.get("termo_capa"),
+        "introducao": introducao,
+        "modulos": modulos_completos,
+        "apendice": apendice
+    }
+
+def traduzir_livro_completo_ia(dados_livro: dict, idioma_destino: str, progress_bar=None) -> dict:
+    total_etapas = 2 + len(dados_livro.get("modulos", [])) + 1
+    etapa = 0
+
+    titulo_tr = traduzir_texto_ia(dados_livro.get("titulo", ""), idioma_destino)
+    subtitulo_tr = traduzir_texto_ia(dados_livro.get("subtitulo", ""), idioma_destino)
+    etapa += 1
+    if progress_bar:
+        progress_bar.progress(etapa / total_etapas)
+
+    intro_tr = traduzir_texto_ia(dados_livro.get("introducao", ""), idioma_destino)
+    etapa += 1
+    if progress_bar:
+        progress_bar.progress(etapa / total_etapas)
+
+    modulos_tr = []
+    for mod in dados_livro.get("modulos", []):
+        t_mod = traduzir_texto_ia(mod.get("titulo", ""), idioma_destino)
+        alerta_tr = traduzir_texto_ia(mod.get("alerta_tecnico", ""), idioma_destino)
+        legenda_tr = traduzir_texto_ia(mod.get("legenda_resultado", ""), idioma_destino)
+
+        subsecoes_tr = []
+        for sub in mod.get("subsecoes", []):
+            subsecoes_tr.append({
+                "subtitulo": traduzir_texto_ia(sub.get("subtitulo", ""), idioma_destino),
+                "conteudo": traduzir_texto_ia(sub.get("conteudo", ""), idioma_destino)
+            })
 
         tabela_tr = []
-        for item in cap.get("tabela_ingredientes", []):
+        for item in mod.get("tabela_parametros", []):
             tabela_tr.append({
-                "ingrediente": traduzir_texto_ia(item.get("ingrediente", ""), idioma_destino),
-                "quantidade": item.get("quantidade", ""),
+                "item": traduzir_texto_ia(item.get("item", ""), idioma_destino),
+                "parametro": traduzir_texto_ia(item.get("parametro", ""), idioma_destino),
                 "funcao": traduzir_texto_ia(item.get("funcao", ""), idioma_destino)
             })
 
-        passos_tr = [traduzir_texto_ia(p, idioma_destino) for p in cap.get("passos_preparo", [])]
+        passos_tr = [traduzir_texto_ia(p, idioma_destino) for p in mod.get("passos_operacionais", [])]
 
-        capitulos_tr.append({
-            "numero": cap.get("numero", 1),
-            "titulo": t_cap_tr,
-            "termo_busca_foto_processo": cap.get("termo_busca_foto_processo", ""),
-            "termo_busca_foto_resultado": cap.get("termo_busca_foto_resultado", ""),
-            "legenda_resultado": legenda_tr,
+        modulos_tr.append({
+            "numero": mod.get("numero"),
+            "titulo": t_mod,
             "alerta_tecnico": alerta_tr,
-            "conteudo": c_cap_tr,
-            "receita_nome": r_nome_tr,
-            "tabela_ingredientes": tabela_tr,
-            "passos_preparo": passos_tr
+            "subsecoes": subsecoes_tr,
+            "nome_tabela": traduzir_texto_ia(mod.get("nome_tabela", "Tabela Técnica"), idioma_destino),
+            "tabela_parametros": tabela_tr,
+            "passos_operacionais": passos_tr,
+            "termo_busca_foto_processo": mod.get("termo_busca_foto_processo", ""),
+            "termo_busca_foto_resultado": mod.get("termo_busca_foto_resultado", ""),
+            "legenda_resultado": legenda_tr
         })
-        etapa_atual += 1
+        etapa += 1
         if progress_bar:
-            progress_bar.progress(etapa_atual / total_etapas)
+            progress_bar.progress(etapa / total_etapas)
+
+    ap_raw = dados_livro.get("apendice", {})
+    falhas_tr = []
+    for f in ap_raw.get("falhas", []):
+        falhas_tr.append({
+            "defeito": traduzir_texto_ia(f.get("defeito", ""), idioma_destino),
+            "causa_raiz": traduzir_texto_ia(f.get("causa_raiz", ""), idioma_destino),
+            "correcao": traduzir_texto_ia(f.get("correcao", ""), idioma_destino)
+        })
+
+    custos_tr = []
+    for c in ap_raw.get("custos_matriz", []):
+        custos_tr.append({
+            "componente": traduzir_texto_ia(c.get("componente", ""), idioma_destino),
+            "valor_estimado": c.get("valor_estimado", ""),
+            "detalhe": traduzir_texto_ia(c.get("detalhe", ""), idioma_destino)
+        })
+
+    conclusao_tr = traduzir_texto_ia(ap_raw.get("conclusao_executiva", ""), idioma_destino)
+
+    apendice_tr = {
+        "titulo": traduzir_texto_ia(ap_raw.get("titulo", "Dossiê Clínico de Falhas"), idioma_destino),
+        "falhas": falhas_tr,
+        "custos_matriz": custos_tr,
+        "conclusao_executiva": conclusao_tr
+    }
 
     return {
         "titulo": titulo_tr,
         "subtitulo": subtitulo_tr,
-        "termo_capa": dados_ebook.get("termo_capa", ""),
+        "termo_capa": dados_livro.get("termo_capa", ""),
         "introducao": intro_tr,
-        "capitulos": capitulos_tr
+        "modulos": modulos_tr,
+        "apendice": apendice_tr
     }
 
 # ==============================================================================
-# 4. PROCESSAMENTO GRÁFICO EDITORIAL (ENQUADRAMENTO PIL SEM ESTICAMENTO)
+# 5. DIAGRAMAÇÃO EDITORIAL DO LIVRO TÉCNICO (REPORTLAB)
 # ==============================================================================
 class NumeradorPaginas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
@@ -455,14 +578,21 @@ class NumeradorPaginas(canvas.Canvas):
     def draw_footer(self, page_count):
         if self._pageNumber > 1:
             self.saveState()
+            # Rodapé
             self.setFont("Helvetica-Bold", 8)
             self.setFillColor(colors.HexColor("#64748B"))
-            self.drawString(36, 18, "MANUAL TÉCNICO PROFISSIONAL | TODOS OS DIREITOS RESERVADOS")
+            self.drawString(36, 20, "MANUAL DE ENGENHARIA & PROCEDIMENTOS | EDIÇÃO PROFISSIONAL")
             texto_pag = f"Página {self._pageNumber} de {page_count}"
-            self.drawRightString(576, 18, texto_pag)
+            self.drawRightString(576, 20, texto_pag)
             self.setStrokeColor(colors.HexColor("#CBD5E1"))
             self.setLineWidth(0.6)
-            self.line(36, 28, 576, 28)
+            self.line(36, 30, 576, 30)
+
+            # Cabeçalho Superior Suave
+            self.setFont("Helvetica", 7.5)
+            self.setFillColor(colors.HexColor("#94A3B8"))
+            self.drawString(36, 762, "PROTOCOLO TÉCNICO PADRONIZADO")
+            self.line(36, 756, 576, 756)
             self.restoreState()
 
 def buscar_foto_pexels(query: str, pexels_key: str, dest_path: str) -> bool:
@@ -496,247 +626,341 @@ def recortar_foto_proporcional(orig_path: str, dest_path: str, target_w: int, ta
     except Exception:
         return False
 
-def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_pdf: str) -> str:
+def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: str) -> str:
     doc = SimpleDocTemplate(
         caminho_pdf,
         pagesize=letter,
         rightMargin=36,
         leftMargin=36,
-        topMargin=36,
-        bottomMargin=38
+        topMargin=46,
+        bottomMargin=42
     )
     styles = getSampleStyleSheet()
 
     cor_primaria = colors.HexColor("#0F172A")
     cor_azul = colors.HexColor("#1D4ED8")
     cor_azul_claro = colors.HexColor("#F0F7FF")
-    cor_borda = colors.HexColor("#93C5FD")
+    cor_alerta_bg = colors.HexColor("#FEF2F2")
+    cor_alerta_border = colors.HexColor("#FCA5A5")
+    cor_alerta_text = colors.HexColor("#991B1B")
 
     estilo_capa_tit = ParagraphStyle(
         'CapaTitulo',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=24,
-        leading=30,
+        fontSize=26,
+        leading=32,
         textColor=cor_azul,
         alignment=1,
-        spaceAfter=8
+        spaceAfter=12
     )
     estilo_capa_sub = ParagraphStyle(
         'CapaSub',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=12,
-        leading=16,
+        fontSize=13,
+        leading=17,
         textColor=cor_primaria,
         alignment=1,
-        spaceAfter=18
+        spaceAfter=22
     )
     estilo_h1 = ParagraphStyle(
         'TitCap',
         parent=styles['Heading1'],
         fontName='Helvetica-Bold',
-        fontSize=13,
-        leading=16.5,
+        fontSize=16,
+        leading=20,
         textColor=cor_azul,
-        spaceBefore=0,
-        spaceAfter=4,
+        spaceBefore=8,
+        spaceAfter=6,
         keepWithNext=True
     )
     estilo_h2 = ParagraphStyle(
         'TitSec',
         parent=styles['Heading2'],
         fontName='Helvetica-Bold',
-        fontSize=9.5,
-        leading=13,
+        fontSize=11,
+        leading=15,
         textColor=cor_primaria,
-        spaceBefore=4,
-        spaceAfter=2,
+        spaceBefore=8,
+        spaceAfter=4,
         keepWithNext=True
     )
     estilo_corpo = ParagraphStyle(
         'CorpoTexto',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=8.5,
-        leading=12.5,
-        textColor=cor_primaria,
-        spaceAfter=4
+        fontSize=9,
+        leading=14,
+        textColor=colors.HexColor("#1E293B"),
+        spaceAfter=6,
+        alignment=4  # Justificado
     )
     estilo_item = ParagraphStyle(
         'ItemPasso',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=8,
-        leading=11.5,
+        fontSize=8.5,
+        leading=12.5,
         textColor=cor_primaria,
-        spaceAfter=2
+        spaceAfter=3
     )
     estilo_alerta = ParagraphStyle(
         'BoxAlerta',
         parent=styles['Normal'],
-        fontName='Helvetica-Bold',
-        fontSize=8,
-        leading=11,
-        textColor=colors.HexColor("#1E3A8A")
+        fontName='Helvetica',
+        fontSize=8.5,
+        leading=12.5,
+        textColor=cor_alerta_text
     )
     estilo_legenda_foto = ParagraphStyle(
         'LegendaFoto',
         parent=styles['Normal'],
         fontName='Helvetica-Oblique',
         fontSize=7.5,
-        leading=9.5,
-        textColor=colors.HexColor("#475569"),
+        leading=10,
+        textColor=colors.HexColor("#64748B"),
         alignment=1,
-        spaceBefore=2,
-        spaceAfter=3
+        spaceBefore=3,
+        spaceAfter=6
     )
     estilo_celula = ParagraphStyle(
         'CelulaTab',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=7.5,
-        leading=10,
+        fontSize=8,
+        leading=11,
         textColor=cor_primaria
     )
     estilo_celula_header = ParagraphStyle(
         'CelulaHeader',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=7.5,
-        leading=10,
+        fontSize=8,
+        leading=11,
         textColor=colors.white
     )
 
     flowables = []
 
-    # CAPA
-    flowables.append(Spacer(1, 20))
-    flowables.append(Paragraph(dados.get("titulo", "Manual Técnico Profissional"), estilo_capa_tit))
-    flowables.append(Paragraph(dados.get("subtitulo", "Guia Técnico & Comercial"), estilo_capa_sub))
+    # ==================== CAPA ====================
+    flowables.append(Spacer(1, 40))
+    flowables.append(Paragraph(dados_livro.get("titulo", "Manual Técnico Profissional"), estilo_capa_tit))
+    flowables.append(Paragraph(dados_livro.get("subtitulo", "Guia Técnico Avançado"), estilo_capa_sub))
 
-    termo_capa = dados.get("termo_capa", "business strategy")
-    capa_raw_path = os.path.join(DIR_PEXELS, f"capa_raw_{int(time.time())}.jpg")
-    capa_fit_path = os.path.join(DIR_PEXELS, f"capa_fit_{int(time.time())}.jpg")
-    if buscar_foto_pexels(termo_capa, pexels_key, capa_raw_path):
-        if recortar_foto_proporcional(capa_raw_path, capa_fit_path, 1080, 560):
+    termo_capa = dados_livro.get("termo_capa", "engineering business")
+    capa_raw = os.path.join(DIR_PEXELS, f"livro_capa_raw_{int(time.time())}.jpg")
+    capa_fit = os.path.join(DIR_PEXELS, f"livro_capa_fit_{int(time.time())}.jpg")
+    if buscar_foto_pexels(termo_capa, pexels_key, capa_raw):
+        if recortar_foto_proporcional(capa_raw, capa_fit, 1080, 560):
             try:
-                flowables.append(RLImage(capa_fit_path, width=540, height=280))
+                flowables.append(RLImage(capa_fit, width=540, height=280))
             except Exception:
                 pass
 
+    flowables.append(Spacer(1, 30))
+    flowables.append(Paragraph("<b>AUTORIA:</b> DEPARTAMENTO DE ENGENHARIA DE PROCESSOS & DESENVOLVIMENTO", estilo_legenda_foto))
     flowables.append(PageBreak())
 
-    # INTRODUÇÃO
-    flowables.append(Paragraph("Introdução Técnica & Fundamentos do Método", estilo_h1))
-    flowables.append(Spacer(1, 4))
-    for p in dados.get("introducao", "").split("\n"):
-        if p.strip():
-            flowables.append(Paragraph(p.strip(), estilo_corpo))
+    # ==================== SUMÁRIO EXECUTIVO ====================
+    flowables.append(Paragraph("Sumário Executivo", estilo_h1))
+    flowables.append(HRFlowable(width="100%", thickness=1, color=cor_azul, spaceAfter=14))
 
-    flowables.append(Spacer(1, 6))
-    flowables.append(HRFlowable(width="100%", thickness=0.8, color=colors.HexColor("#CBD5E1"), spaceAfter=8))
+    sumario_data = [
+        [Paragraph("<b>Seção</b>", estilo_celula_header), Paragraph("<b>Título do Módulo Técnico</b>", estilo_celula_header)]
+    ]
+    sumario_data.append([Paragraph("<b>Introdução</b>", estilo_celula), Paragraph("Fundamentos Científicos & Visão Sistêmica", estilo_celula)])
+    for mod in dados_livro.get("modulos", []):
+        sumario_data.append([
+            Paragraph(f"<b>Módulo {mod.get('numero')}</b>", estilo_celula),
+            Paragraph(mod.get("titulo", ""), estilo_celula)
+        ])
+    sumario_data.append([Paragraph("<b>Apêndice</b>", estilo_celula), Paragraph("Dossiê de Falhas & Engenharia de Custos", estilo_celula)])
 
-    # CAPÍTULOS TÉCNICOS
-    for cap in dados.get("capitulos", []):
-        flowables.append(Paragraph(f"Módulo {cap.get('numero')}: {cap.get('titulo')}", estilo_h1))
-        flowables.append(Spacer(1, 2))
+    tab_sumario = Table(sumario_data, colWidths=[90, 450])
+    tab_sumario.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), cor_azul),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
+        ('PADDING', (0, 0), (-1, -1), 6),
+    ]))
+    flowables.append(tab_sumario)
+    flowables.append(PageBreak())
 
-        # FOTO 1: Processo
-        termo_proc = cap.get("termo_busca_foto_processo", cap.get("termo_busca_foto", "working hands"))
+    # ==================== INTRODUÇÃO ====================
+    flowables.append(Paragraph("Introdução Geral & Fundamentos Sistêmicos", estilo_h1))
+    flowables.append(HRFlowable(width="100%", thickness=0.8, color=colors.HexColor("#CBD5E1"), spaceAfter=10))
+
+    for p_intro in dados_livro.get("introducao", "").split("\n"):
+        if p_intro.strip():
+            flowables.append(Paragraph(p_intro.strip(), estilo_corpo))
+
+    flowables.append(PageBreak())
+
+    # ==================== MÓDULOS TÉCNICOS INDIVIDUAIS ====================
+    for mod in dados_livro.get("modulos", []):
+        flowables.append(Paragraph(f"Módulo {mod.get('numero')}: {mod.get('titulo')}", estilo_h1))
+        flowables.append(HRFlowable(width="100%", thickness=0.8, color=cor_azul, spaceAfter=8))
+
+        # Banner de Ação (Foto de Processo)
+        termo_proc = mod.get("termo_busca_foto_processo")
         if termo_proc:
-            proc_raw = os.path.join(DIR_PEXELS, f"proc_raw_{cap.get('numero')}_{int(time.time())}.jpg")
-            proc_fit = os.path.join(DIR_PEXELS, f"proc_fit_{cap.get('numero')}_{int(time.time())}.jpg")
-            if buscar_foto_pexels(termo_proc, pexels_key, proc_raw):
-                if recortar_foto_proporcional(proc_raw, proc_fit, 1080, 280):
+            p_raw = os.path.join(DIR_PEXELS, f"mod_proc_raw_{mod.get('numero')}_{int(time.time())}.jpg")
+            p_fit = os.path.join(DIR_PEXELS, f"mod_proc_fit_{mod.get('numero')}_{int(time.time())}.jpg")
+            if buscar_foto_pexels(termo_proc, pexels_key, p_raw):
+                if recortar_foto_proporcional(p_raw, p_fit, 1080, 260):
                     try:
-                        flowables.append(RLImage(proc_fit, width=540, height=140))
-                        flowables.append(Spacer(1, 4))
+                        flowables.append(RLImage(p_fit, width=540, height=130))
+                        flowables.append(Spacer(1, 6))
                     except Exception:
                         pass
 
-        # Alerta Técnico
-        alerta = cap.get("alerta_tecnico", "")
+        # Caixa de Alerta Técnico
+        alerta = mod.get("alerta_tecnico")
         if alerta:
             tabela_alerta = Table(
-                [[Paragraph(f"<b>⚠️ ALERTA TÉCNICO:</b> {alerta}", estilo_alerta)]],
+                [[Paragraph(f"<b>⚠️ PONTO CRÍTICO DE CONTROLE (ALERTA):</b> {alerta}", estilo_alerta)]],
                 colWidths=[540]
             )
             tabela_alerta.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, -1), cor_azul_claro),
-                ('BOX', (0, 0), (-1, -1), 1, cor_borda),
-                ('PADDING', (0, 0), (-1, -1), 3.5),
+                ('BACKGROUND', (0, 0), (-1, -1), cor_alerta_bg),
+                ('BOX', (0, 0), (-1, -1), 1, cor_alerta_border),
+                ('PADDING', (0, 0), (-1, -1), 6),
             ]))
             flowables.append(tabela_alerta)
-            flowables.append(Spacer(1, 3))
+            flowables.append(Spacer(1, 8))
 
-        for p_cap in cap.get("conteudo", "").split("\n"):
-            if p_cap.strip():
-                flowables.append(Paragraph(p_cap.strip(), estilo_corpo))
+        # Subseções Técnicas Densas
+        for sub in mod.get("subsecoes", []):
+            flowables.append(Paragraph(sub.get("subtitulo", ""), estilo_h2))
+            for p_sub in sub.get("conteudo", "").split("\n"):
+                if p_sub.strip():
+                    flowables.append(Paragraph(p_sub.strip(), estilo_corpo))
 
-        # Ficha Técnica
-        receita_nome = cap.get("receita_nome", "")
-        if receita_nome:
-            flowables.append(Paragraph(f"📋 Ficha Técnica: {receita_nome}", estilo_h2))
+        flowables.append(Spacer(1, 6))
 
-            itens_tabela = cap.get("tabela_ingredientes", [])
-            if itens_tabela:
-                dados_tabela = [
-                    [
-                        Paragraph("<b>Insumo / Ferramenta / Etapa</b>", estilo_celula_header),
-                        Paragraph("<b>Dose / Medida / Parâmetro</b>", estilo_celula_header),
-                        Paragraph("<b>Função Prática / Impacto Técnico</b>", estilo_celula_header)
-                    ]
+        # Matriz Técnica de Parâmetros
+        itens_tab = mod.get("tabela_parametros", [])
+        if itens_tab:
+            flowables.append(Paragraph(f"📋 {mod.get('nome_tabela', 'Matriz Técnica')}", estilo_h2))
+            dados_t = [
+                [
+                    Paragraph("<b>Componente / Parâmetro</b>", estilo_celula_header),
+                    Paragraph("<b>Especificação / Tolerância</b>", estilo_celula_header),
+                    Paragraph("<b>Função Mecânica & Impacto Prático</b>", estilo_celula_header)
                 ]
-                for item in itens_tabela:
-                    dados_tabela.append([
-                        Paragraph(item.get("ingrediente", ""), estilo_celula),
-                        Paragraph(item.get("quantidade", ""), estilo_celula),
-                        Paragraph(item.get("funcao", ""), estilo_celula)
-                    ])
+            ]
+            for item in itens_tab:
+                dados_t.append([
+                    Paragraph(item.get("item", ""), estilo_celula),
+                    Paragraph(item.get("parametro", ""), estilo_celula),
+                    Paragraph(item.get("funcao", ""), estilo_celula)
+                ])
 
-                tabela_receita = Table(dados_tabela, colWidths=[190, 85, 265])
-                tabela_receita.setStyle(TableStyle([
-                    ('BACKGROUND', (0, 0), (-1, 0), cor_azul),
-                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                    ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
-                    ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
-                    ('PADDING', (0, 0), (-1, -1), 2),
-                ]))
-                flowables.append(tabela_receita)
-                flowables.append(Spacer(1, 2))
+            tab_param = Table(dados_t, colWidths=[180, 110, 250])
+            tab_param.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), cor_azul),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
+                ('PADDING', (0, 0), (-1, -1), 4),
+            ]))
+            flowables.append(tab_param)
+            flowables.append(Spacer(1, 8))
 
-            passos = cap.get("passos_preparo", [])
-            if passos:
-                flowables.append(Paragraph("<b>Procedimento Operacional Padrão (Passo a Passo):</b>", estilo_h2))
-                for idx_p, passo in enumerate(passos, 1):
-                    flowables.append(Paragraph(f"<b>{idx_p}.</b> {passo}", estilo_item))
+        # Procedimento Operacional Padrão (Passo a Passo)
+        passos = mod.get("passos_operacionais", [])
+        if passos:
+            flowables.append(Paragraph("<b>Procedimento Operacional Padrão (POP):</b>", estilo_h2))
+            for idx_p, passo in enumerate(passos, 1):
+                flowables.append(Paragraph(f"<b>Passo {idx_p}:</b> {passo}", estilo_item))
 
-        # FOTO 2: Resultado Final
-        termo_res = cap.get("termo_busca_foto_resultado", "professional result success")
+        # Foto de Resultado de Excelência
+        termo_res = mod.get("termo_busca_foto_resultado")
         if termo_res:
-            res_raw = os.path.join(DIR_PEXELS, f"res_raw_{cap.get('numero')}_{int(time.time())}.jpg")
-            res_fit = os.path.join(DIR_PEXELS, f"res_fit_{cap.get('numero')}_{int(time.time())}.jpg")
-            if buscar_foto_pexels(termo_res, pexels_key, res_raw):
-                if recortar_foto_proporcional(res_raw, res_fit, 1080, 280):
+            r_raw = os.path.join(DIR_PEXELS, f"mod_res_raw_{mod.get('numero')}_{int(time.time())}.jpg")
+            r_fit = os.path.join(DIR_PEXELS, f"mod_res_fit_{mod.get('numero')}_{int(time.time())}.jpg")
+            if buscar_foto_pexels(termo_res, pexels_key, r_raw):
+                if recortar_foto_proporcional(r_raw, r_fit, 1080, 240):
                     try:
-                        flowables.append(Spacer(1, 3))
-                        flowables.append(RLImage(res_fit, width=540, height=140))
-                        legenda = cap.get("legenda_resultado", "Resultado visual do processo concluído com sucesso.")
-                        flowables.append(Paragraph(f"📷 <b>Resultado Esperado:</b> {legenda}", estilo_legenda_foto))
+                        flowables.append(Spacer(1, 6))
+                        flowables.append(RLImage(r_fit, width=540, height=120))
+                        leg = mod.get("legenda_resultado", "Indicador visual de conformidade do resultado.")
+                        flowables.append(Paragraph(f"📷 <b>Controle Visual:</b> {leg}", estilo_legenda_foto))
                     except Exception:
                         pass
 
-        flowables.append(Spacer(1, 3))
-        flowables.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#E2E8F0"), spaceAfter=5))
         flowables.append(PageBreak())
+
+    # ==================== APÊNDICE: FALHAS & ENGENHARIA ECONÔMICA ====================
+    ap = dados_livro.get("apendice", {})
+    flowables.append(Paragraph(ap.get("titulo", "Dossiê Clínico de Falhas & Engenharia de Lucro"), estilo_h1))
+    flowables.append(HRFlowable(width="100%", thickness=1, color=cor_azul, spaceAfter=10))
+
+    # Tabela de Resolução de Falhas
+    falhas = ap.get("falhas", [])
+    if falhas:
+        flowables.append(Paragraph("Matriz de Resolução de Anomalias (Troubleshooting)", estilo_h2))
+        dados_falhas = [
+            [
+                Paragraph("<b>Defeito / Sintoma</b>", estilo_celula_header),
+                Paragraph("<b>Causa Raiz</b>", estilo_celula_header),
+                Paragraph("<b>Ação Corretiva Imediata</b>", estilo_celula_header)
+            ]
+        ]
+        for f in falhas:
+            dados_falhas.append([
+                Paragraph(f.get("defeito", ""), estilo_celula),
+                Paragraph(f.get("causa_raiz", ""), estilo_celula),
+                Paragraph(f.get("correcao", ""), estilo_celula)
+            ])
+        tab_f = Table(dados_falhas, colWidths=[150, 180, 210])
+        tab_f.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#334155")),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
+            ('PADDING', (0, 0), (-1, -1), 4),
+        ]))
+        flowables.append(tab_f)
+        flowables.append(Spacer(1, 10))
+
+    # Matriz Econômica
+    custos = ap.get("custos_matriz", [])
+    if custos:
+        flowables.append(Paragraph("Engenharia de Custos, Precificação & Margem", estilo_h2))
+        dados_c = [
+            [
+                Paragraph("<b>Centro de Custo / Componente</b>", estilo_celula_header),
+                Paragraph("<b>Estimativa / Valor</b>", estilo_celula_header),
+                Paragraph("<b>Diretriz de Posicionamento</b>", estilo_celula_header)
+            ]
+        ]
+        for c in custos:
+            dados_c.append([
+                Paragraph(c.get("componente", ""), estilo_celula),
+                Paragraph(c.get("valor_estimado", ""), estilo_celula),
+                Paragraph(c.get("detalhe", ""), estilo_celula)
+            ])
+        tab_c = Table(dados_c, colWidths=[180, 130, 230])
+        tab_c.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), cor_azul),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
+            ('PADDING', (0, 0), (-1, -1), 4),
+        ]))
+        flowables.append(tab_c)
+        flowables.append(Spacer(1, 10))
+
+    conclusao = ap.get("conclusao_executiva", "")
+    if conclusao:
+        flowables.append(Paragraph("Conclusão Executiva", estilo_h2))
+        flowables.append(Paragraph(conclusao, estilo_corpo))
 
     doc.build(flowables, canvasmaker=NumeradorPaginas)
     return caminho_pdf
 
 # ==============================================================================
-# 5. PROCESSAMENTO DE VÍDEO (TTS, PEXELS & FFMPEG)
+# 6. PROCESSAMENTO DE VÍDEO (TTS, PEXELS & FFMPEG)
 # ==============================================================================
 def sintetizar_audio_tts(texto: str, output_path: str, voz: str = "onyx") -> bool:
     if not OPENAI_API_KEY:
@@ -962,7 +1186,7 @@ def dublar_roteiro_e_renderizar_vsl(
     return video_dublado, cenas_traduzidas
 
 # ==============================================================================
-# 6. INICIALIZAÇÃO DE ESTADOS GLOBAIS
+# 7. INICIALIZAÇÃO DE ESTADOS GLOBAIS
 # ==============================================================================
 if "vsl_input_tema" not in st.session_state:
     st.session_state["vsl_input_tema"] = "Confeitaria Lucrativa & Bolos Caseiros"
@@ -1061,7 +1285,7 @@ tab_minerador, tab_vsl, tab_ebook, tab_master = st.tabs([
 ])
 
 # ------------------------------------------------------------------------------
-# ABA 1: MINERADOR & GOOGLE ADS (COM LIMPEZA TOTAL E ATUALIZAÇÃO DIRETA)
+# ABA 1: MINERADOR & GOOGLE ADS
 # ------------------------------------------------------------------------------
 with tab_minerador:
     st.markdown("## 🔍 Minerador & Validador de Nichos com Kit Google Ads")
@@ -1103,22 +1327,19 @@ with tab_minerador:
         else:
             with st.spinner("Limpando dados anteriores, minerando público e preparando campanhas..."):
                 try:
-                    # 1. FAXINA COMPLETA: remove vídeos, áudios e e-books antigos da sessão
                     chaves_para_limpar = [
                         "video_vsl_pronto", "roteiro_vsl", "video_dublado_pronto",
                         "video_dublado_idioma", "video_dublado_roteiro",
                         "pdf_ebook_pronto", "pdf_ebook_nome", "pdf_global_pronto",
-                        "pdf_global_nome", "pdf_global_lingua", "dados_ebook_sessao"
+                        "pdf_global_nome", "pdf_global_lingua", "dados_livro_sessao"
                     ]
                     for k in chaves_para_limpar:
                         st.session_state.pop(k, None)
 
-                    # 2. GERAÇÃO DO DOSSIÊ DA IA
                     resultado_dossie = minerar_nicho_profundo_ia(nicho_final, profundidade)
                     st.session_state["resultado_pesquisa_nicho"] = resultado_dossie
                     st.session_state["nicho_pesquisado_nome"] = nicho_final
 
-                    # 3. ATUALIZAÇÃO FORÇADA DAS CHAVES DOS CAMPOS DAS OUTRAS ABAS
                     st.session_state["vsl_input_tema"] = nicho_final
                     st.session_state["vsl_input_promessa"] = f"Aprenda o método definitivo e lucre com {nicho_final}"
                     st.session_state["vsl_input_publico"] = "Iniciantes e profissionais que buscam renda extra e independência financeira"
@@ -1126,7 +1347,6 @@ with tab_minerador:
                     st.session_state["ebook_input_tema"] = f"Manual Prático e Definitivo: {nicho_final}"
                     st.session_state["ebook_input_publico"] = "Iniciantes e profissionais que buscam renda extra e independência financeira"
 
-                    # 4. RECARREGAMENTO INSTANTÂNEO PARA APLICAR AS MUDANÇAS
                     st.rerun()
 
                 except Exception as err:
@@ -1158,7 +1378,7 @@ with tab_minerador:
             )
 
 # ------------------------------------------------------------------------------
-# ABA 2: CRIAR VSL & DUBLAGEM GLOBAL (CONECTADA SEM RESQUÍCIOS)
+# ABA 2: CRIAR VSL & DUBLAGEM GLOBAL
 # ------------------------------------------------------------------------------
 with tab_vsl:
     st.markdown("## 🚀 Criador de Vídeo de Vendas (VSL) & Dublagem Global")
@@ -1288,50 +1508,59 @@ with tab_vsl:
                 )
 
 # ------------------------------------------------------------------------------
-# ABA 3: CRIAR E-BOOK & TRADUÇÃO GLOBAL (CONECTADA SEM RESQUÍCIOS)
+# ABA 3: CRIAR LIVRO/E-BOOK TÉCNICO & TRADUÇÃO GLOBAL (PIPELINE MULTI-STAGE)
 # ------------------------------------------------------------------------------
 with tab_ebook:
-    st.markdown("## 📚 Criador de E-book Comercial & Diagramação Editorial")
-    
-    nicho_integrado = st.session_state.get("nicho_pesquisado_nome")
-    if nicho_integrado:
-        st.success(f"🎯 **Nicho Conectado da Mineração:** `{nicho_integrado}`")
+    st.markdown("## 📚 Gerador de Livro Técnico & Manual de Engenharia Operacional")
+    st.caption("Arquitetura em cadeia modular: gera capítulo por capítulo, garantindo 15 a 25 páginas reais com tabelas, POPs e análise de falhas.")
 
     col_e1, col_e2 = st.columns(2)
     with col_e1:
-        tema_ebook = st.text_input("Tema do E-book:", key="ebook_input_tema")
+        tema_ebook = st.text_input("Tema Central do Manual:", key="ebook_input_tema")
     with col_e2:
-        publico_ebook = st.text_input("Público-Alvo do E-book:", key="ebook_input_publico")
+        publico_ebook = st.text_input("Público-Alvo / Perfil Técnico:", key="ebook_input_publico")
 
-    if st.button("📖 Gerar E-book Profissional Completo (.PDF) (10 cr)", type="primary", key="btn_render_ebook"):
+    if st.button("📖 Compilar Livro Técnico Completo (.PDF) (10 cr)", type="primary", key="btn_render_ebook"):
         if saldo_atual < 10:
             st.error("❌ Saldo insuficiente! Você precisa de 10 créditos.")
         else:
-            with st.spinner(f"Construindo manual completo de '{tema_ebook}' com fotos naturais e tabelas personalizadas..."):
-                try:
-                    dados_eb = gerar_conteudo_ebook_ia(tema_ebook, publico_ebook)
-                    st.session_state["dados_ebook_sessao"] = dados_eb
+            prog_bar = st.progress(0.0)
+            status_box = st.empty()
+            try:
+                # Disparo do Pipeline em Série
+                dados_livro = pipeline_geracao_livro_completo(
+                    tema=tema_ebook,
+                    publico=publico_ebook,
+                    status_placeholder=status_box,
+                    progress_bar=prog_bar
+                )
+                st.session_state["dados_livro_sessao"] = dados_livro
 
-                    nome_pdf = f"manual_{re.sub(r'[^a-zA-Z0-9]', '_', tema_ebook.lower())[:20]}_{int(time.time())}.pdf"
-                    caminho_pdf = os.path.join(DIR_EBOOKS, nome_pdf)
-                    compilar_pdf_ebook_com_fotos(dados_eb, PEXELS_API_KEY, caminho_pdf)
+                status_box.write("📑 [5/5] Diagramando páginas editoriais com ReportLab e recortando imagens...")
+                nome_pdf = f"manual_tecnico_{re.sub(r'[^a-zA-Z0-9]', '_', tema_ebook.lower())[:22]}_{int(time.time())}.pdf"
+                caminho_pdf = os.path.join(DIR_EBOOKS, nome_pdf)
 
-                    debitar_creditos_cloud(email_usuario, f"Criação E-book ({tema_ebook})", 10)
-                    st.session_state["pdf_ebook_pronto"] = caminho_pdf
-                    st.session_state["pdf_ebook_nome"] = nome_pdf
-                    st.success(f"✅ E-book de '{tema_ebook}' gerado com layout editorial completo e fotos perfeitas!")
-                    st.rerun()
-                except Exception as e_eb:
-                    st.error(f"Erro na compilação do E-book: {e_eb}")
+                compilar_pdf_livro_tecnico(dados_livro, PEXELS_API_KEY, caminho_pdf)
+
+                debitar_creditos_cloud(email_usuario, f"Criação Livro Técnico ({tema_ebook})", 10)
+                st.session_state["pdf_ebook_pronto"] = caminho_pdf
+                st.session_state["pdf_ebook_nome"] = nome_pdf
+                
+                status_box.empty()
+                prog_bar.progress(1.0)
+                st.success("✅ Livro Técnico Profissional compilado com sucesso! Arquitetura completa, sumário e páginas densas.")
+                st.rerun()
+            except Exception as e_eb:
+                st.error(f"Erro na compilação do Livro Técnico: {e_eb}")
 
     if st.session_state.get("pdf_ebook_pronto") and os.path.exists(st.session_state["pdf_ebook_pronto"]):
         st.markdown("---")
-        st.markdown("### 📥 Seu E-book Original em Português:")
+        st.markdown("### 📥 Seu Livro Técnico Original em Português:")
         with open(st.session_state["pdf_ebook_pronto"], "rb") as f_eb:
             st.download_button(
-                "⬇️ Baixar E-book Original (.PDF)",
+                "⬇️ Baixar Manual Técnico Completo (.PDF)",
                 data=f_eb,
-                file_name=st.session_state.get("pdf_ebook_nome", "ebook.pdf"),
+                file_name=st.session_state.get("pdf_ebook_nome", "manual_tecnico.pdf"),
                 mime="application/pdf",
                 use_container_width=True,
                 key="btn_down_eb_orig"
@@ -1339,8 +1568,8 @@ with tab_ebook:
 
         st.markdown("---")
         with st.container(border=True):
-            st.markdown("### 🌐 Tradução Global do E-book (36 Idiomas)")
-            st.caption("Internacionalize mantendo a diagramação editorial de páginas cheias e fotos proporcionais.")
+            st.markdown("### 🌐 Tradução Global do Livro (36 Idiomas)")
+            st.caption("Internacionalize preservando a diagramação editorial, matrizes técnicas e sumário.")
 
             col_tr1, col_tr2 = st.columns([2, 1])
             with col_tr1:
@@ -1348,20 +1577,20 @@ with tab_ebook:
             with col_tr2:
                 st.write("")
                 st.caption("Custo: 10 Créditos")
-                btn_trad_eb = st.button("🌍 Traduzir E-book Completo (10 cr)", type="primary", use_container_width=True, key="btn_exec_trad_eb")
+                btn_trad_eb = st.button("🌍 Traduzir Livro Técnico (10 cr)", type="primary", use_container_width=True, key="btn_exec_trad_eb")
 
             if btn_trad_eb:
                 if saldo_atual < 10:
                     st.error("❌ Saldo insuficiente para internacionalização.")
-                elif not st.session_state.get("dados_ebook_sessao"):
-                    st.error("Dados originais do e-book não encontrados.")
+                elif not st.session_state.get("dados_livro_sessao"):
+                    st.error("Dados da sessão não encontrados.")
                 else:
                     nome_lingua_eb = IDIOMAS_SISTEMA_36[idioma_eb_sel]
                     barra_eb_tr = st.progress(0.0)
-                    with st.spinner(f"Traduzindo tabelas, legendas e mantendo a diagramação editorial para {idioma_eb_sel}..."):
+                    with st.spinner(f"Traduzindo módulos técnicos, procedimentos e matriz financeira para {idioma_eb_sel}..."):
                         try:
-                            dados_tr = traduzir_ebook_completo_ia(
-                                st.session_state["dados_ebook_sessao"],
+                            dados_tr = traduzir_livro_completo_ia(
+                                st.session_state["dados_livro_sessao"],
                                 nome_lingua_eb,
                                 progress_bar=barra_eb_tr
                             )
@@ -1369,24 +1598,24 @@ with tab_ebook:
                             nome_pdf_tr = f"manual_{cod_idioma}_{int(time.time())}.pdf"
                             caminho_pdf_tr = os.path.join(DIR_EBOOKS, nome_pdf_tr)
 
-                            compilar_pdf_ebook_com_fotos(dados_tr, PEXELS_API_KEY, caminho_pdf_tr)
-                            debitar_creditos_cloud(email_usuario, f"Tradução E-book ({nome_lingua_eb})", 10)
+                            compilar_pdf_livro_tecnico(dados_tr, PEXELS_API_KEY, caminho_pdf_tr)
+                            debitar_creditos_cloud(email_usuario, f"Tradução Livro ({nome_lingua_eb})", 10)
 
                             st.session_state["pdf_global_pronto"] = caminho_pdf_tr
                             st.session_state["pdf_global_nome"] = nome_pdf_tr
                             st.session_state["pdf_global_lingua"] = idioma_eb_sel
-                            st.success(f"✅ E-book traduzido com sucesso para {idioma_eb_sel}!")
+                            st.success(f"✅ Livro Técnico traduzido com sucesso para {idioma_eb_sel}!")
                             st.rerun()
                         except Exception as e_tr:
-                            st.error(f"Erro na tradução do e-book: {e_tr}")
+                            st.error(f"Erro na tradução do livro: {e_tr}")
 
         if st.session_state.get("pdf_global_pronto") and os.path.exists(st.session_state["pdf_global_pronto"]):
             st.success(f"✅ Arquivo internacionalizado pronto: **{st.session_state.get('pdf_global_lingua')}**")
             with open(st.session_state["pdf_global_pronto"], "rb") as f_tr_eb:
                 st.download_button(
-                    label=f"⬇️ BAIXAR E-BOOK EM {st.session_state.get('pdf_global_lingua').upper()} (.PDF)",
+                    label=f"⬇️ BAIXAR LIVRO TÉCNICO EM {st.session_state.get('pdf_global_lingua').upper()} (.PDF)",
                     data=f_tr_eb,
-                    file_name=st.session_state.get("pdf_global_nome", "ebook_global.pdf"),
+                    file_name=st.session_state.get("pdf_global_nome", "manual_global.pdf"),
                     mime="application/pdf",
                     type="primary",
                     use_container_width=True,
