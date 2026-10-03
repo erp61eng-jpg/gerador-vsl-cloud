@@ -459,7 +459,7 @@ def pipeline_geracao_livro_completo(tema: str, publico: str, gerar_bump: bool = 
     blueprint = gerar_blueprint_ebook_ia(tema, publico)
     
     if status_placeholder:
-        status_placeholder.write("✍️ [2/6] Escrevendo introdução técnica aprofundada...")
+        status_placeholder.write("✍️️ [2/6] Escrevendo introdução técnica aprofundada...")
     if progress_bar:
         progress_bar.progress(0.20)
     
@@ -990,6 +990,7 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
         flowables.append(HRFlowable(width="100%", thickness=0.8, color=colors.HexColor("#CBD5E1"), spaceAfter=14))
 
     # ==================== APÊNDICE ====================
+    ap = dados_livro.get("apendice", {})
     flowables.append(Paragraph(ap.get("titulo", "Dossiê Clínico de Falhas & Engenharia de Lucro"), estilo_h1))
     flowables.append(HRFlowable(width="100%", thickness=1, color=cor_azul, spaceAfter=8))
 
@@ -1173,7 +1174,7 @@ def compilar_pdf_order_bump(dados_bump: dict, pexels_key: str, caminho_pdf: str)
         ]
         for em in em_list:
             dados_t_em.append([
-                Paragraph(f"⚠️ {em.get('anomalia', '')}", estilo_celula),
+                Paragraph(f"⚠️️ {em.get('anomalia', '')}", estilo_celula),
                 Paragraph(em.get("risco_imediato", ""), estilo_celula),
                 Paragraph(em.get("comando_correcao", ""), estilo_celula)
             ])
@@ -1694,7 +1695,7 @@ with tab_vsl:
             with col_d2:
                 st.write("")
                 st.caption("Custo: 20 Créditos")
-                btn_dub = st.button("🎙️ Dublar Vídeo Agora (20 cr)", type="primary", use_container_width=True, key="btn_exec_dub")
+                btn_dub = st.button("🎙️️ Dublar Vídeo Agora (20 cr)", type="primary", use_container_width=True, key="btn_exec_dub")
 
             if btn_dub:
                 if saldo_atual < 20:
