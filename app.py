@@ -962,10 +962,21 @@ def dublar_roteiro_e_renderizar_vsl(
     return video_dublado, cenas_traduzidas
 
 # ==============================================================================
-# 6. INTERFACE STREAMLIT (SISTEMA CENTRALIZADO & INTEGRADO)
+# 6. INICIALIZAÇÃO DE ESTADOS GLOBAIS
 # ==============================================================================
+if "vsl_input_tema" not in st.session_state:
+    st.session_state["vsl_input_tema"] = "Confeitaria Lucrativa & Bolos Caseiros"
+if "vsl_input_promessa" not in st.session_state:
+    st.session_state["vsl_input_promessa"] = "Domine as receitas mais pedidas e fature da sua cozinha"
+if "vsl_input_publico" not in st.session_state:
+    st.session_state["vsl_input_publico"] = "Mulheres e empreendedoras que buscam renda extra com doces"
 
-# BARRA LATERAL (COM STATUS COMPLETO INCLUINDO ELEVENLABS)
+if "ebook_input_tema" not in st.session_state:
+    st.session_state["ebook_input_tema"] = "Manual Definitivo da Confeitaria Lucrativa"
+if "ebook_input_publico" not in st.session_state:
+    st.session_state["ebook_input_publico"] = "Mulheres e empreendedoras que buscam renda extra com doces"
+
+# BARRA LATERAL
 with st.sidebar:
     st.sidebar.markdown(
         """
@@ -1050,16 +1061,16 @@ tab_minerador, tab_vsl, tab_ebook, tab_master = st.tabs([
 ])
 
 # ------------------------------------------------------------------------------
-# ABA 1: MINERADOR & GOOGLE ADS
+# ABA 1: MINERADOR & GOOGLE ADS (COM LIMPEZA TOTAL E ATUALIZAÇÃO DIRETA)
 # ------------------------------------------------------------------------------
 with tab_minerador:
     st.markdown("## 🔍 Minerador & Validador de Nichos com Kit Google Ads")
-    st.caption("Analise nichos comerciais, descubra dores ocultas e obtenha a campanha completa pronta para o Google Ads e YouTube Ads.")
+    st.caption("Analise nichos comerciais, descubra dores ocultas e sincronize os dados limpos nas abas seguintes.")
 
     NICHOS_PREDEFINIDOS = [
+        "🎂 Confeitaria Lucrativa & Bolos Caseiros",
         "🐕 Adestramento Canino & Comportamento Pet",
         "🍞 Gastronomia & Pães Sem Glúten",
-        "🎂 Confeitaria Lucrativa & Bolos Caseiros",
         "💰 Renda Extra & Milhas Aéreas",
         "🌱 Jardinagem, Suculentas & Hortas em Apartamento",
         "🛠️ Manutenção Residencial & Marido de Aluguel",
@@ -1078,7 +1089,7 @@ with tab_minerador:
     if "Manual" in nicho_sel:
         nicho_manual = st.text_input(
             "Digite o Nicho ou Micronicho que deseja pesquisar:",
-            placeholder="Ex: Instalação e higienização de ar condicionado split",
+            placeholder="Ex: Fabricação de trufas e bombons gourmet",
             key="miner_nicho_manual"
         )
         if nicho_manual.strip():
@@ -1090,18 +1101,34 @@ with tab_minerador:
         if not nicho_final or "Manual" in nicho_final:
             st.warning("Por favor, informe um nicho válido.")
         else:
-            with st.spinner("Analisando concorrência, intenção de busca e gerando campanhas do Google Ads..."):
+            with st.spinner("Limpando dados anteriores, minerando público e preparando campanhas..."):
                 try:
+                    # 1. FAXINA COMPLETA: remove vídeos, áudios e e-books antigos da sessão
+                    chaves_para_limpar = [
+                        "video_vsl_pronto", "roteiro_vsl", "video_dublado_pronto",
+                        "video_dublado_idioma", "video_dublado_roteiro",
+                        "pdf_ebook_pronto", "pdf_ebook_nome", "pdf_global_pronto",
+                        "pdf_global_nome", "pdf_global_lingua", "dados_ebook_sessao"
+                    ]
+                    for k in chaves_para_limpar:
+                        st.session_state.pop(k, None)
+
+                    # 2. GERAÇÃO DO DOSSIÊ DA IA
                     resultado_dossie = minerar_nicho_profundo_ia(nicho_final, profundidade)
                     st.session_state["resultado_pesquisa_nicho"] = resultado_dossie
                     st.session_state["nicho_pesquisado_nome"] = nicho_final
-                    
-                    st.session_state["tema_vsl_ativo"] = nicho_final
-                    st.session_state["promessa_vsl_ativo"] = f"Aprenda o método definitivo e comprovado sobre {nicho_final}"
-                    st.session_state["tema_ebook_ativo"] = f"Manual Prático e Definitivo: {nicho_final}"
-                    st.session_state["publico_ativo"] = "Pessoas e profissionais que buscam resultados rápidos e comprovados"
 
-                    st.success(f"✅ Dossiê concluído! O nicho '{nicho_final}' já foi integrado automaticamente às abas de VSL e E-book.")
+                    # 3. ATUALIZAÇÃO FORÇADA DAS CHAVES DOS CAMPOS DAS OUTRAS ABAS
+                    st.session_state["vsl_input_tema"] = nicho_final
+                    st.session_state["vsl_input_promessa"] = f"Aprenda o método definitivo e lucre com {nicho_final}"
+                    st.session_state["vsl_input_publico"] = "Iniciantes e profissionais que buscam renda extra e independência financeira"
+
+                    st.session_state["ebook_input_tema"] = f"Manual Prático e Definitivo: {nicho_final}"
+                    st.session_state["ebook_input_publico"] = "Iniciantes e profissionais que buscam renda extra e independência financeira"
+
+                    # 4. RECARREGAMENTO INSTANTÂNEO PARA APLICAR AS MUDANÇAS
+                    st.rerun()
+
                 except Exception as err:
                     st.error(f"Erro na análise: {err}")
 
@@ -1131,7 +1158,7 @@ with tab_minerador:
             )
 
 # ------------------------------------------------------------------------------
-# ABA 2: CRIAR VSL & DUBLAGEM GLOBAL
+# ABA 2: CRIAR VSL & DUBLAGEM GLOBAL (CONECTADA SEM RESQUÍCIOS)
 # ------------------------------------------------------------------------------
 with tab_vsl:
     st.markdown("## 🚀 Criador de Vídeo de Vendas (VSL) & Dublagem Global")
@@ -1139,19 +1166,13 @@ with tab_vsl:
     nicho_integrado = st.session_state.get("nicho_pesquisado_nome")
     if nicho_integrado:
         st.success(f"🎯 **Nicho Conectado da Mineração:** `{nicho_integrado}`")
-    else:
-        st.caption("Dica: você pode minerar um nicho na Aba 1 para preencher tudo automaticamente aqui.")
 
     col_v1, col_v2 = st.columns(2)
     with col_v1:
-        tema_vsl_padrao = st.session_state.get("tema_vsl_ativo", "Adestramento Canino & Comportamento Pet")
-        tema_vsl = st.text_input("Tema / Produto da VSL:", value=tema_vsl_padrao, key="vsl_input_tema")
-        
-        promessa_padrao = st.session_state.get("promessa_vsl_ativo", "Elimine maus comportamentos e tenha um cão obediente em 15 dias")
-        promessa_vsl = st.text_input("Grande Promessa:", value=promessa_padrao, key="vsl_input_promessa")
+        tema_vsl = st.text_input("Tema / Produto da VSL:", key="vsl_input_tema")
+        promessa_vsl = st.text_input("Grande Promessa:", key="vsl_input_promessa")
     with col_v2:
-        publico_padrao = st.session_state.get("publico_ativo", "Tutores de cães de primeira viagem e famílias com pets")
-        publico_vsl = st.text_input("Público-Alvo da VSL:", value=publico_padrao, key="vsl_input_publico")
+        publico_vsl = st.text_input("Público-Alvo da VSL:", key="vsl_input_publico")
         qtd_cenas = st.slider("Quantidade de Cenas (Cortes Dinâmicos):", 3, 10, 5, key="vsl_slider_cenas")
 
     col_opt1, col_opt2, col_opt3 = st.columns(3)
@@ -1267,7 +1288,7 @@ with tab_vsl:
                 )
 
 # ------------------------------------------------------------------------------
-# ABA 3: CRIAR E-BOOK & TRADUÇÃO GLOBAL
+# ABA 3: CRIAR E-BOOK & TRADUÇÃO GLOBAL (CONECTADA SEM RESQUÍCIOS)
 # ------------------------------------------------------------------------------
 with tab_ebook:
     st.markdown("## 📚 Criador de E-book Comercial & Diagramação Editorial")
@@ -1275,16 +1296,12 @@ with tab_ebook:
     nicho_integrado = st.session_state.get("nicho_pesquisado_nome")
     if nicho_integrado:
         st.success(f"🎯 **Nicho Conectado da Mineração:** `{nicho_integrado}`")
-    else:
-        st.caption("Páginas 100% preenchidas com fotografia proporcional e tabelas sob medida para qualquer nicho.")
 
     col_e1, col_e2 = st.columns(2)
     with col_e1:
-        tema_ebook_padrao = st.session_state.get("tema_ebook_ativo", "Manual Definitivo de Adestramento Canino")
-        tema_ebook = st.text_input("Tema do E-book:", value=tema_ebook_padrao, key="ebook_input_tema")
+        tema_ebook = st.text_input("Tema do E-book:", key="ebook_input_tema")
     with col_e2:
-        publico_ebook_padrao = st.session_state.get("publico_ativo", "Tutores de cães de primeira viagem e famílias com pets")
-        publico_ebook = st.text_input("Público-Alvo do E-book:", value=publico_ebook_padrao, key="ebook_input_publico")
+        publico_ebook = st.text_input("Público-Alvo do E-book:", key="ebook_input_publico")
 
     if st.button("📖 Gerar E-book Profissional Completo (.PDF) (10 cr)", type="primary", key="btn_render_ebook"):
         if saldo_atual < 10:
