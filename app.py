@@ -459,7 +459,7 @@ def pipeline_geracao_livro_completo(tema: str, publico: str, gerar_bump: bool = 
     blueprint = gerar_blueprint_ebook_ia(tema, publico)
     
     if status_placeholder:
-        status_placeholder.write("✍️️ [2/6] Escrevendo introdução técnica aprofundada...")
+        status_placeholder.write("✍️ [2/6] Escrevendo introdução técnica aprofundada...")
     if progress_bar:
         progress_bar.progress(0.20)
     
@@ -627,7 +627,7 @@ def traduzir_livro_completo_ia(dados_livro: dict, idioma_destino: str, progress_
     }
 
 # ==============================================================================
-# 6. DIAGRAMAÇÃO EDITORIAL COM FONTES DE ALTA LEGIBILIDADE (REPORTLAB)
+# 6. DIAGRAMAÇÃO EDITORIAL COM FLUXO OTIMIZADO (SEM ESPAÇOS SOBRANDO)
 # ==============================================================================
 class NumeradorPaginas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
@@ -651,17 +651,17 @@ class NumeradorPaginas(canvas.Canvas):
             self.saveState()
             self.setFont("Helvetica-Bold", 8.5)
             self.setFillColor(colors.HexColor("#64748B"))
-            self.drawString(36, 20, "MANUAL DE ENGENHARIA & PROCEDIMENTOS | EDIÇÃO PROFISSIONAL")
+            self.drawString(36, 18, "MANUAL DE ENGENHARIA & PROCEDIMENTOS | EDIÇÃO PROFISSIONAL")
             texto_pag = f"Página {self._pageNumber} de {page_count}"
-            self.drawRightString(576, 20, texto_pag)
+            self.drawRightString(576, 18, texto_pag)
             self.setStrokeColor(colors.HexColor("#CBD5E1"))
             self.setLineWidth(0.6)
-            self.line(36, 30, 576, 30)
+            self.line(36, 26, 576, 26)
 
             self.setFont("Helvetica", 8)
             self.setFillColor(colors.HexColor("#94A3B8"))
-            self.drawString(36, 762, "PROTOCOLO TÉCNICO PADRONIZADO")
-            self.line(36, 756, 576, 756)
+            self.drawString(36, 764, "PROTOCOLO TÉCNICO PADRONIZADO")
+            self.line(36, 758, 576, 758)
             self.restoreState()
 
 class NumeradorPaginasBump(canvas.Canvas):
@@ -685,12 +685,12 @@ class NumeradorPaginasBump(canvas.Canvas):
         self.saveState()
         self.setFont("Helvetica-Bold", 8.5)
         self.setFillColor(colors.HexColor("#64748B"))
-        self.drawString(36, 18, "CADERNO DE EXECUÇÃO & CHECKLIST OPERACIONAL | USO PRÁTICO")
+        self.drawString(36, 16, "CADERNO DE EXECUÇÃO & CHECKLIST OPERACIONAL | USO PRÁTICO")
         texto_pag = f"Pág. {self._pageNumber} de {page_count}"
-        self.drawRightString(576, 18, texto_pag)
+        self.drawRightString(576, 16, texto_pag)
         self.setStrokeColor(colors.HexColor("#CBD5E1"))
         self.setLineWidth(0.6)
-        self.line(36, 26, 576, 26)
+        self.line(36, 24, 576, 24)
         self.restoreState()
 
 def buscar_foto_pexels(query: str, pexels_key: str, dest_path: str) -> bool:
@@ -725,13 +725,14 @@ def recortar_foto_proporcional(orig_path: str, dest_path: str, target_w: int, ta
         return False
 
 def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: str) -> str:
+    # Margens balanceadas para otimizar a área útil da folha
     doc = SimpleDocTemplate(
         caminho_pdf,
         pagesize=letter,
         rightMargin=36,
         leftMargin=36,
-        topMargin=46,
-        bottomMargin=42
+        topMargin=38,
+        bottomMargin=36
     )
     styles = getSampleStyleSheet()
 
@@ -741,7 +742,7 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
     cor_alerta_border = colors.HexColor("#FCA5A5")
     cor_alerta_text = colors.HexColor("#991B1B")
 
-    # Escala tipográfica generosa para leitura fluida
+    # Estilos com espaçamento vertical compacto para eliminar buracos brancos
     estilo_capa_tit = ParagraphStyle(
         'CapaTitulo',
         parent=styles['Normal'],
@@ -750,7 +751,7 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
         leading=34,
         textColor=cor_azul,
         alignment=1,
-        spaceAfter=12
+        spaceAfter=10
     )
     estilo_capa_sub = ParagraphStyle(
         'CapaSub',
@@ -760,28 +761,28 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
         leading=18,
         textColor=cor_primaria,
         alignment=1,
-        spaceAfter=22
+        spaceAfter=18
     )
     estilo_h1 = ParagraphStyle(
         'TitCap',
         parent=styles['Heading1'],
         fontName='Helvetica-Bold',
-        fontSize=20,
-        leading=25,
+        fontSize=18,
+        leading=23,
         textColor=cor_azul,
-        spaceBefore=12,
-        spaceAfter=8,
+        spaceBefore=14,
+        spaceAfter=6,
         keepWithNext=True
     )
     estilo_h2 = ParagraphStyle(
         'TitSec',
         parent=styles['Heading2'],
         fontName='Helvetica-Bold',
-        fontSize=14,
-        leading=18.5,
+        fontSize=13.5,
+        leading=17.5,
         textColor=cor_primaria,
         spaceBefore=10,
-        spaceAfter=5,
+        spaceAfter=4,
         keepWithNext=True
     )
     estilo_corpo = ParagraphStyle(
@@ -789,9 +790,9 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
         parent=styles['Normal'],
         fontName='Helvetica',
         fontSize=12,
-        leading=17,
+        leading=16.5,
         textColor=colors.HexColor("#1E293B"),
-        spaceAfter=8,
+        spaceAfter=6,
         alignment=4
     )
     estilo_item = ParagraphStyle(
@@ -799,28 +800,28 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
         parent=styles['Normal'],
         fontName='Helvetica',
         fontSize=11.5,
-        leading=16,
+        leading=15.5,
         textColor=cor_primaria,
-        spaceAfter=4
+        spaceAfter=3
     )
     estilo_alerta = ParagraphStyle(
         'BoxAlerta',
         parent=styles['Normal'],
         fontName='Helvetica',
         fontSize=11,
-        leading=15,
+        leading=14.5,
         textColor=cor_alerta_text
     )
     estilo_legenda_foto = ParagraphStyle(
         'LegendaFoto',
         parent=styles['Normal'],
         fontName='Helvetica-Oblique',
-        fontSize=9.5,
-        leading=12.5,
+        fontSize=9,
+        leading=12,
         textColor=colors.HexColor("#64748B"),
         alignment=1,
         spaceBefore=3,
-        spaceAfter=6
+        spaceAfter=5
     )
     estilo_celula = ParagraphStyle(
         'CelulaTab',
@@ -841,8 +842,8 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
 
     flowables = []
 
-    # CAPA
-    flowables.append(Spacer(1, 35))
+    # ==================== CAPA ====================
+    flowables.append(Spacer(1, 20))
     flowables.append(Paragraph(dados_livro.get("titulo", "Manual Técnico Profissional"), estilo_capa_tit))
     flowables.append(Paragraph(dados_livro.get("subtitulo", "Guia Técnico Avançado"), estilo_capa_sub))
 
@@ -850,19 +851,19 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
     capa_raw = os.path.join(DIR_PEXELS, f"livro_capa_raw_{int(time.time())}.jpg")
     capa_fit = os.path.join(DIR_PEXELS, f"livro_capa_fit_{int(time.time())}.jpg")
     if buscar_foto_pexels(termo_capa, pexels_key, capa_raw):
-        if recortar_foto_proporcional(capa_raw, capa_fit, 1080, 560):
+        if recortar_foto_proporcional(capa_raw, capa_fit, 1080, 520):
             try:
-                flowables.append(RLImage(capa_fit, width=540, height=280))
+                flowables.append(RLImage(capa_fit, width=540, height=260))
             except Exception:
                 pass
 
-    flowables.append(Spacer(1, 25))
+    flowables.append(Spacer(1, 15))
     flowables.append(Paragraph("<b>AUTORIA:</b> DEPARTAMENTO DE ENGENHARIA DE PROCESSOS & DESENVOLVIMENTO", estilo_legenda_foto))
     flowables.append(PageBreak())
 
-    # SUMÁRIO EXECUTIVO
+    # ==================== SUMÁRIO EXECUTIVO ====================
     flowables.append(Paragraph("Sumário Executivo", estilo_h1))
-    flowables.append(HRFlowable(width="100%", thickness=1, color=cor_azul, spaceAfter=14))
+    flowables.append(HRFlowable(width="100%", thickness=1, color=cor_azul, spaceAfter=10))
 
     sumario_data = [
         [Paragraph("<b>Seção</b>", estilo_celula_header), Paragraph("<b>Título do Módulo Técnico</b>", estilo_celula_header)]
@@ -880,35 +881,37 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
         ('BACKGROUND', (0, 0), (-1, 0), cor_azul),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
-        ('PADDING', (0, 0), (-1, -1), 6),
+        ('PADDING', (0, 0), (-1, -1), 5),
     ]))
     flowables.append(tab_sumario)
     flowables.append(PageBreak())
 
-    # INTRODUÇÃO
+    # ==================== INTRODUÇÃO ====================
     flowables.append(Paragraph("Introdução Geral & Fundamentos Sistêmicos", estilo_h1))
-    flowables.append(HRFlowable(width="100%", thickness=0.8, color=colors.HexColor("#CBD5E1"), spaceAfter=10))
+    flowables.append(HRFlowable(width="100%", thickness=0.8, color=colors.HexColor("#CBD5E1"), spaceAfter=8))
 
     for p_intro in dados_livro.get("introducao", "").split("\n"):
         if p_intro.strip():
             flowables.append(Paragraph(p_intro.strip(), estilo_corpo))
 
-    flowables.append(PageBreak())
+    flowables.append(Spacer(1, 10))
+    flowables.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#E2E8F0"), spaceAfter=14))
 
-    # MÓDULOS TÉCNICOS INDIVIDUAIS
+    # ==================== MÓDULOS TÉCNICOS INDIVIDUAIS (FLUXO CONTÍNUO OTIMIZADO) ====================
     for mod in dados_livro.get("modulos", []):
         flowables.append(Paragraph(f"Módulo {mod.get('numero')}: {mod.get('titulo')}", estilo_h1))
-        flowables.append(HRFlowable(width="100%", thickness=0.8, color=cor_azul, spaceAfter=8))
+        flowables.append(HRFlowable(width="100%", thickness=0.8, color=cor_azul, spaceAfter=6))
 
+        # Imagem compacta para não quebrar a página de forma abrupta
         termo_proc = mod.get("termo_busca_foto_processo")
         if termo_proc:
             p_raw = os.path.join(DIR_PEXELS, f"mod_proc_raw_{mod.get('numero')}_{int(time.time())}.jpg")
             p_fit = os.path.join(DIR_PEXELS, f"mod_proc_fit_{mod.get('numero')}_{int(time.time())}.jpg")
             if buscar_foto_pexels(termo_proc, pexels_key, p_raw):
-                if recortar_foto_proporcional(p_raw, p_fit, 1080, 260):
+                if recortar_foto_proporcional(p_raw, p_fit, 1080, 220):
                     try:
-                        flowables.append(RLImage(p_fit, width=540, height=130))
-                        flowables.append(Spacer(1, 6))
+                        flowables.append(RLImage(p_fit, width=540, height=110))
+                        flowables.append(Spacer(1, 4))
                     except Exception:
                         pass
 
@@ -921,10 +924,10 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
             tabela_alerta.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, -1), cor_alerta_bg),
                 ('BOX', (0, 0), (-1, -1), 1, cor_alerta_border),
-                ('PADDING', (0, 0), (-1, -1), 6.5),
+                ('PADDING', (0, 0), (-1, -1), 5),
             ]))
             flowables.append(tabela_alerta)
-            flowables.append(Spacer(1, 8))
+            flowables.append(Spacer(1, 6))
 
         for sub in mod.get("subsecoes", []):
             flowables.append(Paragraph(sub.get("subtitulo", ""), estilo_h2))
@@ -932,7 +935,7 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
                 if p_sub.strip():
                     flowables.append(Paragraph(p_sub.strip(), estilo_corpo))
 
-        flowables.append(Spacer(1, 6))
+        flowables.append(Spacer(1, 4))
 
         itens_tab = mod.get("tabela_parametros", [])
         if itens_tab:
@@ -957,10 +960,10 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
                 ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
                 ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
                 ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
-                ('PADDING', (0, 0), (-1, -1), 5),
+                ('PADDING', (0, 0), (-1, -1), 4),
             ]))
             flowables.append(tab_param)
-            flowables.append(Spacer(1, 8))
+            flowables.append(Spacer(1, 6))
 
         passos = mod.get("passos_operacionais", [])
         if passos:
@@ -973,21 +976,22 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
             r_raw = os.path.join(DIR_PEXELS, f"mod_res_raw_{mod.get('numero')}_{int(time.time())}.jpg")
             r_fit = os.path.join(DIR_PEXELS, f"mod_res_fit_{mod.get('numero')}_{int(time.time())}.jpg")
             if buscar_foto_pexels(termo_res, pexels_key, r_raw):
-                if recortar_foto_proporcional(r_raw, r_fit, 1080, 240):
+                if recortar_foto_proporcional(r_raw, r_fit, 1080, 200):
                     try:
-                        flowables.append(Spacer(1, 6))
-                        flowables.append(RLImage(r_fit, width=540, height=120))
+                        flowables.append(Spacer(1, 4))
+                        flowables.append(RLImage(r_fit, width=540, height=100))
                         leg = mod.get("legenda_resultado", "Indicador visual de conformidade do resultado.")
                         flowables.append(Paragraph(f"📷 <b>Controle Visual:</b> {leg}", estilo_legenda_foto))
                     except Exception:
                         pass
 
-        flowables.append(PageBreak())
+        # Divisor elegante entre módulos sem quebra de página forçada
+        flowables.append(Spacer(1, 10))
+        flowables.append(HRFlowable(width="100%", thickness=0.8, color=colors.HexColor("#CBD5E1"), spaceAfter=14))
 
-    # APÊNDICE
-    ap = dados_livro.get("apendice", {})
+    # ==================== APÊNDICE ====================
     flowables.append(Paragraph(ap.get("titulo", "Dossiê Clínico de Falhas & Engenharia de Lucro"), estilo_h1))
-    flowables.append(HRFlowable(width="100%", thickness=1, color=cor_azul, spaceAfter=10))
+    flowables.append(HRFlowable(width="100%", thickness=1, color=cor_azul, spaceAfter=8))
 
     falhas = ap.get("falhas", [])
     if falhas:
@@ -1010,10 +1014,10 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#334155")),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
-            ('PADDING', (0, 0), (-1, -1), 5),
+            ('PADDING', (0, 0), (-1, -1), 4),
         ]))
         flowables.append(tab_f)
-        flowables.append(Spacer(1, 10))
+        flowables.append(Spacer(1, 8))
 
     custos = ap.get("custos_matriz", [])
     if custos:
@@ -1036,10 +1040,10 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
             ('BACKGROUND', (0, 0), (-1, 0), cor_azul),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
-            ('PADDING', (0, 0), (-1, -1), 5),
+            ('PADDING', (0, 0), (-1, -1), 4),
         ]))
         flowables.append(tab_c)
-        flowables.append(Spacer(1, 10))
+        flowables.append(Spacer(1, 8))
 
     conclusao = ap.get("conclusao_executiva", "")
     if conclusao:
@@ -1055,8 +1059,8 @@ def compilar_pdf_order_bump(dados_bump: dict, pexels_key: str, caminho_pdf: str)
         pagesize=letter,
         rightMargin=36,
         leftMargin=36,
-        topMargin=36,
-        bottomMargin=36
+        topMargin=32,
+        bottomMargin=30
     )
     styles = getSampleStyleSheet()
 
@@ -1068,47 +1072,47 @@ def compilar_pdf_order_bump(dados_bump: dict, pexels_key: str, caminho_pdf: str)
         'TitBump',
         parent=styles['Heading1'],
         fontName='Helvetica-Bold',
-        fontSize=21,
-        leading=25,
+        fontSize=20,
+        leading=24,
         textColor=cor_verde,
         alignment=1,
-        spaceAfter=6
+        spaceAfter=4
     )
     estilo_sub = ParagraphStyle(
         'SubBump',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=13,
-        leading=17,
+        fontSize=12,
+        leading=16,
         textColor=cor_primaria,
         alignment=1,
-        spaceAfter=14
+        spaceAfter=10
     )
     estilo_sec = ParagraphStyle(
         'SecBump',
         parent=styles['Heading2'],
         fontName='Helvetica-Bold',
-        fontSize=14,
-        leading=18,
+        fontSize=13,
+        leading=17,
         textColor=cor_primaria,
-        spaceBefore=10,
-        spaceAfter=6,
+        spaceBefore=8,
+        spaceAfter=4,
         keepWithNext=True
     )
     estilo_celula = ParagraphStyle(
         'CelBump',
         parent=styles['Normal'],
         fontName='Helvetica',
-        fontSize=10,
-        leading=13.5,
+        fontSize=9.5,
+        leading=13,
         textColor=cor_primaria
     )
     estilo_celula_h = ParagraphStyle(
         'CelHBump',
         parent=styles['Normal'],
         fontName='Helvetica-Bold',
-        fontSize=10.5,
-        leading=14,
+        fontSize=10,
+        leading=13.5,
         textColor=colors.white
     )
 
@@ -1121,10 +1125,10 @@ def compilar_pdf_order_bump(dados_bump: dict, pexels_key: str, caminho_pdf: str)
     capa_raw = os.path.join(DIR_PEXELS, f"bump_capa_raw_{int(time.time())}.jpg")
     capa_fit = os.path.join(DIR_PEXELS, f"bump_capa_fit_{int(time.time())}.jpg")
     if buscar_foto_pexels(termo_capa, pexels_key, capa_raw):
-        if recortar_foto_proporcional(capa_raw, capa_fit, 1080, 320):
+        if recortar_foto_proporcional(capa_raw, capa_fit, 1080, 260):
             try:
-                flowables.append(RLImage(capa_fit, width=540, height=160))
-                flowables.append(Spacer(1, 10))
+                flowables.append(RLImage(capa_fit, width=540, height=130))
+                flowables.append(Spacer(1, 6))
             except Exception:
                 pass
 
@@ -1146,15 +1150,15 @@ def compilar_pdf_order_bump(dados_bump: dict, pexels_key: str, caminho_pdf: str)
                 Paragraph(f"[  ] {c.get('criterio_aprovacao', '')}", estilo_celula)
             ])
 
-        tab_chk = Table(dados_t_chk, colWidths=[120, 240, 180])
+        tab_chk = Table(dados_t_chk, colWidths=[110, 250, 180])
         tab_chk.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), cor_verde),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
-            ('PADDING', (0, 0), (-1, -1), 5.5),
+            ('PADDING', (0, 0), (-1, -1), 4),
         ]))
         flowables.append(tab_chk)
-        flowables.append(Spacer(1, 12))
+        flowables.append(Spacer(1, 8))
 
     # Tabela de Emergência
     flowables.append(Paragraph("Protocolo Rápido de Emergência (Resolução em 5 Minutos)", estilo_sec))
@@ -1174,12 +1178,12 @@ def compilar_pdf_order_bump(dados_bump: dict, pexels_key: str, caminho_pdf: str)
                 Paragraph(em.get("comando_correcao", ""), estilo_celula)
             ])
 
-        tab_em = Table(dados_t_em, colWidths=[150, 170, 220])
+        tab_em = Table(dados_t_em, colWidths=[140, 170, 230])
         tab_em.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), cor_vermelho),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
-            ('PADDING', (0, 0), (-1, -1), 5.5),
+            ('PADDING', (0, 0), (-1, -1), 4),
         ]))
         flowables.append(tab_em)
 
@@ -1726,7 +1730,7 @@ with tab_vsl:
             st.video(st.session_state["video_dublado_pronto"])
             with open(st.session_state["video_dublado_pronto"], "rb") as f_vd:
                 st.download_button(
-                    f"⬇️️ BAIXAR VSL DUBLADA EM {st.session_state.get('video_dublado_idioma').upper()} (.MP4)",
+                    f"⬇️ BAIXAR VSL DUBLADA EM {st.session_state.get('video_dublado_idioma').upper()} (.MP4)",
                     data=f_vd,
                     file_name=os.path.basename(st.session_state["video_dublado_pronto"]),
                     mime="video/mp4",
