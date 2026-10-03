@@ -65,6 +65,7 @@ SUPABASE_KEY = obter_credencial("SUPABASE_KEY")
 OPENAI_API_KEY = obter_credencial("OPENAI_API_KEY")
 GEMINI_API_KEY = obter_credencial("GEMINI_API_KEY")
 PEXELS_API_KEY = obter_credencial("PEXELS_API_KEY")
+ELEVENLABS_API_KEY = obter_credencial("ELEVENLABS_API_KEY")
 
 supabase_client: Optional[Client] = None
 if SUPABASE_URL and SUPABASE_KEY:
@@ -236,7 +237,7 @@ def gerar_roteiro_vsl_ia(nicho: str, promessa: str, publico: str, num_cenas: int
     Gere exatamente {num_cenas} cenas cronológicas (atenção, dor, virada, benefício, CTA).
     Para cada cena:
     1. "fala": Frase falada em português (curta, de 10 a 16 palavras, impactante).
-    2. "termo_video": Termo em INGLÊS de 2 a 4 palavras para buscar vídeos em HD no Pexels que retratem exatamente o nicho '{nicho}' (Ex: cães -> "dog training park"; ferramentas -> "repair technician hands"; culinária -> "chef cooking kitchen"). NUNCA use termos desconexos.
+    2. "termo_video": Termo em INGLÊS de 2 a 4 palavras para buscar vídeos em HD no Pexels que retratem exatamente o nicho '{nicho}'. NUNCA use termos desconexos.
     
     Retorne estritamente um JSON:
     {{
@@ -484,13 +485,11 @@ def buscar_foto_pexels(query: str, pexels_key: str, dest_path: str) -> bool:
     return False
 
 def recortar_foto_proporcional(orig_path: str, dest_path: str, target_w: int, target_h: int) -> bool:
-    """Aplica recorte centralizado profissional (object-fit: cover) usando PIL. NUNCA achata nem estica!"""
     if not os.path.exists(orig_path):
         return False
     try:
         with PILImage.open(orig_path) as img:
             img_rgb = img.convert("RGB")
-            # ImageOps.fit corta o excesso das bordas mantendo a escala natural dos objetos
             img_cortada = ImageOps.fit(img_rgb, (target_w, target_h), method=PILImage.Resampling.LANCZOS)
             img_cortada.save(dest_path, "JPEG", quality=92)
         return True
@@ -611,7 +610,7 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_pdf: str)
 
     flowables = []
 
-    # ==================== CAPA ====================
+    # CAPA
     flowables.append(Spacer(1, 20))
     flowables.append(Paragraph(dados.get("titulo", "Manual Técnico Profissional"), estilo_capa_tit))
     flowables.append(Paragraph(dados.get("subtitulo", "Guia Técnico & Comercial"), estilo_capa_sub))
@@ -620,7 +619,6 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_pdf: str)
     capa_raw_path = os.path.join(DIR_PEXELS, f"capa_raw_{int(time.time())}.jpg")
     capa_fit_path = os.path.join(DIR_PEXELS, f"capa_fit_{int(time.time())}.jpg")
     if buscar_foto_pexels(termo_capa, pexels_key, capa_raw_path):
-        # Capa em proporção 16:9 perfeita (sem deformação)
         if recortar_foto_proporcional(capa_raw_path, capa_fit_path, 1080, 560):
             try:
                 flowables.append(RLImage(capa_fit_path, width=540, height=280))
@@ -629,7 +627,7 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_pdf: str)
 
     flowables.append(PageBreak())
 
-    # ==================== INTRODUÇÃO ====================
+    # INTRODUÇÃO
     flowables.append(Paragraph("Introdução Técnica & Fundamentos do Método", estilo_h1))
     flowables.append(Spacer(1, 4))
     for p in dados.get("introducao", "").split("\n"):
@@ -639,12 +637,12 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_pdf: str)
     flowables.append(Spacer(1, 6))
     flowables.append(HRFlowable(width="100%", thickness=0.8, color=colors.HexColor("#CBD5E1"), spaceAfter=8))
 
-    # ==================== CAPÍTULOS TÉCNICOS COM FOTOS NATURAIS ====================
+    # CAPÍTULOS TÉCNICOS
     for cap in dados.get("capitulos", []):
         flowables.append(Paragraph(f"Módulo {cap.get('numero')}: {cap.get('titulo')}", estilo_h1))
         flowables.append(Spacer(1, 2))
 
-        # FOTO 1: Preparo / Ação (Banner proporcional 3:1 real, recortado do centro)
+        # FOTO 1: Processo
         termo_proc = cap.get("termo_busca_foto_processo", cap.get("termo_busca_foto", "working hands"))
         if termo_proc:
             proc_raw = os.path.join(DIR_PEXELS, f"proc_raw_{cap.get('numero')}_{int(time.time())}.jpg")
@@ -657,7 +655,7 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_pdf: str)
                     except Exception:
                         pass
 
-        # Caixa de Alerta Técnico
+        # Alerta Técnico
         alerta = cap.get("alerta_tecnico", "")
         if alerta:
             tabela_alerta = Table(
@@ -672,12 +670,11 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_pdf: str)
             flowables.append(tabela_alerta)
             flowables.append(Spacer(1, 3))
 
-        # Texto Explicativo Denso
         for p_cap in cap.get("conteudo", "").split("\n"):
             if p_cap.strip():
                 flowables.append(Paragraph(p_cap.strip(), estilo_corpo))
 
-        # Ficha Técnica / Protocolo Operacional
+        # Ficha Técnica
         receita_nome = cap.get("receita_nome", "")
         if receita_nome:
             flowables.append(Paragraph(f"📋 Ficha Técnica: {receita_nome}", estilo_h2))
@@ -716,7 +713,7 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_pdf: str)
                 for idx_p, passo in enumerate(passos, 1):
                     flowables.append(Paragraph(f"<b>{idx_p}.</b> {passo}", estilo_item))
 
-        # FOTO 2: O Resultado Final (Banner proporcional 3:1 real, enquadrado perfeitamente)
+        # FOTO 2: Resultado Final
         termo_res = cap.get("termo_busca_foto_resultado", "professional result success")
         if termo_res:
             res_raw = os.path.join(DIR_PEXELS, f"res_raw_{cap.get('numero')}_{int(time.time())}.jpg")
@@ -968,7 +965,7 @@ def dublar_roteiro_e_renderizar_vsl(
 # 6. INTERFACE STREAMLIT (SISTEMA CENTRALIZADO & INTEGRADO)
 # ==============================================================================
 
-# BARRA LATERAL
+# BARRA LATERAL (COM STATUS COMPLETO INCLUINDO ELEVENLABS)
 with st.sidebar:
     st.sidebar.markdown(
         """
@@ -1041,6 +1038,7 @@ with st.sidebar:
     st.write("• Supabase:", "🟢 Ativo" if supabase_client else "🔴 Pendente")
     st.write("• OpenAI:", "🟢 Ativo" if OPENAI_API_KEY else "🔴 Ausente")
     st.write("• Gemini:", "🟢 Ativo" if GEMINI_API_KEY else "🔴 Ausente")
+    st.write("• ElevenLabs:", "🟢 Ativo" if ELEVENLABS_API_KEY else "🔴 Ausente")
     st.write("• Pexels:", "🟢 Ativo" if PEXELS_API_KEY else "🔴 Ausente")
 
 # ABAS PRINCIPAIS
@@ -1052,7 +1050,7 @@ tab_minerador, tab_vsl, tab_ebook, tab_master = st.tabs([
 ])
 
 # ------------------------------------------------------------------------------
-# ABA 1: MINERADOR & GOOGLE ADS (COM PROPAGAÇÃO AUTOMÁTICA DE NICHO)
+# ABA 1: MINERADOR & GOOGLE ADS
 # ------------------------------------------------------------------------------
 with tab_minerador:
     st.markdown("## 🔍 Minerador & Validador de Nichos com Kit Google Ads")
@@ -1098,7 +1096,6 @@ with tab_minerador:
                     st.session_state["resultado_pesquisa_nicho"] = resultado_dossie
                     st.session_state["nicho_pesquisado_nome"] = nicho_final
                     
-                    # INTEGRAÇÃO INSTANTÂNEA COM AS OUTRAS ABAS
                     st.session_state["tema_vsl_ativo"] = nicho_final
                     st.session_state["promessa_vsl_ativo"] = f"Aprenda o método definitivo e comprovado sobre {nicho_final}"
                     st.session_state["tema_ebook_ativo"] = f"Manual Prático e Definitivo: {nicho_final}"
@@ -1134,7 +1131,7 @@ with tab_minerador:
             )
 
 # ------------------------------------------------------------------------------
-# ABA 2: CRIAR VSL & DUBLAGEM GLOBAL (CONECTADA AO NICHO ATIVO)
+# ABA 2: CRIAR VSL & DUBLAGEM GLOBAL
 # ------------------------------------------------------------------------------
 with tab_vsl:
     st.markdown("## 🚀 Criador de Vídeo de Vendas (VSL) & Dublagem Global")
@@ -1270,7 +1267,7 @@ with tab_vsl:
                 )
 
 # ------------------------------------------------------------------------------
-# ABA 3: CRIAR E-BOOK & TRADUÇÃO GLOBAL (FOTOS COM CORTE PIL NATURAL)
+# ABA 3: CRIAR E-BOOK & TRADUÇÃO GLOBAL
 # ------------------------------------------------------------------------------
 with tab_ebook:
     st.markdown("## 📚 Criador de E-book Comercial & Diagramação Editorial")
