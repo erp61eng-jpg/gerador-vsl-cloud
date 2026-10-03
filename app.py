@@ -630,7 +630,7 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_pdf: str)
         flowables.append(Paragraph(f"Módulo {cap.get('numero')}: {cap.get('titulo')}", estilo_h1))
         flowables.append(Spacer(1, 3))
 
-        # FOTO 1: Ação / Preparo / Mão na Massa
+        # FOTO 1: Ação / Preparo
         termo_proc = cap.get("termo_busca_foto_processo", cap.get("termo_busca_foto", "working process"))
         if termo_proc:
             proc_img_path = os.path.join(DIR_PEXELS, f"proc_{cap.get('numero')}_{int(time.time())}.jpg")
@@ -991,7 +991,8 @@ with st.sidebar:
 
     email_digitado = st.text_input(
         "Seu E-mail Cadastrado:",
-        value=st.session_state["email_usuario_ativo"]
+        value=st.session_state["email_usuario_ativo"],
+        key="sidebar_email_input"
     ).lower().strip()
 
     if email_digitado and email_digitado != st.session_state["email_usuario_ativo"]:
@@ -1053,22 +1054,23 @@ with tab_minerador:
 
     col_m1, col_m2 = st.columns([2, 1])
     with col_m1:
-        nicho_sel = st.selectbox("Selecione um Nicho ou Digite o Seu:", NICHOS_PREDEFINIDOS)
+        nicho_sel = st.selectbox("Selecione um Nicho ou Digite o Seu:", NICHOS_PREDEFINIDOS, key="miner_nicho_sel")
     with col_m2:
-        profundidade = st.selectbox("Profundidade da Análise:", ["Dossiê Completo de Lançamento", "Raio-X Rápido de Dores & Promessas"])
+        profundidade = st.selectbox("Profundidade da Análise:", ["Dossiê Completo de Lançamento", "Raio-X Rápido de Dores & Promessas"], key="miner_profundidade")
 
     nicho_final = nicho_sel
     if "Manual" in nicho_sel:
         nicho_manual = st.text_input(
             "Digite o Nicho ou Micronicho que deseja pesquisar:",
-            placeholder="Ex: Instalação e higienização de ar condicionado split"
+            placeholder="Ex: Instalação e higienização de ar condicionado split",
+            key="miner_nicho_manual"
         )
         if nicho_manual.strip():
             nicho_final = nicho_manual.strip()
 
     st.info(f"🎯 **Nicho Selecionado para Mineração:** `{nicho_final}`")
 
-    if st.button("🚀 Analisar Nicho & Gerar Kit Google Ads", type="primary"):
+    if st.button("🚀 Analisar Nicho & Gerar Kit Google Ads", type="primary", key="btn_minerar_nicho"):
         if not nicho_final or "Manual" in nicho_final:
             st.warning("Por favor, informe um nicho válido.")
         else:
@@ -1100,7 +1102,8 @@ with tab_minerador:
             st.text_area(
                 "📋 Conteúdo do Dossiê e Palavras-chave:",
                 value=st.session_state["resultado_pesquisa_nicho"],
-                height=350
+                height=350,
+                key="dossie_txt_area"
             )
             nome_arq_txt = f"campanha_google_ads_{re.sub(r'[^a-zA-Z0-9]', '_', st.session_state.get('nicho_pesquisado_nome', 'nicho').lower())}.txt"
             st.download_button(
@@ -1108,11 +1111,12 @@ with tab_minerador:
                 data=st.session_state["resultado_pesquisa_nicho"],
                 file_name=nome_arq_txt,
                 mime="text/plain",
-                use_container_width=True
+                use_container_width=True,
+                key="btn_download_campanha"
             )
 
 # ------------------------------------------------------------------------------
-# ABA 2: CRIAR VSL & DUBLAGEM GLOBAL (CONECTADA AO NICHO ATIVO)
+# ABA 2: CRIAR VSL & DUBLAGEM GLOBAL (CONECTADA AO NICHO ATIVO COM KEYS EXCLUSIVAS)
 # ------------------------------------------------------------------------------
 with tab_vsl:
     st.markdown("## 🚀 Criador de Vídeo de Vendas (VSL) & Dublagem Global")
@@ -1126,25 +1130,25 @@ with tab_vsl:
     col_v1, col_v2 = st.columns(2)
     with col_v1:
         tema_vsl_padrao = st.session_state.get("tema_vsl_ativo", "Adestramento Canino & Comportamento Pet")
-        tema_vsl = st.text_input("Tema / Produto da VSL:", value=tema_vsl_padrao)
+        tema_vsl = st.text_input("Tema / Produto da VSL:", value=tema_vsl_padrao, key="vsl_input_tema")
         
         promessa_padrao = st.session_state.get("promessa_vsl_ativo", "Elimine maus comportamentos e tenha um cão obediente em 15 dias")
-        promessa_vsl = st.text_input("Grande Promessa:", value=promessa_padrao)
+        promessa_vsl = st.text_input("Grande Promessa:", value=promessa_padrao, key="vsl_input_promessa")
     with col_v2:
         publico_padrao = st.session_state.get("publico_ativo", "Tutores de cães de primeira viagem e famílias com pets")
-        publico_vsl = st.text_input("Público-Alvo:", value=publico_padrao)
-        qtd_cenas = st.slider("Quantidade de Cenas (Cortes Dinâmicos):", 3, 10, 5)
+        publico_vsl = st.text_input("Público-Alvo da VSL:", value=publico_padrao, key="vsl_input_publico")
+        qtd_cenas = st.slider("Quantidade de Cenas (Cortes Dinâmicos):", 3, 10, 5, key="vsl_slider_cenas")
 
     col_opt1, col_opt2, col_opt3 = st.columns(3)
     with col_opt1:
-        formato_vertical = st.checkbox("Formato Vertical 9:16 (Reels/TikTok/Shorts)", value=False)
+        formato_vertical = st.checkbox("Formato Vertical 9:16 (Reels/TikTok/Shorts)", value=False, key="vsl_check_vertical")
     with col_opt2:
-        voz_sel = st.selectbox("Locução (OpenAI TTS):", ["onyx (Forte/Masculina)", "alloy (Neutra)", "nova (Energética/Feminina)", "echo (Suave)"])
+        voz_sel = st.selectbox("Locução (OpenAI TTS):", ["onyx (Forte/Masculina)", "alloy (Neutra)", "nova (Energética/Feminina)", "echo (Suave)"], key="vsl_select_voz")
         voz_codigo = voz_sel.split()[0]
     with col_opt3:
-        musica_up = st.file_uploader("Trilha Sonora (.mp3 opcional):", type=["mp3"])
+        musica_up = st.file_uploader("Trilha Sonora (.mp3 opcional):", type=["mp3"], key="vsl_uploader_musica")
 
-    if st.button("🎬 Gerar Roteiro e Renderizar VSL Original (20 cr)", type="primary"):
+    if st.button("🎬 Gerar Roteiro e Renderizar VSL Original (20 cr)", type="primary", key="btn_render_vsl"):
         if saldo_atual < 20:
             st.error("❌ Saldo insuficiente! Você precisa de 20 créditos.")
         else:
@@ -1187,7 +1191,8 @@ with tab_vsl:
                 data=f_v,
                 file_name=os.path.basename(st.session_state["video_vsl_pronto"]),
                 mime="video/mp4",
-                use_container_width=True
+                use_container_width=True,
+                key="btn_down_vsl_orig"
             )
 
         st.markdown("---")
@@ -1197,11 +1202,11 @@ with tab_vsl:
 
             col_d1, col_d2 = st.columns([2, 1])
             with col_d1:
-                idioma_dub_sel = st.selectbox("Selecione o Idioma para Dublar:", list(IDIOMAS_SISTEMA_36.keys()))
+                idioma_dub_sel = st.selectbox("Selecione o Idioma para Dublar:", list(IDIOMAS_SISTEMA_36.keys()), key="vsl_select_idioma_dub")
             with col_d2:
                 st.write("")
                 st.caption("Custo: 20 Créditos")
-                btn_dub = st.button("🎙️ Dublar Vídeo Agora (20 cr)", type="primary", use_container_width=True)
+                btn_dub = st.button("🎙️ Dublar Vídeo Agora (20 cr)", type="primary", use_container_width=True, key="btn_exec_dub")
 
             if btn_dub:
                 if saldo_atual < 20:
@@ -1242,11 +1247,12 @@ with tab_vsl:
                     file_name=os.path.basename(st.session_state["video_dublado_pronto"]),
                     mime="video/mp4",
                     type="primary",
-                    use_container_width=True
+                    use_container_width=True,
+                    key="btn_down_vsl_dub"
                 )
 
 # ------------------------------------------------------------------------------
-# ABA 3: CRIAR E-BOOK & TRADUÇÃO GLOBAL (CONECTADO AO NICHO ATIVO)
+# ABA 3: CRIAR E-BOOK & TRADUÇÃO GLOBAL (CONECTADO COM KEYS EXCLUSIVAS)
 # ------------------------------------------------------------------------------
 with tab_ebook:
     st.markdown("## 📚 Criador de E-book Comercial & Diagramação Editorial")
@@ -1260,12 +1266,12 @@ with tab_ebook:
     col_e1, col_e2 = st.columns(2)
     with col_e1:
         tema_ebook_padrao = st.session_state.get("tema_ebook_ativo", "Manual Definitivo de Adestramento Canino")
-        tema_ebook = st.text_input("Tema do E-book:", value=tema_ebook_padrao)
+        tema_ebook = st.text_input("Tema do E-book:", value=tema_ebook_padrao, key="ebook_input_tema")
     with col_e2:
         publico_ebook_padrao = st.session_state.get("publico_ativo", "Tutores de cães de primeira viagem e famílias com pets")
-        publico_ebook = st.text_input("Público-Alvo:", value=publico_ebook_padrao)
+        publico_ebook = st.text_input("Público-Alvo do E-book:", value=publico_ebook_padrao, key="ebook_input_publico")
 
-    if st.button("📖 Gerar E-book Profissional Completo (.PDF) (10 cr)", type="primary"):
+    if st.button("📖 Gerar E-book Profissional Completo (.PDF) (10 cr)", type="primary", key="btn_render_ebook"):
         if saldo_atual < 10:
             st.error("❌ Saldo insuficiente! Você precisa de 10 créditos.")
         else:
@@ -1295,7 +1301,8 @@ with tab_ebook:
                 data=f_eb,
                 file_name=st.session_state.get("pdf_ebook_nome", "ebook.pdf"),
                 mime="application/pdf",
-                use_container_width=True
+                use_container_width=True,
+                key="btn_down_eb_orig"
             )
 
         st.markdown("---")
@@ -1305,11 +1312,11 @@ with tab_ebook:
 
             col_tr1, col_tr2 = st.columns([2, 1])
             with col_tr1:
-                idioma_eb_sel = st.selectbox("Selecione o Idioma de Destino:", list(IDIOMAS_SISTEMA_36.keys()))
+                idioma_eb_sel = st.selectbox("Selecione o Idioma de Destino:", list(IDIOMAS_SISTEMA_36.keys()), key="ebook_select_idioma_tr")
             with col_tr2:
                 st.write("")
                 st.caption("Custo: 10 Créditos")
-                btn_trad_eb = st.button("🌍 Traduzir E-book Completo (10 cr)", type="primary", use_container_width=True)
+                btn_trad_eb = st.button("🌍 Traduzir E-book Completo (10 cr)", type="primary", use_container_width=True, key="btn_exec_trad_eb")
 
             if btn_trad_eb:
                 if saldo_atual < 10:
@@ -1350,7 +1357,8 @@ with tab_ebook:
                     file_name=st.session_state.get("pdf_global_nome", "ebook_global.pdf"),
                     mime="application/pdf",
                     type="primary",
-                    use_container_width=True
+                    use_container_width=True,
+                    key="btn_down_eb_glob"
                 )
 
 # ------------------------------------------------------------------------------
