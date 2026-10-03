@@ -11,6 +11,7 @@ from typing import List, Dict, Tuple, Optional
 import streamlit as st
 from openai import OpenAI
 from supabase import create_client, Client
+from PIL import Image as PILImage, ImageOps
 
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
@@ -235,7 +236,7 @@ def gerar_roteiro_vsl_ia(nicho: str, promessa: str, publico: str, num_cenas: int
     Gere exatamente {num_cenas} cenas cronológicas (atenção, dor, virada, benefício, CTA).
     Para cada cena:
     1. "fala": Frase falada em português (curta, de 10 a 16 palavras, impactante).
-    2. "termo_video": Termo em INGLÊS de 2 a 4 palavras para buscar vídeos em HD no Pexels que retratem exatamente o nicho '{nicho}' (Ex: se for cachorro: "dog training park", "obedient dog trainer"; se for ar condicionado: "air conditioner technician repair"; se for confeitaria: "decorating cake pastry chef"). NUNCA use termos de outros nichos.
+    2. "termo_video": Termo em INGLÊS de 2 a 4 palavras para buscar vídeos em HD no Pexels que retratem exatamente o nicho '{nicho}' (Ex: cães -> "dog training park"; ferramentas -> "repair technician hands"; culinária -> "chef cooking kitchen"). NUNCA use termos desconexos.
     
     Retorne estritamente um JSON:
     {{
@@ -274,13 +275,9 @@ def gerar_conteudo_ebook_ia(tema: str, publico: str) -> dict:
     DIRETRIZES DE EXTREMO RIGOR:
     1. PROIBIDO TEXTO SUPERFICIAL OU RESUMINHOS. Seja um manual comercial de alto valor.
     2. O conteúdo deve ser 100% PERSONALIZADO para '{tema}'.
-       - Se for Pet/Cães: foco em comportamento canino, reforço positivo, comandos e resolução de desobediência.
-       - Se for Técnico/Serviços: ferramentas, procedimentos passo a passo, diagnósticos de defeito e segurança.
-       - Se for Culinária: insumos exatos em gramas, reações físico-químicas, temperaturas e ponto de textura.
-       - Se for Negócios: estratégias, métricas, planilhas e plano de ação.
     3. Para CADA capítulo, forneça DOIS termos de busca em inglês para o Pexels FOCADOS EXCLUSIVAMENTE em '{tema}':
-       - "termo_busca_foto_processo": Ação/preparo/treinamento/trabalho no nicho '{tema}'.
-       - "termo_busca_foto_resultado": O resultado final de sucesso no nicho '{tema}'.
+       - "termo_busca_foto_processo": Ação/preparo/trabalho prático no nicho '{tema}'.
+       - "termo_busca_foto_resultado": O resultado final de sucesso e excelência no nicho '{tema}'.
        - "legenda_resultado": Frase técnica sobre o resultado visual esperado.
     4. Crie uma TABELA TÉCNICA ESTRUTURADA por capítulo com parâmetros objetivos (ex: Insumos/Ferramentas/Comandos, Medidas/Doses/Tempos, e Impacto Prático).
     5. No Módulo 4, inclua Diagnóstico de Erros Comuns e Precificação/Monetização no mercado de '{tema}'.
@@ -358,7 +355,7 @@ def gerar_conteudo_ebook_ia(tema: str, publico: str) -> dict:
                 "termo_busca_foto_resultado": "termo em inglês de negócio sucesso sobre {tema}",
                 "legenda_resultado": "Estrutura final validada, lucrativa e livre de falhas.",
                 "alerta_tecnico": "Atenção aos sinais prematuros de falha e como agir de imediato.",
-                "conteudo": "Guia de Troubleshooting (o que fazer quando algo der errado) e estratégia comercial para precificar serviços ou produtos no nicho de {tema}.",
+                "conteudo": "Guia de Troubleshooting e estratégia comercial para precificar serviços ou produtos no nicho de {tema}.",
                 "receita_nome": "Ficha Financeira e Matriz de Resolução de Problemas",
                 "tabela_ingredientes": [
                     {{"ingrediente": "Custo de Implementação / Insumos", "quantidade": "Valor médio estimado", "funcao": "Base de custo real"}},
@@ -435,7 +432,7 @@ def traduzir_ebook_completo_ia(dados_ebook: dict, idioma_destino: str, progress_
     }
 
 # ==============================================================================
-# 4. PROCESSAMENTO GRÁFICO EDITORIAL (DUPLA ILUSTRAÇÃO & ZERO ESPAÇO VAZIO)
+# 4. PROCESSAMENTO GRÁFICO EDITORIAL (ENQUADRAMENTO PIL SEM ESTICAMENTO)
 # ==============================================================================
 class NumeradorPaginas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
@@ -459,12 +456,12 @@ class NumeradorPaginas(canvas.Canvas):
             self.saveState()
             self.setFont("Helvetica-Bold", 8)
             self.setFillColor(colors.HexColor("#64748B"))
-            self.drawString(36, 20, "MANUAL TÉCNICO PROFISSIONAL | TODOS OS DIREITOS RESERVADOS")
+            self.drawString(36, 18, "MANUAL TÉCNICO PROFISSIONAL | TODOS OS DIREITOS RESERVADOS")
             texto_pag = f"Página {self._pageNumber} de {page_count}"
-            self.drawRightString(576, 20, texto_pag)
+            self.drawRightString(576, 18, texto_pag)
             self.setStrokeColor(colors.HexColor("#CBD5E1"))
             self.setLineWidth(0.6)
-            self.line(36, 30, 576, 30)
+            self.line(36, 28, 576, 28)
             self.restoreState()
 
 def buscar_foto_pexels(query: str, pexels_key: str, dest_path: str) -> bool:
@@ -486,6 +483,20 @@ def buscar_foto_pexels(query: str, pexels_key: str, dest_path: str) -> bool:
         pass
     return False
 
+def recortar_foto_proporcional(orig_path: str, dest_path: str, target_w: int, target_h: int) -> bool:
+    """Aplica recorte centralizado profissional (object-fit: cover) usando PIL. NUNCA achata nem estica!"""
+    if not os.path.exists(orig_path):
+        return False
+    try:
+        with PILImage.open(orig_path) as img:
+            img_rgb = img.convert("RGB")
+            # ImageOps.fit corta o excesso das bordas mantendo a escala natural dos objetos
+            img_cortada = ImageOps.fit(img_rgb, (target_w, target_h), method=PILImage.Resampling.LANCZOS)
+            img_cortada.save(dest_path, "JPEG", quality=92)
+        return True
+    except Exception:
+        return False
+
 def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_pdf: str) -> str:
     doc = SimpleDocTemplate(
         caminho_pdf,
@@ -493,7 +504,7 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_pdf: str)
         rightMargin=36,
         leftMargin=36,
         topMargin=36,
-        bottomMargin=42
+        bottomMargin=38
     )
     styles = getSampleStyleSheet()
 
@@ -526,22 +537,22 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_pdf: str)
         'TitCap',
         parent=styles['Heading1'],
         fontName='Helvetica-Bold',
-        fontSize=13.5,
-        leading=17,
+        fontSize=13,
+        leading=16.5,
         textColor=cor_azul,
         spaceBefore=0,
-        spaceAfter=5,
+        spaceAfter=4,
         keepWithNext=True
     )
     estilo_h2 = ParagraphStyle(
         'TitSec',
         parent=styles['Heading2'],
         fontName='Helvetica-Bold',
-        fontSize=10,
-        leading=13.5,
+        fontSize=9.5,
+        leading=13,
         textColor=cor_primaria,
-        spaceBefore=5,
-        spaceAfter=3,
+        spaceBefore=4,
+        spaceAfter=2,
         keepWithNext=True
     )
     estilo_corpo = ParagraphStyle(
@@ -551,7 +562,7 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_pdf: str)
         fontSize=8.5,
         leading=12.5,
         textColor=cor_primaria,
-        spaceAfter=5
+        spaceAfter=4
     )
     estilo_item = ParagraphStyle(
         'ItemPasso',
@@ -575,11 +586,11 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_pdf: str)
         parent=styles['Normal'],
         fontName='Helvetica-Oblique',
         fontSize=7.5,
-        leading=10,
+        leading=9.5,
         textColor=colors.HexColor("#475569"),
         alignment=1,
         spaceBefore=2,
-        spaceAfter=4
+        spaceAfter=3
     )
     estilo_celula = ParagraphStyle(
         'CelulaTab',
@@ -600,46 +611,51 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_pdf: str)
 
     flowables = []
 
-    # CAPA
+    # ==================== CAPA ====================
     flowables.append(Spacer(1, 20))
     flowables.append(Paragraph(dados.get("titulo", "Manual Técnico Profissional"), estilo_capa_tit))
     flowables.append(Paragraph(dados.get("subtitulo", "Guia Técnico & Comercial"), estilo_capa_sub))
 
     termo_capa = dados.get("termo_capa", "business strategy")
-    capa_img_path = os.path.join(DIR_PEXELS, f"capa_{int(time.time())}.jpg")
-    if buscar_foto_pexels(termo_capa, pexels_key, capa_img_path):
-        try:
-            flowables.append(RLImage(capa_img_path, width=540, height=270))
-        except Exception:
-            pass
+    capa_raw_path = os.path.join(DIR_PEXELS, f"capa_raw_{int(time.time())}.jpg")
+    capa_fit_path = os.path.join(DIR_PEXELS, f"capa_fit_{int(time.time())}.jpg")
+    if buscar_foto_pexels(termo_capa, pexels_key, capa_raw_path):
+        # Capa em proporção 16:9 perfeita (sem deformação)
+        if recortar_foto_proporcional(capa_raw_path, capa_fit_path, 1080, 560):
+            try:
+                flowables.append(RLImage(capa_fit_path, width=540, height=280))
+            except Exception:
+                pass
 
     flowables.append(PageBreak())
 
-    # INTRODUÇÃO
+    # ==================== INTRODUÇÃO ====================
     flowables.append(Paragraph("Introdução Técnica & Fundamentos do Método", estilo_h1))
     flowables.append(Spacer(1, 4))
     for p in dados.get("introducao", "").split("\n"):
         if p.strip():
             flowables.append(Paragraph(p.strip(), estilo_corpo))
 
-    flowables.append(Spacer(1, 8))
-    flowables.append(HRFlowable(width="100%", thickness=0.8, color=colors.HexColor("#CBD5E1"), spaceAfter=10))
+    flowables.append(Spacer(1, 6))
+    flowables.append(HRFlowable(width="100%", thickness=0.8, color=colors.HexColor("#CBD5E1"), spaceAfter=8))
 
-    # CAPÍTULOS TÉCNICOS COM DUPLA FOTO
+    # ==================== CAPÍTULOS TÉCNICOS COM FOTOS NATURAIS ====================
     for cap in dados.get("capitulos", []):
         flowables.append(Paragraph(f"Módulo {cap.get('numero')}: {cap.get('titulo')}", estilo_h1))
-        flowables.append(Spacer(1, 3))
+        flowables.append(Spacer(1, 2))
 
-        # FOTO 1: Ação / Preparo
-        termo_proc = cap.get("termo_busca_foto_processo", cap.get("termo_busca_foto", "working process"))
+        # FOTO 1: Preparo / Ação (Banner proporcional 3:1 real, recortado do centro)
+        termo_proc = cap.get("termo_busca_foto_processo", cap.get("termo_busca_foto", "working hands"))
         if termo_proc:
-            proc_img_path = os.path.join(DIR_PEXELS, f"proc_{cap.get('numero')}_{int(time.time())}.jpg")
-            if buscar_foto_pexels(termo_proc, pexels_key, proc_img_path):
-                try:
-                    flowables.append(RLImage(proc_img_path, width=540, height=95))
-                    flowables.append(Spacer(1, 4))
-                except Exception:
-                    pass
+            proc_raw = os.path.join(DIR_PEXELS, f"proc_raw_{cap.get('numero')}_{int(time.time())}.jpg")
+            proc_fit = os.path.join(DIR_PEXELS, f"proc_fit_{cap.get('numero')}_{int(time.time())}.jpg")
+            if buscar_foto_pexels(termo_proc, pexels_key, proc_raw):
+                if recortar_foto_proporcional(proc_raw, proc_fit, 1080, 280):
+                    try:
+                        flowables.append(RLImage(proc_fit, width=540, height=140))
+                        flowables.append(Spacer(1, 4))
+                    except Exception:
+                        pass
 
         # Caixa de Alerta Técnico
         alerta = cap.get("alerta_tecnico", "")
@@ -651,17 +667,17 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_pdf: str)
             tabela_alerta.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, -1), cor_azul_claro),
                 ('BOX', (0, 0), (-1, -1), 1, cor_borda),
-                ('PADDING', (0, 0), (-1, -1), 4),
+                ('PADDING', (0, 0), (-1, -1), 3.5),
             ]))
             flowables.append(tabela_alerta)
-            flowables.append(Spacer(1, 4))
+            flowables.append(Spacer(1, 3))
 
         # Texto Explicativo Denso
         for p_cap in cap.get("conteudo", "").split("\n"):
             if p_cap.strip():
                 flowables.append(Paragraph(p_cap.strip(), estilo_corpo))
 
-        # Ficha Técnica com Tabela Universal
+        # Ficha Técnica / Protocolo Operacional
         receita_nome = cap.get("receita_nome", "")
         if receita_nome:
             flowables.append(Paragraph(f"📋 Ficha Técnica: {receita_nome}", estilo_h2))
@@ -682,17 +698,17 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_pdf: str)
                         Paragraph(item.get("funcao", ""), estilo_celula)
                     ])
 
-                tabela_receita = Table(dados_tabela, colWidths=[200, 80, 260])
+                tabela_receita = Table(dados_tabela, colWidths=[190, 85, 265])
                 tabela_receita.setStyle(TableStyle([
                     ('BACKGROUND', (0, 0), (-1, 0), cor_azul),
                     ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
                     ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
                     ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
                     ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
-                    ('PADDING', (0, 0), (-1, -1), 2.5),
+                    ('PADDING', (0, 0), (-1, -1), 2),
                 ]))
                 flowables.append(tabela_receita)
-                flowables.append(Spacer(1, 3))
+                flowables.append(Spacer(1, 2))
 
             passos = cap.get("passos_preparo", [])
             if passos:
@@ -700,21 +716,23 @@ def compilar_pdf_ebook_com_fotos(dados: dict, pexels_key: str, caminho_pdf: str)
                 for idx_p, passo in enumerate(passos, 1):
                     flowables.append(Paragraph(f"<b>{idx_p}.</b> {passo}", estilo_item))
 
-        # FOTO 2: O Resultado Final Perfeito
-        termo_res = cap.get("termo_busca_foto_resultado", "success professional result")
+        # FOTO 2: O Resultado Final (Banner proporcional 3:1 real, enquadrado perfeitamente)
+        termo_res = cap.get("termo_busca_foto_resultado", "professional result success")
         if termo_res:
-            res_img_path = os.path.join(DIR_PEXELS, f"res_{cap.get('numero')}_{int(time.time())}.jpg")
-            if buscar_foto_pexels(termo_res, pexels_key, res_img_path):
-                try:
-                    flowables.append(Spacer(1, 3))
-                    flowables.append(RLImage(res_img_path, width=540, height=95))
-                    legenda = cap.get("legenda_resultado", "Resultado visual do processo concluído com sucesso.")
-                    flowables.append(Paragraph(f"📷 <b>Resultado Esperado:</b> {legenda}", estilo_legenda_foto))
-                except Exception:
-                    pass
+            res_raw = os.path.join(DIR_PEXELS, f"res_raw_{cap.get('numero')}_{int(time.time())}.jpg")
+            res_fit = os.path.join(DIR_PEXELS, f"res_fit_{cap.get('numero')}_{int(time.time())}.jpg")
+            if buscar_foto_pexels(termo_res, pexels_key, res_raw):
+                if recortar_foto_proporcional(res_raw, res_fit, 1080, 280):
+                    try:
+                        flowables.append(Spacer(1, 3))
+                        flowables.append(RLImage(res_fit, width=540, height=140))
+                        legenda = cap.get("legenda_resultado", "Resultado visual do processo concluído com sucesso.")
+                        flowables.append(Paragraph(f"📷 <b>Resultado Esperado:</b> {legenda}", estilo_legenda_foto))
+                    except Exception:
+                        pass
 
-        flowables.append(Spacer(1, 4))
-        flowables.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#E2E8F0"), spaceAfter=6))
+        flowables.append(Spacer(1, 3))
+        flowables.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#E2E8F0"), spaceAfter=5))
         flowables.append(PageBreak())
 
     doc.build(flowables, canvasmaker=NumeradorPaginas)
@@ -1116,7 +1134,7 @@ with tab_minerador:
             )
 
 # ------------------------------------------------------------------------------
-# ABA 2: CRIAR VSL & DUBLAGEM GLOBAL (CONECTADA AO NICHO ATIVO COM KEYS EXCLUSIVAS)
+# ABA 2: CRIAR VSL & DUBLAGEM GLOBAL (CONECTADA AO NICHO ATIVO)
 # ------------------------------------------------------------------------------
 with tab_vsl:
     st.markdown("## 🚀 Criador de Vídeo de Vendas (VSL) & Dublagem Global")
@@ -1252,7 +1270,7 @@ with tab_vsl:
                 )
 
 # ------------------------------------------------------------------------------
-# ABA 3: CRIAR E-BOOK & TRADUÇÃO GLOBAL (CONECTADO COM KEYS EXCLUSIVAS)
+# ABA 3: CRIAR E-BOOK & TRADUÇÃO GLOBAL (FOTOS COM CORTE PIL NATURAL)
 # ------------------------------------------------------------------------------
 with tab_ebook:
     st.markdown("## 📚 Criador de E-book Comercial & Diagramação Editorial")
@@ -1261,7 +1279,7 @@ with tab_ebook:
     if nicho_integrado:
         st.success(f"🎯 **Nicho Conectado da Mineração:** `{nicho_integrado}`")
     else:
-        st.caption("Páginas 100% preenchidas com dupla fotografia e tabelas sob medida para qualquer nicho.")
+        st.caption("Páginas 100% preenchidas com fotografia proporcional e tabelas sob medida para qualquer nicho.")
 
     col_e1, col_e2 = st.columns(2)
     with col_e1:
@@ -1275,7 +1293,7 @@ with tab_ebook:
         if saldo_atual < 10:
             st.error("❌ Saldo insuficiente! Você precisa de 10 créditos.")
         else:
-            with st.spinner(f"Construindo manual completo de '{tema_ebook}' com fotos e tabelas personalizadas..."):
+            with st.spinner(f"Construindo manual completo de '{tema_ebook}' com fotos naturais e tabelas personalizadas..."):
                 try:
                     dados_eb = gerar_conteudo_ebook_ia(tema_ebook, publico_ebook)
                     st.session_state["dados_ebook_sessao"] = dados_eb
@@ -1287,7 +1305,7 @@ with tab_ebook:
                     debitar_creditos_cloud(email_usuario, f"Criação E-book ({tema_ebook})", 10)
                     st.session_state["pdf_ebook_pronto"] = caminho_pdf
                     st.session_state["pdf_ebook_nome"] = nome_pdf
-                    st.success(f"✅ E-book de '{tema_ebook}' gerado com layout editorial completo!")
+                    st.success(f"✅ E-book de '{tema_ebook}' gerado com layout editorial completo e fotos perfeitas!")
                     st.rerun()
                 except Exception as e_eb:
                     st.error(f"Erro na compilação do E-book: {e_eb}")
@@ -1308,7 +1326,7 @@ with tab_ebook:
         st.markdown("---")
         with st.container(border=True):
             st.markdown("### 🌐 Tradução Global do E-book (36 Idiomas)")
-            st.caption("Internacionalize mantendo a diagramação editorial de páginas cheias e fotos duplas.")
+            st.caption("Internacionalize mantendo a diagramação editorial de páginas cheias e fotos proporcionais.")
 
             col_tr1, col_tr2 = st.columns([2, 1])
             with col_tr1:
