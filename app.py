@@ -5,7 +5,7 @@ import time
 import textwrap
 import subprocess
 import requests
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Tuple, Optional
 
 import streamlit as st
@@ -66,6 +66,8 @@ OPENAI_API_KEY = obter_credencial("OPENAI_API_KEY")
 GEMINI_API_KEY = obter_credencial("GEMINI_API_KEY")
 PEXELS_API_KEY = obter_credencial("PEXELS_API_KEY")
 ELEVENLABS_API_KEY = obter_credencial("ELEVENLABS_API_KEY")
+TIKTOK_ADVERTISER_ID = obter_credencial("TIKTOK_ADVERTISER_ID", "7693205737438314502")
+TIKTOK_ACCESS_TOKEN = obter_credencial("TIKTOK_ACCESS_TOKEN", "")
 
 supabase_client: Optional[Client] = None
 if SUPABASE_URL and SUPABASE_KEY:
@@ -459,7 +461,7 @@ def pipeline_geracao_livro_completo(tema: str, publico: str, gerar_bump: bool = 
     blueprint = gerar_blueprint_ebook_ia(tema, publico)
     
     if status_placeholder:
-        status_placeholder.write("✍️️ [2/6] Escrevendo introdução técnica aprofundada...")
+        status_placeholder.write("✍ [2/6] Escrevendo introdução técnica aprofundada...")
     if progress_bar:
         progress_bar.progress(0.20)
     
@@ -627,7 +629,7 @@ def traduzir_livro_completo_ia(dados_livro: dict, idioma_destino: str, progress_
     }
 
 # ==============================================================================
-# 6. DIAGRAMAÇÃO EDITORIAL COM FLUXO OTIMIZADO (SEM ESPAÇOS SOBRANDO)
+# 6. DIAGRAMAÇÃO EDITORIAL COM FLUXO OTIMIZADO
 # ==============================================================================
 class NumeradorPaginas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
@@ -725,7 +727,6 @@ def recortar_foto_proporcional(orig_path: str, dest_path: str, target_w: int, ta
         return False
 
 def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: str) -> str:
-    # Margens balanceadas para otimizar a área útil da folha
     doc = SimpleDocTemplate(
         caminho_pdf,
         pagesize=letter,
@@ -742,7 +743,6 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
     cor_alerta_border = colors.HexColor("#FCA5A5")
     cor_alerta_text = colors.HexColor("#991B1B")
 
-    # Estilos com espaçamento vertical compacto para eliminar buracos brancos
     estilo_capa_tit = ParagraphStyle(
         'CapaTitulo',
         parent=styles['Normal'],
@@ -842,7 +842,7 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
 
     flowables = []
 
-    # ==================== CAPA ====================
+    # CAPA
     flowables.append(Spacer(1, 20))
     flowables.append(Paragraph(dados_livro.get("titulo", "Manual Técnico Profissional"), estilo_capa_tit))
     flowables.append(Paragraph(dados_livro.get("subtitulo", "Guia Técnico Avançado"), estilo_capa_sub))
@@ -861,7 +861,7 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
     flowables.append(Paragraph("<b>AUTORIA:</b> DEPARTAMENTO DE ENGENHARIA DE PROCESSOS & DESENVOLVIMENTO", estilo_legenda_foto))
     flowables.append(PageBreak())
 
-    # ==================== SUMÁRIO EXECUTIVO ====================
+    # SUMÁRIO
     flowables.append(Paragraph("Sumário Executivo", estilo_h1))
     flowables.append(HRFlowable(width="100%", thickness=1, color=cor_azul, spaceAfter=10))
 
@@ -886,7 +886,7 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
     flowables.append(tab_sumario)
     flowables.append(PageBreak())
 
-    # ==================== INTRODUÇÃO ====================
+    # INTRODUÇÃO
     flowables.append(Paragraph("Introdução Geral & Fundamentos Sistêmicos", estilo_h1))
     flowables.append(HRFlowable(width="100%", thickness=0.8, color=colors.HexColor("#CBD5E1"), spaceAfter=8))
 
@@ -897,12 +897,11 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
     flowables.append(Spacer(1, 10))
     flowables.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#E2E8F0"), spaceAfter=14))
 
-    # ==================== MÓDULOS TÉCNICOS INDIVIDUAIS (FLUXO CONTÍNUO OTIMIZADO) ====================
+    # MÓDULOS
     for mod in dados_livro.get("modulos", []):
         flowables.append(Paragraph(f"Módulo {mod.get('numero')}: {mod.get('titulo')}", estilo_h1))
         flowables.append(HRFlowable(width="100%", thickness=0.8, color=cor_azul, spaceAfter=6))
 
-        # Imagem compacta para não quebrar a página de forma abrupta
         termo_proc = mod.get("termo_busca_foto_processo")
         if termo_proc:
             p_raw = os.path.join(DIR_PEXELS, f"mod_proc_raw_{mod.get('numero')}_{int(time.time())}.jpg")
@@ -985,11 +984,10 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
                     except Exception:
                         pass
 
-        # Divisor elegante entre módulos sem quebra de página forçada
         flowables.append(Spacer(1, 10))
         flowables.append(HRFlowable(width="100%", thickness=0.8, color=colors.HexColor("#CBD5E1"), spaceAfter=14))
 
-    # ==================== APÊNDICE ====================
+    # APÊNDICE
     ap = dados_livro.get("apendice", {})
     flowables.append(Paragraph(ap.get("titulo", "Dossiê Clínico de Falhas & Engenharia de Lucro"), estilo_h1))
     flowables.append(HRFlowable(width="100%", thickness=1, color=cor_azul, spaceAfter=8))
@@ -1133,7 +1131,6 @@ def compilar_pdf_order_bump(dados_bump: dict, pexels_key: str, caminho_pdf: str)
             except Exception:
                 pass
 
-    # Checklist Operacional
     flowables.append(Paragraph("Checklist de Conformidade Operacional (Auditoria Passo a Passo)", estilo_sec))
     chks = dados_bump.get("checklist_rotina", [])
     if chks:
@@ -1161,7 +1158,6 @@ def compilar_pdf_order_bump(dados_bump: dict, pexels_key: str, caminho_pdf: str)
         flowables.append(tab_chk)
         flowables.append(Spacer(1, 8))
 
-    # Tabela de Emergência
     flowables.append(Paragraph("Protocolo Rápido de Emergência (Resolução em 5 Minutos)", estilo_sec))
     em_list = dados_bump.get("tabela_emergencia", [])
     if em_list:
@@ -1174,7 +1170,7 @@ def compilar_pdf_order_bump(dados_bump: dict, pexels_key: str, caminho_pdf: str)
         ]
         for em in em_list:
             dados_t_em.append([
-                Paragraph(f"⚠️️ {em.get('anomalia', '')}", estilo_celula),
+                Paragraph(f"⚠ {em.get('anomalia', '')}", estilo_celula),
                 Paragraph(em.get("risco_imediato", ""), estilo_celula),
                 Paragraph(em.get("comando_correcao", ""), estilo_celula)
             ])
@@ -1418,7 +1414,104 @@ def dublar_roteiro_e_renderizar_vsl(
     return video_dublado, cenas_traduzidas
 
 # ==============================================================================
-# 8. INICIALIZAÇÃO DE ESTADOS GLOBAIS
+# 8. MOTOR DE INTEGRAÇÃO TIKTOK MARKETING API
+# ==============================================================================
+TIKTOK_API_BASE = "https://business-api.tiktok.com/open_api/v1.3"
+
+def disparar_campanha_tiktok_completa(
+    advertiser_id: str,
+    access_token: str,
+    video_path: str,
+    campaign_name: str,
+    copy_text: str,
+    landing_page_url: str,
+    orcamento_diario: float
+) -> dict:
+    headers = {"Access-Token": access_token}
+    headers_json = {"Access-Token": access_token, "Content-Type": "application/json"}
+
+    # 1. Upload do Vídeo
+    if not os.path.exists(video_path):
+        raise FileNotFoundError(f"Vídeo não encontrado em: {video_path}")
+
+    url_upload = f"{TIKTOK_API_BASE}/file/video/ad/upload/"
+    with open(video_path, "rb") as vf:
+        files = {"video_file": vf}
+        data = {"advertiser_id": advertiser_id, "upload_type": "UPLOAD_BY_FILE"}
+        res_upload = requests.post(url_upload, headers=headers, data=data, files=files).json()
+
+    if res_upload.get("code") != 0:
+        raise Exception(f"Erro no Upload do Vídeo: {res_upload.get('message')}")
+    
+    video_id = res_upload["data"]["video_id"]
+
+    # 2. Criação da Campanha
+    url_campaign = f"{TIKTOK_API_BASE}/campaign/create/"
+    payload_campaign = {
+        "advertiser_id": advertiser_id,
+        "campaign_name": campaign_name,
+        "objective_type": "WEB_CONVERSIONS",
+        "budget_mode": "BUDGET_MODE_DYNAMIC"
+    }
+    res_camp = requests.post(url_campaign, headers=headers_json, json=payload_campaign).json()
+    if res_camp.get("code") != 0:
+        raise Exception(f"Erro ao criar Campanha: {res_camp.get('message')}")
+    
+    campaign_id = res_camp["data"]["campaign_id"]
+
+    # 3. Criação do Grupo de Anúncios
+    url_adgroup = f"{TIKTOK_API_BASE}/adgroup/create/"
+    data_inicio = datetime.now(timezone.utc) + timedelta(minutes=10)
+    data_formatada = data_inicio.strftime("%Y-%m-%d %H:%M:%S")
+
+    payload_adgroup = {
+        "advertiser_id": advertiser_id,
+        "campaign_id": campaign_id,
+        "adgroup_name": f"Grupo - {campaign_name}",
+        "placement_type": "PLACEMENT_TYPE_NORMAL",
+        "placements": ["PLACEMENT_TIKTOK"],
+        "location_ids": ["6252001"],  # Código para Brasil
+        "budget_mode": "BUDGET_MODE_DAY",
+        "budget": orcamento_diario,
+        "schedule_type": "SCHEDULE_FROM_NOW",
+        "schedule_start_time": data_formatada,
+        "billing_event": "OCPM",
+        "bid_type": "BID_TYPE_NO_BID",
+        "optimization_goal": "CLICK"
+    }
+    res_adgroup = requests.post(url_adgroup, headers=headers_json, json=payload_adgroup).json()
+    if res_adgroup.get("code") != 0:
+        raise Exception(f"Erro ao criar Grupo de Anúncios: {res_adgroup.get('message')}")
+    
+    adgroup_id = res_adgroup["data"]["adgroup_id"]
+
+    # 4. Publicação do Anúncio Final
+    url_ad = f"{TIKTOK_API_BASE}/ad/create/"
+    payload_ad = {
+        "advertiser_id": advertiser_id,
+        "adgroup_id": adgroup_id,
+        "creatives": [{
+            "ad_name": f"Criativo - {campaign_name}",
+            "ad_format": "SINGLE_VIDEO",
+            "video_id": video_id,
+            "ad_text": copy_text[:100],
+            "call_to_action": "LEARN_MORE",
+            "landing_page_url": landing_page_url
+        }]
+    }
+    res_ad = requests.post(url_ad, headers=headers_json, json=payload_ad).json()
+    if res_ad.get("code") != 0:
+        raise Exception(f"Erro ao publicar Anúncio: {res_ad.get('message')}")
+
+    return {
+        "video_id": video_id,
+        "campaign_id": campaign_id,
+        "adgroup_id": adgroup_id,
+        "ad_id": res_ad["data"]["ad_ids"][0]
+    }
+
+# ==============================================================================
+# 9. INICIALIZAÇÃO DE ESTADOS GLOBAIS
 # ==============================================================================
 if "vsl_input_tema" not in st.session_state:
     st.session_state["vsl_input_tema"] = "Confeitaria Lucrativa & Bolos Caseiros"
@@ -1507,13 +1600,17 @@ with st.sidebar:
     st.write("• Gemini:", "🟢 Ativo" if GEMINI_API_KEY else "🔴 Ausente")
     st.write("• ElevenLabs:", "🟢 Ativo" if ELEVENLABS_API_KEY else "🔴 Ausente")
     st.write("• Pexels:", "🟢 Ativo" if PEXELS_API_KEY else "🔴 Ausente")
+    st.write("• TikTok Ads:", "🟢 Token Configurado" if TIKTOK_ACCESS_TOKEN else "🟡 Aguardando Token")
 
-# ABAS PRINCIPAIS
-tab_minerador, tab_vsl, tab_ebook, tab_master = st.tabs([
+# ==============================================================================
+# 10. ABAS PRINCIPAIS DO SISTEMA
+# ==============================================================================
+tab_minerador, tab_vsl, tab_ebook, tab_ads, tab_master = st.tabs([
     "🔍 1. Minerador & Google Ads",
     "🚀 2. Criar VSL & Dublagem Global",
     "📚 3. Criar Livro Técnico & Order Bump",
-    "👑 4. Gestão Master"
+    "🎯 4. Central de Publicidade",
+    "👑 5. Gestão Master"
 ])
 
 # ------------------------------------------------------------------------------
@@ -1630,7 +1727,7 @@ with tab_vsl:
 
     col_opt1, col_opt2, col_opt3 = st.columns(3)
     with col_opt1:
-        formato_vertical = st.checkbox("Formato Vertical 9:16 (Reels/TikTok/Shorts)", value=False, key="vsl_check_vertical")
+        formato_vertical = st.checkbox("Formato Vertical 9:16 (Reels/TikTok/Shorts)", value=True, key="vsl_check_vertical")
     with col_opt2:
         voz_sel = st.selectbox("Locução (OpenAI TTS):", ["onyx (Forte/Masculina)", "alloy (Neutra)", "nova (Energética/Feminina)", "echo (Suave)"], key="vsl_select_voz")
         voz_codigo = voz_sel.split()[0]
@@ -1656,7 +1753,7 @@ with tab_vsl:
                     video_pronto = renderizar_vsl_completa(
                         cenas=cenas_estruturadas,
                         vertical=formato_vertical,
-                        voz=voz_codigo,
+                        voz=voz,
                         pexels_key=PEXELS_API_KEY,
                         musica_fundo_path=p_musica,
                         progress_bar=barra_vsl
@@ -1695,7 +1792,7 @@ with tab_vsl:
             with col_d2:
                 st.write("")
                 st.caption("Custo: 20 Créditos")
-                btn_dub = st.button("🎙️️ Dublar Vídeo Agora (20 cr)", type="primary", use_container_width=True, key="btn_exec_dub")
+                btn_dub = st.button("🎙 Dublar Vídeo Agora (20 cr)", type="primary", use_container_width=True, key="btn_exec_dub")
 
             if btn_dub:
                 if saldo_atual < 20:
@@ -1925,7 +2022,150 @@ with tab_ebook:
                         )
 
 # ------------------------------------------------------------------------------
-# ABA 4: GESTÃO MASTER
+# ABA 4: CENTRAL DE PUBLICIDADE MULTIPLATAFORMA
+# ------------------------------------------------------------------------------
+with tab_ads:
+    st.markdown("## 🎯 Central de Tráfego & Publicidade Automática")
+    st.caption("Dispare campanhas em redes de tráfego pago utilizando os criativos já renderizados nas etapas anteriores.")
+
+    if "plataforma_ativa" not in st.session_state:
+        st.session_state["plataforma_ativa"] = "TikTok"
+
+    # SELETOR DE PLATAFORMAS (ÍCONES / BOTÕES)
+    col_icon_tt, col_icon_meta, col_icon_goog = st.columns(3)
+    with col_icon_tt:
+        if st.button("🎵 **TikTok Ads**\n\n*(Vídeos Verticais 9:16)*", use_container_width=True):
+            st.session_state["plataforma_ativa"] = "TikTok"
+    with col_icon_meta:
+        if st.button("🔵 **Meta Ads**\n\n*(Instagram Reels & Stories)*", use_container_width=True):
+            st.session_state["plataforma_ativa"] = "Meta"
+    with col_icon_goog:
+        if st.button("🔴 **Google & YouTube**\n\n*(YouTube Shorts & Search)*", use_container_width=True):
+            st.session_state["plataforma_ativa"] = "Google"
+
+    st.markdown("---")
+
+    # PAINEL TIKTOK ADS
+    if st.session_state["plataforma_ativa"] == "TikTok":
+        st.subheader("🎵 Disparo de Anúncios no TikTok Ads")
+
+        video_atual = st.session_state.get("video_vsl_pronto")
+
+        col_cfg1, col_cfg2 = st.columns([1.2, 1])
+
+        with col_cfg1:
+            st.markdown("##### 1. Configuração da Campanha")
+            nome_sugerido = f"Campanha VSL - {st.session_state.get('nicho_pesquisado_nome', 'Conversão')}"
+            nome_camp = st.text_input("Nome da Campanha:", value=nome_sugerido)
+            link_checkout = st.text_input(
+                "Link de Checkout da Kiwify / Página de Vendas:",
+                placeholder="https://pay.kiwify.com.br/...",
+                help="Insira a URL que receberá o tráfego do anúncio."
+            )
+            
+            c_orc, c_moeda = st.columns([2, 1])
+            with c_orc:
+                orcamento = st.number_input("Orçamento Diário:", min_value=30.0, value=60.0, step=10.0)
+            with c_moeda:
+                st.selectbox("Moeda:", ["BRL (R$)"], disabled=True)
+
+            copy_anuncio = st.text_area(
+                "Texto do Anúncio (Legenda):",
+                value=f"Descubra o passo a passo completo sobre {st.session_state.get('nicho_pesquisado_nome', 'este método')}! Toque em 'Saiba Mais'.",
+                height=90
+            )
+
+        with col_cfg2:
+            st.markdown("##### 2. Criativo em Vídeo (9:16)")
+            if video_atual and os.path.exists(video_atual):
+                st.video(video_atual)
+                st.success("✅ Vídeo da VSL pronto e carregado na memória!")
+            else:
+                st.info("Nenhum vídeo renderizado na aba 2. Você pode subir um arquivo local:")
+                video_manual = st.file_uploader("Carregar arquivo .MP4 do seu computador:", type=["mp4"])
+                if video_manual:
+                    caminho_ad = os.path.join(DIR_VSL, f"upload_manual_{int(time.time())}.mp4")
+                    with open(caminho_ad, "wb") as f_up:
+                        f_up.write(video_manual.read())
+                    st.session_state["video_vsl_pronto"] = caminho_ad
+                    st.video(caminho_ad)
+
+        st.markdown("---")
+        st.markdown("##### 3. Autenticação e Disparo")
+
+        adv_padrao = TIKTOK_ADVERTISER_ID
+        tok_padrao = TIKTOK_ACCESS_TOKEN
+
+        col_c1, col_c2 = st.columns(2)
+        with col_c1:
+            adv_id_input = st.text_input("Advertiser ID (Conta Central VSL):", value=adv_padrao)
+        with col_c2:
+            token_input = st.text_input(
+                "TikTok Access Token:",
+                value=tok_padrao,
+                type="password",
+                help="Token gerado no portal TikTok for Business Developers"
+            )
+
+        aba_disparo, aba_manual_tt = st.tabs(["⚡ Disparo Automático (1 Clique)", "📥 Download & Atalho Manual"])
+
+        with aba_disparo:
+            if st.button("🚀 Publicar Campanha Completa no TikTok Ads", type="primary", use_container_width=True):
+                vid_path = st.session_state.get("video_vsl_pronto")
+                if not token_input:
+                    st.error("⚠️ Insira o Access Token do TikTok para autenticar a API.")
+                elif not link_checkout:
+                    st.error("⚠️ Preencha o link de checkout da Kiwify.")
+                elif not vid_path or not os.path.exists(vid_path):
+                    st.error("⚠️ Nenhum arquivo de vídeo carregado na memória.")
+                else:
+                    with st.spinner("⏳ Criando campanha, enviando vídeo e ativando anúncio no TikTok..."):
+                        try:
+                            res_publicacao = disparar_campanha_tiktok_completa(
+                                advertiser_id=adv_id_input,
+                                access_token=token_input,
+                                video_path=vid_path,
+                                campaign_name=nome_camp,
+                                copy_text=copy_anuncio,
+                                landing_page_url=link_checkout,
+                                orcamento_diario=orcamento
+                            )
+                            st.success("🎉 Campanha criada e enviada com sucesso ao TikTok Ads!")
+                            st.json(res_publicacao)
+                        except Exception as e_pub:
+                            st.error(f"Erro na publicação: {e_pub}")
+
+        with aba_manual_tt:
+            st.caption("Caso ainda não tenha o Access Token gerado, baixe o vídeo e abra o gerenciador:")
+            col_m_btn1, col_m_btn2 = st.columns(2)
+            with col_m_btn1:
+                if video_atual and os.path.exists(video_atual):
+                    with open(video_atual, "rb") as f_v_ad:
+                        st.download_button(
+                            "📥 Baixar Vídeo Renderizado (.mp4)",
+                            data=f_v_ad,
+                            file_name="anuncio_tiktok_vsl.mp4",
+                            use_container_width=True
+                        )
+            with col_m_btn2:
+                st.link_button(
+                    "🌐 Abrir TikTok Ads Manager",
+                    "https://ads.tiktok.com/i18n/dashboard",
+                    use_container_width=True
+                )
+
+    # PAINEL META ADS
+    elif st.session_state["plataforma_ativa"] == "Meta":
+        st.subheader("🔵 Meta Ads (Instagram Reels & Stories)")
+        st.info("Módulo estruturado para integração via Graph API do Facebook. Utilizará o mesmo vídeo 9:16 gerado pela VSL.")
+
+    # PAINEL GOOGLE ADS
+    elif st.session_state["plataforma_ativa"] == "Google":
+        st.subheader("🔴 Google Ads & YouTube Shorts")
+        st.info("Módulo estruturado para disparo de YouTube Shorts e campanhas de Display/Search.")
+
+# ------------------------------------------------------------------------------
+# ABA 5: GESTÃO MASTER
 # ------------------------------------------------------------------------------
 with tab_master:
     st.markdown("## 👑 Painel de Gestão Master")
