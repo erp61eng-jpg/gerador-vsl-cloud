@@ -1750,10 +1750,11 @@ with tab_vsl:
                         with open(p_musica, "wb") as f_m:
                             f_m.write(musica_up.getbuffer())
 
+                    # CORREÇÃO APLICADA: voz=voz_codigo
                     video_pronto = renderizar_vsl_completa(
                         cenas=cenas_estruturadas,
                         vertical=formato_vertical,
-                        voz=voz,
+                        voz=voz_codigo,
                         pexels_key=PEXELS_API_KEY,
                         musica_fundo_path=p_musica,
                         progress_bar=barra_vsl
