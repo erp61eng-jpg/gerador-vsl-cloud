@@ -115,6 +115,16 @@ IDIOMAS_SISTEMA_36 = {
     "🇿🇦 Africâner": "Afrikaans"
 }
 
+def listar_musicas_locais() -> Dict[str, Optional[str]]:
+    """Varre a pasta temp_musicas e retorna opções formatadas para seleção."""
+    os.makedirs(DIR_MUSICAS, exist_ok=True)
+    arquivos = [f for f in os.listdir(DIR_MUSICAS) if f.lower().endswith(".mp3")]
+    opcoes = {"Sem trilha sonora (Apenas voz)": None}
+    for arq in sorted(arquivos):
+        nome_formatado = arq.replace("_", " ").replace("-", " ").replace(".mp3", "").title()
+        opcoes[f"🎵 {nome_formatado}"] = os.path.join(DIR_MUSICAS, arq)
+    return opcoes
+
 # ==============================================================================
 # 2. MOTOR DE CRÉDITOS & SUPABASE
 # ==============================================================================
@@ -1273,11 +1283,24 @@ def renderizar_vsl_completa(
     musica_fundo_path: Optional[str] = None,
     volume_musica: float = 0.08,
     logo_path: Optional[str] = None,
+    marca_dagua: Optional[str] = None,
     progress_bar = None
 ) -> str:
     res_w, res_h = (1080, 1920) if vertical else (1920, 1080)
     cenas_clipes = []
     total = len(cenas)
+
+    # Configuração do filtro de marca d'água no canto superior esquerdo
+    filtro_marca = ""
+    if marca_dagua and marca_dagua.strip():
+        marca_limpa = re.sub(r"[':\\]", "", marca_dagua.strip())
+        tam_fonte_marca = 32 if vertical else 26
+        pos_y_marca = 80 if vertical else 50
+        filtro_marca = (
+            f",drawtext=text='{marca_limpa}':fontcolor=white@0.65:"
+            f"fontsize={tam_fonte_marca}:box=1:boxcolor=black@0.35:boxborderw=8:"
+            f"x=45:y={pos_y_marca}"
+        )
 
     for idx, item in enumerate(cenas):
         frase = item.get("fala", "") if isinstance(item, dict) else str(item)
@@ -1308,6 +1331,7 @@ def renderizar_vsl_completa(
                 f"drawtext=textfile='{legenda_path_escapado}':fontcolor=white:fontsize={fontsize}:"
                 f"box=1:boxcolor=black@0.75:boxborderw=16:line_spacing=12:"
                 f"x=(w-text_w)/2:y=h-text_h-90"
+                f"{filtro_marca}"
             )
             cmd = [
                 "ffmpeg", "-y",
@@ -1328,6 +1352,7 @@ def renderizar_vsl_completa(
                 f"drawtext=textfile='{legenda_path_escapado}':fontcolor=white:fontsize={fontsize+4}:"
                 f"box=1:boxcolor=blue@0.65:boxborderw=20:line_spacing=14:"
                 f"x=(w-text_w)/2:y=(h-text_h)/2"
+                f"{filtro_marca}"
             )
             cmd = [
                 "ffmpeg", "-y",
@@ -1387,6 +1412,7 @@ def dublar_roteiro_e_renderizar_vsl(
     musica_fundo_path: Optional[str] = None,
     volume_musica: float = 0.08,
     logo_path: Optional[str] = None,
+    marca_dagua: Optional[str] = None,
     progress_bar = None
 ) -> Tuple[str, List[Dict[str, str]]]:
     cenas_traduzidas = []
@@ -1409,6 +1435,7 @@ def dublar_roteiro_e_renderizar_vsl(
         musica_fundo_path=musica_fundo_path,
         volume_musica=volume_musica,
         logo_path=logo_path,
+        marca_dagua=marca_dagua,
         progress_bar=progress_bar
     )
     return video_dublado, cenas_traduzidas
@@ -1524,6 +1551,11 @@ if "ebook_input_tema" not in st.session_state:
     st.session_state["ebook_input_tema"] = "Manual Definitivo da Confeitaria Lucrativa"
 if "ebook_input_publico" not in st.session_state:
     st.session_state["ebook_input_publico"] = "Mulheres e empreendedoras que buscam renda extra com doces"
+
+if "vsl_musica_ativa" not in st.session_state:
+    st.session_state["vsl_musica_ativa"] = None
+if "vsl_marca_ativa" not in st.session_state:
+    st.session_state["vsl_marca_ativa"] = ""
 
 # BARRA LATERAL
 with st.sidebar:
@@ -1728,11 +1760,33 @@ with tab_vsl:
     col_opt1, col_opt2, col_opt3 = st.columns(3)
     with col_opt1:
         formato_vertical = st.checkbox("Formato Vertical 9:16 (Reels/TikTok/Shorts)", value=True, key="vsl_check_vertical")
+        marca_dagua_input = st.text_input(
+            "🔒 Marca d'água (Anti-Cópia):",
+            value=st.session_state.get("vsl_marca_ativa", ""),
+            placeholder="Ex: @receitas.semgluten ou Manual Prático",
+            help="Texto semi-transparente fixo no topo esquerdo do vídeo que impede plágio do seu anúncio.",
+            key="vsl_input_marca_dagua"
+        )
     with col_opt2:
         voz_sel = st.selectbox("Locução (OpenAI TTS):", ["onyx (Forte/Masculina)", "alloy (Neutra)", "nova (Energética/Feminina)", "echo (Suave)"], key="vsl_select_voz")
         voz_codigo = voz_sel.split()[0]
     with col_opt3:
-        musica_up = st.file_uploader("Trilha Sonora (.mp3 opcional):", type=["mp3"], key="vsl_uploader_musica")
+        musica_up = st.file_uploader("Adicionar novo .mp3 (Salva no acervo):", type=["mp3"], key="vsl_uploader_musica")
+        if musica_up:
+            p_salvar = os.path.join(DIR_MUSICAS, musica_up.name)
+            if not os.path.exists(p_salvar):
+                with open(p_salvar, "wb") as f_m:
+                    f_m.write(musica_up.getbuffer())
+                st.toast(f"Música '{musica_up.name}' adicionada ao acervo!", icon="🎵")
+
+        opcoes_musica = listar_musicas_locais()
+        trilha_escolhida_nome = st.selectbox(
+            "Trilha Sonora de Fundo (8% vol):",
+            options=list(opcoes_musica.keys()),
+            key="vsl_select_trilha"
+        )
+        caminho_musica_ativa = opcoes_musica[trilha_escolhida_nome]
+        st.session_state["vsl_musica_ativa"] = caminho_musica_ativa
 
     if st.button("🎬 Gerar Roteiro e Renderizar VSL Original (20 cr)", type="primary", key="btn_render_vsl"):
         if saldo_atual < 20:
@@ -1743,20 +1797,18 @@ with tab_vsl:
                 try:
                     cenas_estruturadas = gerar_roteiro_vsl_ia(tema_vsl, promessa_vsl, publico_vsl, qtd_cenas)
                     st.session_state["roteiro_vsl"] = cenas_estruturadas
+                    st.session_state["vsl_marca_ativa"] = marca_dagua_input
 
-                    p_musica = None
-                    if musica_up:
-                        p_musica = os.path.join(DIR_MUSICAS, musica_up.name)
-                        with open(p_musica, "wb") as f_m:
-                            f_m.write(musica_up.getbuffer())
+                    p_musica = st.session_state.get("vsl_musica_ativa")
 
-                    # CORREÇÃO APLICADA: voz=voz_codigo
                     video_pronto = renderizar_vsl_completa(
                         cenas=cenas_estruturadas,
                         vertical=formato_vertical,
                         voz=voz_codigo,
                         pexels_key=PEXELS_API_KEY,
                         musica_fundo_path=p_musica,
+                        volume_musica=0.08,
+                        marca_dagua=marca_dagua_input,
                         progress_bar=barra_vsl
                     )
 
@@ -1805,7 +1857,8 @@ with tab_vsl:
                     barra_dub = st.progress(0.0)
                     with st.spinner(f"Traduzindo roteiro e sintetizando dublagem nativa para {idioma_dub_sel}..."):
                         try:
-                            p_musica = os.path.join(DIR_MUSICAS, musica_up.name) if musica_up else None
+                            p_musica = st.session_state.get("vsl_musica_ativa")
+                            marca_ativa = st.session_state.get("vsl_marca_ativa", marca_dagua_input)
                             v_dublado, rot_tr = dublar_roteiro_e_renderizar_vsl(
                                 cenas_originais=st.session_state["roteiro_vsl"],
                                 idioma_alvo=nome_lingua_dub,
@@ -1813,6 +1866,8 @@ with tab_vsl:
                                 voz=voz_codigo,
                                 pexels_key=PEXELS_API_KEY,
                                 musica_fundo_path=p_musica,
+                                volume_musica=0.08,
+                                marca_dagua=marca_ativa,
                                 progress_bar=barra_dub
                             )
                             debitar_creditos_cloud(email_usuario, f"Dublagem VSL ({nome_lingua_dub})", 20)
@@ -2032,7 +2087,6 @@ with tab_ads:
     if "plataforma_ativa" not in st.session_state:
         st.session_state["plataforma_ativa"] = "TikTok"
 
-    # SELETOR DE PLATAFORMAS (ÍCONES / BOTÕES)
     col_icon_tt, col_icon_meta, col_icon_goog = st.columns(3)
     with col_icon_tt:
         if st.button("🎵 **TikTok Ads**\n\n*(Vídeos Verticais 9:16)*", use_container_width=True):
