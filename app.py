@@ -115,6 +115,32 @@ IDIOMAS_SISTEMA_36 = {
     "🇿🇦 Africâner": "Afrikaans"
 }
 
+# ==============================================================================
+# GESTOR DE TRILHAS SONORAS (DOWNLOAD AUTOMÁTICO SE ESTIVER VAZIO)
+# ==============================================================================
+TRILHAS_PADRAO = {
+    "comercial_animada.mp3": "https://raw.githubusercontent.com/effacestudios/Royalty-Free-Music-Pack/master/commercial.mp3",
+    "planejamento_vendas.mp3": "https://raw.githubusercontent.com/effacestudios/Royalty-Free-Music-Pack/master/Planning.mp3",
+    "suave_dinamica.mp3": "https://raw.githubusercontent.com/effacestudios/Royalty-Free-Music-Pack/master/Happy%20Life.mp3"
+}
+
+def garantir_trilhas_padrao():
+    """Baixa faixas instrumentais gratuitas se a pasta temp_musicas estiver vazia."""
+    os.makedirs(DIR_MUSICAS, exist_ok=True)
+    existentes = [f for f in os.listdir(DIR_MUSICAS) if f.lower().endswith(".mp3")]
+    if not existentes:
+        for nome_arq, url in TRILHAS_PADRAO.items():
+            dest = os.path.join(DIR_MUSICAS, nome_arq)
+            try:
+                r = requests.get(url, timeout=12)
+                if r.status_code == 200 and len(r.content) > 10000:
+                    with open(dest, "wb") as f:
+                        f.write(r.content)
+            except Exception:
+                pass
+
+garantir_trilhas_padrao()
+
 def listar_musicas_locais() -> Dict[str, Optional[str]]:
     """Varre a pasta temp_musicas e retorna opções formatadas para seleção."""
     os.makedirs(DIR_MUSICAS, exist_ok=True)
@@ -1198,7 +1224,7 @@ def compilar_pdf_order_bump(dados_bump: dict, pexels_key: str, caminho_pdf: str)
     return caminho_pdf
 
 # ==============================================================================
-# 7. PROCESSAMENTO DE VÍDEO (TTS, PEXELS & FFMPEG)
+# 7. PROCESSAMENTO DE VÍDEO (TTS, PEXELS, WATERMARK & FFMPEG)
 # ==============================================================================
 def sintetizar_audio_tts(texto: str, output_path: str, voz: str = "onyx") -> bool:
     if not OPENAI_API_KEY:
@@ -1290,7 +1316,6 @@ def renderizar_vsl_completa(
     cenas_clipes = []
     total = len(cenas)
 
-    # Configuração do filtro de marca d'água no canto superior esquerdo
     filtro_marca = ""
     if marca_dagua and marca_dagua.strip():
         marca_limpa = re.sub(r"[':\\]", "", marca_dagua.strip())
@@ -1457,7 +1482,6 @@ def disparar_campanha_tiktok_completa(
     headers = {"Access-Token": access_token}
     headers_json = {"Access-Token": access_token, "Content-Type": "application/json"}
 
-    # 1. Upload do Vídeo
     if not os.path.exists(video_path):
         raise FileNotFoundError(f"Vídeo não encontrado em: {video_path}")
 
@@ -1472,7 +1496,6 @@ def disparar_campanha_tiktok_completa(
     
     video_id = res_upload["data"]["video_id"]
 
-    # 2. Criação da Campanha
     url_campaign = f"{TIKTOK_API_BASE}/campaign/create/"
     payload_campaign = {
         "advertiser_id": advertiser_id,
@@ -1486,7 +1509,6 @@ def disparar_campanha_tiktok_completa(
     
     campaign_id = res_camp["data"]["campaign_id"]
 
-    # 3. Criação do Grupo de Anúncios
     url_adgroup = f"{TIKTOK_API_BASE}/adgroup/create/"
     data_inicio = datetime.now(timezone.utc) + timedelta(minutes=10)
     data_formatada = data_inicio.strftime("%Y-%m-%d %H:%M:%S")
@@ -1497,7 +1519,7 @@ def disparar_campanha_tiktok_completa(
         "adgroup_name": f"Grupo - {campaign_name}",
         "placement_type": "PLACEMENT_TYPE_NORMAL",
         "placements": ["PLACEMENT_TIKTOK"],
-        "location_ids": ["6252001"],  # Código para Brasil
+        "location_ids": ["6252001"],
         "budget_mode": "BUDGET_MODE_DAY",
         "budget": orcamento_diario,
         "schedule_type": "SCHEDULE_FROM_NOW",
@@ -1512,7 +1534,6 @@ def disparar_campanha_tiktok_completa(
     
     adgroup_id = res_adgroup["data"]["adgroup_id"]
 
-    # 4. Publicação do Anúncio Final
     url_ad = f"{TIKTOK_API_BASE}/ad/create/"
     payload_ad = {
         "advertiser_id": advertiser_id,
