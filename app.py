@@ -115,6 +115,46 @@ IDIOMAS_SISTEMA_36 = {
     "🇿🇦 Africâner": "Afrikaans"
 }
 
+# PRESETS DE PLATAFORMAS COM GEOMETRIA & SAFE ZONES
+PRESETS_PLATAFORMAS = {
+    "TikTok (Ads / Orgânico 9:16)": {
+        "resolucao": (1080, 1920),
+        "vertical": True,
+        "largura_linha": 20,
+        "fontsize": 44,
+        "pos_y": "(h-text_h)/2 + 100",  # Centro-inferior seguro livre dos botões e do rodapé
+        "pos_marca_y": 140,
+        "cta_padrao": "Toque no botão vermelho abaixo para garantir agora!"
+    },
+    "Instagram Reels / Meta Ads (9:16)": {
+        "resolucao": (1080, 1920),
+        "vertical": True,
+        "largura_linha": 22,
+        "fontsize": 44,
+        "pos_y": "h-text_h-420",        # Acima da legenda e botão de CTA do Instagram
+        "pos_marca_y": 120,
+        "cta_padrao": "Toque em Saiba Mais ou no link da bio para começar!"
+    },
+    "YouTube Shorts (9:16)": {
+        "resolucao": (1080, 1920),
+        "vertical": True,
+        "largura_linha": 22,
+        "fontsize": 44,
+        "pos_y": "h-text_h-380",        # Acima do título do Shorts
+        "pos_marca_y": 120,
+        "cta_padrao": "Acesse o primeiro link fixado nos comentários!"
+    },
+    "Página de Vendas / YouTube (16:9 Horizontal)": {
+        "resolucao": (1920, 1080),
+        "vertical": False,
+        "largura_linha": 42,
+        "fontsize": 46,
+        "pos_y": "h-text_h-85",         # Posição clássica de VSL de Landing Page
+        "pos_marca_y": 50,
+        "cta_padrao": "Clique no botão oficial logo abaixo deste vídeo!"
+    }
+}
+
 # ==============================================================================
 # GESTOR DE TRILHAS SONORAS (DOWNLOAD AUTOMÁTICO SE ESTIVER VAZIO)
 # ==============================================================================
@@ -1278,7 +1318,7 @@ def compilar_pdf_order_bump(dados_bump: dict, pexels_key: str, caminho_pdf: str)
     return caminho_pdf
 
 # ==============================================================================
-# 7. PROCESSAMENTO DE VÍDEO (TTS, PEXELS, WATERMARK & FFMPEG)
+# 7. PROCESSAMENTO DE VÍDEO COM SAFE ZONES (FFMPEG, TTS, PEXELS & WATERMARK)
 # ==============================================================================
 def sintetizar_audio_tts(texto: str, output_path: str, voz: str = "onyx") -> bool:
     if not OPENAI_API_KEY:
@@ -1347,38 +1387,35 @@ def buscar_video_pexels(query: str, pexels_key: str, dest_path: str, vertical: b
             continue
     return False
 
-def criar_arquivo_legenda(texto: str, output_path: str, vertical: bool = False) -> str:
-    largura = 24 if vertical else 40
-    linhas = textwrap.wrap(texto.strip(), width=largura)
-    texto_formatado = "\n".join(linhas)
-    with open(output_path, "w", encoding="utf-8") as f:
-        f.write(texto_formatado)
-    return output_path
-
 def renderizar_vsl_completa(
     cenas: List[Dict[str, str]],
-    vertical: bool,
+    plataforma_nome: str,
     voz: str,
     pexels_key: str,
     musica_fundo_path: Optional[str] = None,
     volume_musica: float = 0.08,
-    logo_path: Optional[str] = None,
     marca_dagua: Optional[str] = None,
     progress_bar = None
 ) -> str:
-    res_w, res_h = (1080, 1920) if vertical else (1920, 1080)
+    config = PRESETS_PLATAFORMAS.get(plataforma_nome, PRESETS_PLATAFORMAS["TikTok (Ads / Orgânico 9:16)"])
+    res_w, res_h = config["resolucao"]
+    vertical = config["vertical"]
+    pos_y_legenda = config["pos_y"]
+    tam_fonte = config["fontsize"]
+    largura_wrap = config["largura_linha"]
+
     cenas_clipes = []
     total = len(cenas)
 
     filtro_marca = ""
     if marca_dagua and marca_dagua.strip():
         marca_limpa = re.sub(r"[':\\]", "", marca_dagua.strip())
-        tam_fonte_marca = 32 if vertical else 26
-        pos_y_marca = 80 if vertical else 50
+        tam_fonte_marca = 30 if vertical else 24
+        pos_y_m = config["pos_marca_y"]
         filtro_marca = (
-            f",drawtext=text='{marca_limpa}':fontcolor=white@0.65:"
-            f"fontsize={tam_fonte_marca}:box=1:boxcolor=black@0.35:boxborderw=8:"
-            f"x=45:y={pos_y_marca}"
+            f",drawtext=text='{marca_limpa}':fontcolor=white@0.70:"
+            f"fontsize={tam_fonte_marca}:box=1:boxcolor=black@0.40:boxborderw=8:"
+            f"x=45:y={pos_y_m}"
         )
 
     for idx, item in enumerate(cenas):
@@ -1395,11 +1432,13 @@ def renderizar_vsl_completa(
 
         cena_out = os.path.join(DIR_VSL, f"{prefixo}_out.mp4")
 
+        # Quebra de linhas dinâmica pela safe zone da plataforma
+        linhas = textwrap.wrap(frase.strip(), width=largura_wrap)
+        texto_formatado = "\n".join(linhas)
         legenda_txt = os.path.join(DIR_VSL, f"{prefixo}_legenda.txt")
-        criar_arquivo_legenda(frase, legenda_txt, vertical=vertical)
+        with open(legenda_txt, "w", encoding="utf-8") as f_l:
+            f_l.write(texto_formatado)
         legenda_path_escapado = legenda_txt.replace(os.sep, "/").replace(":", "\\:")
-
-        fontsize = 44 if not vertical else 48
 
         if tem_video and os.path.exists(v_raw_path):
             vf = (
@@ -1407,9 +1446,9 @@ def renderizar_vsl_completa(
                 f"crop={res_w}:{res_h},"
                 f"setsar=1,"
                 f"fps=30,"
-                f"drawtext=textfile='{legenda_path_escapado}':fontcolor=white:fontsize={fontsize}:"
-                f"box=1:boxcolor=black@0.75:boxborderw=16:line_spacing=12:"
-                f"x=(w-text_w)/2:y=h-text_h-90"
+                f"drawtext=textfile='{legenda_path_escapado}':fontcolor=white:fontsize={tam_fonte}:"
+                f"box=1:boxcolor=black@0.80:boxborderw=16:line_spacing=12:"
+                f"x=(w-text_w)/2:y={pos_y_legenda}"
                 f"{filtro_marca}"
             )
             cmd = [
@@ -1428,7 +1467,7 @@ def renderizar_vsl_completa(
         else:
             vf = (
                 f"setsar=1,fps=30,"
-                f"drawtext=textfile='{legenda_path_escapado}':fontcolor=white:fontsize={fontsize+4}:"
+                f"drawtext=textfile='{legenda_path_escapado}':fontcolor=white:fontsize={tam_fonte+4}:"
                 f"box=1:boxcolor=blue@0.65:boxborderw=20:line_spacing=14:"
                 f"x=(w-text_w)/2:y=(h-text_h)/2"
                 f"{filtro_marca}"
@@ -1485,12 +1524,11 @@ def renderizar_vsl_completa(
 def dublar_roteiro_e_renderizar_vsl(
     cenas_originais: List[Dict[str, str]],
     idioma_alvo: str,
-    vertical: bool,
+    plataforma_nome: str,
     voz: str,
     pexels_key: str,
     musica_fundo_path: Optional[str] = None,
     volume_musica: float = 0.08,
-    logo_path: Optional[str] = None,
     marca_dagua: Optional[str] = None,
     progress_bar = None
 ) -> Tuple[str, List[Dict[str, str]]]:
@@ -1508,19 +1546,18 @@ def dublar_roteiro_e_renderizar_vsl(
 
     video_dublado = renderizar_vsl_completa(
         cenas=cenas_traduzidas,
-        vertical=vertical,
+        plataforma_nome=plataforma_nome,
         voz=voz,
         pexels_key=pexels_key,
         musica_fundo_path=musica_fundo_path,
         volume_musica=volume_musica,
-        logo_path=logo_path,
         marca_dagua=marca_dagua,
         progress_bar=progress_bar
     )
     return video_dublado, cenas_traduzidas
 
 # ==============================================================================
-# 8. MOTOR DE INTEGRAÇÃO TIKTOK MARKETING API
+# 8. MOTOR DE INTEGRAÇÃO TIKTOK MARKETING API COM IDENTIDADE
 # ==============================================================================
 TIKTOK_API_BASE = "https://business-api.tiktok.com/open_api/v1.3"
 
@@ -1833,6 +1870,18 @@ with tab_vsl:
     if nicho_integrado:
         st.success(f"🎯 **Nicho Conectado da Mineração:** `{nicho_integrado}`")
 
+    col_plat_vsl1, col_plat_vsl2 = st.columns([2, 1])
+    with col_plat_vsl1:
+        plataforma_vsl_sel = st.selectbox(
+            "🎯 Rede / Plataforma de Exibição (Calibra Safe Zones):",
+            options=list(PRESETS_PLATAFORMAS.keys()),
+            index=0,
+            key="vsl_plataforma_sel",
+            help="Define automaticamente a geometria e afasta legendas dos botões da interface de cada rede."
+        )
+    with col_plat_vsl2:
+        st.info(f"📐 **Resolução Configurada:** `{PRESETS_PLATAFORMAS[plataforma_vsl_sel]['resolucao'][0]}x{PRESETS_PLATAFORMAS[plataforma_vsl_sel]['resolucao'][1]}`")
+
     col_v1, col_v2 = st.columns(2)
     with col_v1:
         tema_vsl = st.text_input("Tema / Produto da VSL:", key="vsl_input_tema")
@@ -1843,12 +1892,11 @@ with tab_vsl:
 
     col_opt1, col_opt2, col_opt3 = st.columns(3)
     with col_opt1:
-        formato_vertical = st.checkbox("Formato Vertical 9:16 (Reels/TikTok/Shorts)", value=True, key="vsl_check_vertical")
         marca_dagua_input = st.text_input(
             "🔒 Marca d'água (Anti-Cópia):",
             value=st.session_state.get("vsl_marca_ativa", ""),
             placeholder="Ex: @receitas.semgluten ou Manual Prático",
-            help="Texto semi-transparente fixo no topo esquerdo do vídeo que impede plágio do seu anúncio.",
+            help="Texto semi-transparente fixo na área segura do vídeo.",
             key="vsl_input_marca_dagua"
         )
     with col_opt2:
@@ -1877,17 +1925,18 @@ with tab_vsl:
             st.error("❌ Saldo insuficiente! Você precisa de 20 créditos.")
         else:
             barra_vsl = st.progress(0.0)
-            with st.spinner(f"Criando cenas visuais de '{tema_vsl}' no Pexels, áudio sincronizado e cortes dinâmicos..."):
+            with st.spinner(f"Renderizando cenas de '{tema_vsl}' calibradas para {plataforma_vsl_sel}..."):
                 try:
                     cenas_estruturadas = gerar_roteiro_vsl_ia(tema_vsl, promessa_vsl, publico_vsl, qtd_cenas)
                     st.session_state["roteiro_vsl"] = cenas_estruturadas
                     st.session_state["vsl_marca_ativa"] = marca_dagua_input
+                    st.session_state["vsl_plataforma_ativa"] = plataforma_vsl_sel
 
                     p_musica = st.session_state.get("vsl_musica_ativa")
 
                     video_pronto = renderizar_vsl_completa(
                         cenas=cenas_estruturadas,
-                        vertical=formato_vertical,
+                        plataforma_nome=plataforma_vsl_sel,
                         voz=voz_codigo,
                         pexels_key=PEXELS_API_KEY,
                         musica_fundo_path=p_musica,
@@ -1898,7 +1947,7 @@ with tab_vsl:
 
                     debitar_creditos_cloud(email_usuario, f"Criação VSL ({tema_vsl})", 20)
                     st.session_state["video_vsl_pronto"] = video_pronto
-                    st.success(f"✅ VSL de '{tema_vsl}' renderizada com sucesso!")
+                    st.success(f"✅ VSL de '{tema_vsl}' renderizada com Safe Zone aplicada!")
                     st.rerun()
                 except Exception as e_vsl:
                     st.error(f"Erro na renderização da VSL: {e_vsl}")
@@ -1943,10 +1992,12 @@ with tab_vsl:
                         try:
                             p_musica = st.session_state.get("vsl_musica_ativa")
                             marca_ativa = st.session_state.get("vsl_marca_ativa", marca_dagua_input)
+                            plat_usar = st.session_state.get("vsl_plataforma_ativa", plataforma_vsl_sel)
+
                             v_dublado, rot_tr = dublar_roteiro_e_renderizar_vsl(
                                 cenas_originais=st.session_state["roteiro_vsl"],
                                 idioma_alvo=nome_lingua_dub,
-                                vertical=formato_vertical,
+                                plataforma_nome=plat_usar,
                                 voz=voz_codigo,
                                 pexels_key=PEXELS_API_KEY,
                                 musica_fundo_path=p_musica,
@@ -1982,7 +2033,19 @@ with tab_vsl:
 # ------------------------------------------------------------------------------
 with tab_apresentacao:
     st.markdown("## 🎥 Vídeo Longo de Apresentação do Produto (Pitch Comercial de 3 Minutos)")
-    st.caption("Gere um vídeo completo de vendas para Landing Page ou YouTube: Gancho, Revelação do Produto, Benefícios, Garantia e CTA Final.")
+    st.caption("Gere um vídeo completo de vendas com gancho, revelação do produto, benefícios, quebra de objeções e chamada final de compra.")
+
+    col_plat1, col_plat2 = st.columns([2, 1])
+    with col_plat1:
+        plataforma_ap_sel = st.selectbox(
+            "🎯 Onde este vídeo será veiculado?",
+            options=list(PRESETS_PLATAFORMAS.keys()),
+            index=0,
+            key="ap_plataforma_sel",
+            help="Adapta resolução, safe zones (para não tampar botões do TikTok/Reels) e posicionamento das legendas."
+        )
+    with col_plat2:
+        st.info(f"📐 **Resolução:** `{PRESETS_PLATAFORMAS[plataforma_ap_sel]['resolucao'][0]}x{PRESETS_PLATAFORMAS[plataforma_ap_sel]['resolucao'][1]}`")
 
     col_ap1, col_ap2 = st.columns(2)
     with col_ap1:
@@ -2010,13 +2073,14 @@ with tab_apresentacao:
         )
         prod_oferta = st.text_input(
             "Condição Especial & Chamada Final (CTA):",
-            value="Apenas R$ 97,00 com acesso vitalício, 3 bônus exclusivos e 7 dias de garantia incondicional",
+            value=f"{PRESETS_PLATAFORMAS[plataforma_ap_sel]['cta_padrao']} Apenas R$ 97,00 com garantia total.",
             key="ap_prod_oferta"
         )
-        formato_ap_vert = st.checkbox(
-            "Formato Vertical 9:16 (Reels/TikTok) — *Desmarque para 16:9 (Horizontal/Site/YouTube)*",
-            value=False,
-            key="ap_formato_vertical"
+        marca_ap = st.text_input(
+            "Marca d'água / Assinatura do Vídeo:",
+            value=st.session_state.get("vsl_marca_ativa", ""),
+            placeholder="Ex: @minhamarca.oficial",
+            key="ap_marca_dagua"
         )
 
     col_ap_opt1, col_ap_opt2 = st.columns(2)
@@ -2028,21 +2092,14 @@ with tab_apresentacao:
         )
         voz_ap_cod = voz_ap_sel.split()[0]
     with col_ap_opt2:
-        marca_ap = st.text_input(
-            "Marca d'água / Assinatura do Vídeo:",
-            value=st.session_state.get("vsl_marca_ativa", ""),
-            placeholder="Ex: @minhamarca.oficial",
-            key="ap_marca_dagua"
+        opcoes_musica = listar_musicas_locais()
+        trilha_ap = st.selectbox(
+            "Trilha Sonora de Fundo:",
+            options=list(opcoes_musica.keys()),
+            index=2 if len(opcoes_musica) > 2 else 0,
+            key="ap_trilha_sel"
         )
-
-    opcoes_musica = listar_musicas_locais()
-    trilha_ap = st.selectbox(
-        "Trilha Sonora de Fundo:",
-        options=list(opcoes_musica.keys()),
-        index=2 if len(opcoes_musica) > 2 else 0,
-        key="ap_trilha_sel"
-    )
-    musica_ap_path = opcoes_musica[trilha_ap]
+        musica_ap_path = opcoes_musica[trilha_ap]
 
     if st.button("🎬 Gerar e Renderizar Apresentação de 3 Minutos (30 cr)", type="primary", key="btn_render_apresentacao"):
         if saldo_atual < 30:
@@ -2061,10 +2118,10 @@ with tab_apresentacao:
                 )
                 st.session_state["roteiro_pitch_3min"] = roteiro_pitch
 
-                status_ap.write("🎥 Renderizando 13 cenas em alta definição, áudio sincronizado e trilha sonora...")
+                status_ap.write(f"🎥 Renderizando 13 cenas com Safe Zone para {plataforma_ap_sel}...")
                 video_pitch = renderizar_vsl_completa(
                     cenas=roteiro_pitch,
-                    vertical=formato_ap_vert,
+                    plataforma_nome=plataforma_ap_sel,
                     voz=voz_ap_cod,
                     pexels_key=PEXELS_API_KEY,
                     musica_fundo_path=musica_ap_path,
@@ -2076,7 +2133,7 @@ with tab_apresentacao:
                 debitar_creditos_cloud(email_usuario, f"Apresentação 3 Min ({prod_nome})", 30)
                 st.session_state["video_pitch_pronto"] = video_pitch
                 status_ap.empty()
-                st.success("✅ Vídeo de Apresentação de 3 minutos renderizado com sucesso!")
+                st.success("✅ Vídeo de Apresentação renderizado com Safe Zone calibrada!")
                 st.rerun()
             except Exception as e_pitch:
                 st.error(f"Erro ao compilar apresentação: {e_pitch}")
@@ -2313,7 +2370,7 @@ with tab_ads:
     if st.session_state["plataforma_ativa"] == "TikTok":
         st.subheader("🎵 Disparo de Anúncios no TikTok Ads")
 
-        video_atual = st.session_state.get("video_vsl_pronto")
+        video_atual = st.session_state.get("video_vsl_pronto") or st.session_state.get("video_pitch_pronto")
 
         col_cfg1, col_cfg2 = st.columns([1.2, 1])
 
@@ -2343,9 +2400,9 @@ with tab_ads:
             st.markdown("##### 2. Criativo em Vídeo (9:16)")
             if video_atual and os.path.exists(video_atual):
                 st.video(video_atual)
-                st.success("✅ Vídeo da VSL pronto e carregado na memória!")
+                st.success("✅ Vídeo pronto e carregado na memória!")
             else:
-                st.info("Nenhum vídeo renderizado na aba 2. Você pode subir um arquivo local:")
+                st.info("Nenhum vídeo renderizado. Você pode subir um arquivo local:")
                 video_manual = st.file_uploader("Carregar arquivo .MP4 do seu computador:", type=["mp4"])
                 if video_manual:
                     caminho_ad = os.path.join(DIR_VSL, f"upload_manual_{int(time.time())}.mp4")
@@ -2382,7 +2439,7 @@ with tab_ads:
 
         with aba_disparo:
             if st.button("🚀 Publicar Campanha Completa no TikTok Ads", type="primary", use_container_width=True):
-                vid_path = st.session_state.get("video_vsl_pronto")
+                vid_path = video_atual
                 if not token_input:
                     st.error("⚠️ Insira o Access Token do TikTok para autenticar a API.")
                 elif not link_checkout:
