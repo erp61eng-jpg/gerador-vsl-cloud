@@ -274,31 +274,45 @@ def traduzir_texto_ia(texto: str, idioma_destino: str) -> str:
     except Exception:
         return texto
 
-def minerar_nicho_profundo_ia(nicho: str, profundidade: str) -> str:
+def minerar_nicho_profundo_ia(nicho: str, profundidade: str) -> dict:
     prompt = f"""
-    Atue como Diretor de Aquisição e Especialista Sênior em Tráfego Pago, Copywriting e Engenharia de Produtos Digitais.
-    Domínio absoluto de: Google Ads, Meta Ads, Kiwify e plataformas internacionais.
-    
-    Analise o seguinte nicho com rigor técnico:
+    Atue como Diretor de Aquisição, Copywriter de Elite e Especialista em Engenharia de Produtos Digitais.
+    Analise o seguinte nicho com rigor técnico e comercial:
     NICHO: "{nicho}"
     NÍVEL DE PROFUNDIDADE: {profundidade}
-    
-    Gere um dossiê executivo completo formatado em Markdown com as seguintes seções estruturadas:
-    
-    ### 1. 🎯 PÚBLICO-ALVO & NÍVEL DE CONSCIÊNCIA
-    ### 2. ⚡ AS 3 MAIORES DORES OCULTAS & AS 3 PRINCIPAIS OBJEÇÕES
-    ### 3. 💎 ARQUITETURA DO PRODUTO & MECANISMO ÚNICO
-    - **Nome Sugerido do Produto:** (Nome comercial de alto impacto).
-    - **A Grande Promessa:** (1 frase visceral de transformação).
-    - **Mecanismo Único:** O método por trás da solução.
-    ### 4. 👑 O PATRÃO GOOGLE ADS (KIT COMPLETO DE CAMPANHA)
-    #### A) Palavras-Chave de Fundo de Funil (Correspondência de Frase e Exata)
-    #### B) Lista de 10 Palavras-Chave Negativas Obrigatórias
-    #### C) Anúncio Responsivo de Pesquisa (5 Títulos e 3 Descrições)
-    #### D) Gancho para YouTube Ads (Primeiros 5 Segundos)
-    ### 5. 💰 ESTRATÉGIA DE MONETIZAÇÃO & ESCALA (Preço Brasil, Exterior e Order Bump)
+
+    Crie uma arquitetura comercial completa e extraia campos precisos de alta conversão.
+
+    Retorne ESTRITAMENTE um JSON com as seguintes chaves:
+    {{
+        "nome_produto": "Nome comercial de alto impacto para o produto (ex: Método Bolos Lucrativos Sem Glúten)",
+        "grande_promessa": "1 frase visceral de transformação com resultado prático e tangível",
+        "publico_alvo": "Descrição detalhada do cliente ideal (perfil, dor principal e objetivo)",
+        "mecanismo_unico": "Nome e resumo curto do método ou mecanismo exclusivo por trás da solução",
+        "oferta_cta": "Condição irresistível de compra (ex: Apenas R$ 97,00 com acesso vitalício, 3 bônus exclusivos e 7 dias de garantia)",
+        "dores_objecoes": "As 3 maiores dores ocultas e as 3 principais objeções superadas",
+        "campanha_google_ads": "Kit completo: 10 Palavras-chave Fundo de Funil, 10 Negativas Obrigatórias, 5 Títulos RSA, 3 Descrições e Gancho YouTube Ads (5 segundos)",
+        "dossie_markdown": "Dossiê executivo e mercadológico completo em Markdown estruturado detalhando o mercado, público, estratégia de escala e precificação."
+    }}
     """
-    return executar_prompt_ia(prompt, formato_json=False, temperatura=0.35)
+    resp = executar_prompt_ia(prompt, formato_json=True, temperatura=0.35)
+    try:
+        dados = json.loads(resp)
+        if isinstance(dados, dict) and "nome_produto" in dados:
+            return dados
+    except Exception:
+        pass
+
+    return {
+        "nome_produto": f"Método Definitivo: {nicho}",
+        "grande_promessa": f"Aprenda o método testado e lucre com {nicho}",
+        "publico_alvo": "Iniciantes e profissionais que buscam renda extra e independência financeira",
+        "mecanismo_unico": f"Protocolo Estruturado de Execução em {nicho}",
+        "oferta_cta": "Apenas R$ 97,00 com acesso vitalício e 7 dias de garantia incondicional",
+        "dores_objecoes": "Falta de direcionamento claro, medo de errar e desperdício de tempo e dinheiro",
+        "campanha_google_ads": f"Palavras-chave: curso {nicho}, aprender {nicho}, como fazer {nicho}",
+        "dossie_markdown": resp if isinstance(resp, str) else f"### Dossiê de Análise: {nicho}"
+    }
 
 def gerar_roteiro_vsl_ia(nicho: str, promessa: str, publico: str, num_cenas: int = 5) -> List[Dict[str, str]]:
     prompt = f"""
@@ -1432,7 +1446,6 @@ def renderizar_vsl_completa(
 
         cena_out = os.path.join(DIR_VSL, f"{prefixo}_out.mp4")
 
-        # Quebra de linhas dinâmica pela safe zone da plataforma
         linhas = textwrap.wrap(frase.strip(), width=largura_wrap)
         texto_formatado = "\n".join(linhas)
         legenda_txt = os.path.join(DIR_VSL, f"{prefixo}_legenda.txt")
@@ -1657,24 +1670,67 @@ def disparar_campanha_tiktok_completa(
     }
 
 # ==============================================================================
-# 9. INICIALIZAÇÃO DE ESTADOS GLOBAIS
+# 9. INICIALIZAÇÃO DE ESTADOS GLOBAIS & CALLBACKS DE SINCRONIZAÇÃO
 # ==============================================================================
-if "vsl_input_tema" not in st.session_state:
-    st.session_state["vsl_input_tema"] = "Confeitaria Lucrativa & Bolos Caseiros"
-if "vsl_input_promessa" not in st.session_state:
-    st.session_state["vsl_input_promessa"] = "Domine as receitas mais pedidas e fature da sua cozinha"
-if "vsl_input_publico" not in st.session_state:
-    st.session_state["vsl_input_publico"] = "Mulheres e empreendedoras que buscam renda extra com doces"
+ESTADOS_INICIAIS = {
+    "nicho_pesquisado_nome": "Confeitaria Lucrativa & Bolos Caseiros",
+    "miner_nome_produto": "Método Confeitaria Lucrativa & Bolos Caseiros",
+    "miner_promessa": "Domine as receitas mais pedidas e fature da cozinha da sua casa",
+    "miner_publico": "Mulheres e empreendedoras que buscam renda extra com doces",
+    "miner_mecanismo": "Protocolo de Produção Padronizada Sem Glúten",
+    "miner_oferta": "Apenas R$ 97,00 com acesso vitalício, 3 bônus exclusivos e 7 dias de garantia",
+    "miner_dores": "Medo de perder matéria-prima, insegurança na precificação e dificuldade em atrair clientes",
+    "miner_google_ads": "",
+    "miner_dossie": "",
 
-if "ebook_input_tema" not in st.session_state:
-    st.session_state["ebook_input_tema"] = "Manual Definitivo da Confeitaria Lucrativa"
-if "ebook_input_publico" not in st.session_state:
-    st.session_state["ebook_input_publico"] = "Mulheres e empreendedoras que buscam renda extra com doces"
+    # 2º ITEM (VSL)
+    "vsl_input_tema": "Método Confeitaria Lucrativa & Bolos Caseiros",
+    "vsl_input_promessa": "Domine as receitas mais pedidas e fature da cozinha da sua casa",
+    "vsl_input_publico": "Mulheres e empreendedoras que buscam renda extra com doces",
+    "vsl_plataforma_ativa": "TikTok (Ads / Orgânico 9:16)",
+    "vsl_musica_ativa": None,
+    "vsl_marca_ativa": "",
 
-if "vsl_musica_ativa" not in st.session_state:
-    st.session_state["vsl_musica_ativa"] = None
-if "vsl_marca_ativa" not in st.session_state:
-    st.session_state["vsl_marca_ativa"] = ""
+    # 3º ITEM (APRESENTAÇÃO 3 MIN)
+    "ap_prod_nome": "Método Confeitaria Lucrativa & Bolos Caseiros",
+    "ap_prod_nicho": "Confeitaria Lucrativa & Bolos Caseiros",
+    "ap_prod_promessa": "Domine as receitas mais pedidas e fature da cozinha da sua casa",
+    "ap_prod_publico": "Mulheres e empreendedoras que buscam renda extra com doces",
+    "ap_prod_oferta": "Apenas R$ 97,00 com acesso vitalício, 3 bônus exclusivos e 7 dias de garantia",
+    "ap_marca_dagua": "",
+
+    # 4º ITEM (LIVRO TÉCNICO & ORDER BUMP)
+    "ebook_input_tema": "Manual Prático: Confeitaria Lucrativa & Bolos Caseiros",
+    "ebook_input_publico": "Mulheres e empreendedoras que buscam renda extra com doces"
+}
+
+for chave_k, valor_v in ESTADOS_INICIAIS.items():
+    if chave_k not in st.session_state:
+        st.session_state[chave_k] = valor_v
+
+def sincronizar_campos_mineracao():
+    """Propaga imediatamente os valores editados na Mineração para as abas 2, 3 e 4."""
+    prod = st.session_state.get("miner_nome_produto", "")
+    prom = st.session_state.get("miner_promessa", "")
+    pub = st.session_state.get("miner_publico", "")
+    oft = st.session_state.get("miner_oferta", "")
+    nic = st.session_state.get("nicho_pesquisado_nome", "")
+
+    # Aba 2 - VSL
+    st.session_state["vsl_input_tema"] = prod
+    st.session_state["vsl_input_promessa"] = prom
+    st.session_state["vsl_input_publico"] = pub
+
+    # Aba 3 - Apresentação 3 Min
+    st.session_state["ap_prod_nome"] = prod
+    st.session_state["ap_prod_nicho"] = nic
+    st.session_state["ap_prod_promessa"] = prom
+    st.session_state["ap_prod_publico"] = pub
+    st.session_state["ap_prod_oferta"] = oft
+
+    # Aba 4 - Livro Técnico
+    st.session_state["ebook_input_tema"] = f"Manual Prático: {prod}"
+    st.session_state["ebook_input_publico"] = pub
 
 # BARRA LATERAL
 with st.sidebar:
@@ -1766,11 +1822,11 @@ tab_minerador, tab_vsl, tab_apresentacao, tab_ebook, tab_ads, tab_master = st.ta
 ])
 
 # ------------------------------------------------------------------------------
-# ABA 1: MINERADOR & GOOGLE ADS
+# ABA 1: MINERADOR & GOOGLE ADS (CAMPOS AUTOMÁTICOS & EDITÁVEIS)
 # ------------------------------------------------------------------------------
 with tab_minerador:
-    st.markdown("## 🔍 Minerador & Validador de Nichos com Kit Google Ads")
-    st.caption("Analise nichos comerciais, descubra dores ocultas e sincronize os dados limpos nas abas seguintes.")
+    st.markdown("## 🔍 1. Minerador de Nicho com Campos Automáticos & Editáveis")
+    st.caption("A IA gera a estratégia completa e preenche os campos abaixo. Você pode editá-los livremente e sincronizar com todas as abas.")
 
     NICHOS_PREDEFINIDOS = [
         "🎂 Confeitaria Lucrativa & Bolos Caseiros",
@@ -1802,12 +1858,13 @@ with tab_minerador:
 
     st.info(f"🎯 **Nicho Selecionado para Mineração:** `{nicho_final}`")
 
-    if st.button("🚀 Analisar Nicho & Gerar Kit Google Ads", type="primary", key="btn_minerar_nicho"):
+    if st.button("🚀 Analisar Nicho & Gerar Campos Automáticos", type="primary", key="btn_minerar_nicho"):
         if not nicho_final or "Manual" in nicho_final:
             st.warning("Por favor, informe um nicho válido.")
         else:
-            with st.spinner("Limpando dados anteriores, minerando público e preparando campanhas..."):
+            with st.spinner("Minerando dados, criando mecanismo e preenchendo campos automáticos..."):
                 try:
+                    # Limpeza de arquivos de mídia anteriores
                     chaves_para_limpar = [
                         "video_vsl_pronto", "roteiro_vsl", "video_dublado_pronto",
                         "video_dublado_idioma", "video_dublado_roteiro",
@@ -1819,56 +1876,74 @@ with tab_minerador:
                     for k in chaves_para_limpar:
                         st.session_state.pop(k, None)
 
-                    resultado_dossie = minerar_nicho_profundo_ia(nicho_final, profundidade)
-                    st.session_state["resultado_pesquisa_nicho"] = resultado_dossie
+                    resultado_miner = minerar_nicho_profundo_ia(nicho_final, profundidade)
+
+                    # Armazena os dados minerados
                     st.session_state["nicho_pesquisado_nome"] = nicho_final
+                    st.session_state["miner_nome_produto"] = resultado_miner.get("nome_produto", nicho_final)
+                    st.session_state["miner_promessa"] = resultado_miner.get("grande_promessa", f"Domine {nicho_final}")
+                    st.session_state["miner_publico"] = resultado_miner.get("publico_alvo", "Iniciantes e profissionais...")
+                    st.session_state["miner_mecanismo"] = resultado_miner.get("mecanismo_unico", "Método Passo a Passo")
+                    st.session_state["miner_oferta"] = resultado_miner.get("oferta_cta", "Apenas R$ 97,00 com garantia")
+                    st.session_state["miner_dores"] = resultado_miner.get("dores_objecoes", "")
+                    st.session_state["miner_google_ads"] = resultado_miner.get("campanha_google_ads", "")
+                    st.session_state["miner_dossie"] = resultado_miner.get("dossie_markdown", "")
 
-                    st.session_state["vsl_input_tema"] = nicho_final
-                    st.session_state["vsl_input_promessa"] = f"Aprenda o método definitivo e lucre com {nicho_final}"
-                    st.session_state["vsl_input_publico"] = "Iniciantes e profissionais que buscam renda extra e independência financeira"
+                    # Sincroniza automaticamente com o 2º, 3º e 4º itens
+                    sincronizar_campos_mineracao()
 
-                    st.session_state["ebook_input_tema"] = f"Manual Prático e Definitivo: {nicho_final}"
-                    st.session_state["ebook_input_publico"] = "Iniciantes e profissionais que buscam renda extra e independência financeira"
-
+                    st.success("✅ Nicho minerado com sucesso! Os campos abaixo e nas abas seguintes foram preenchidos.")
                     st.rerun()
 
                 except Exception as err:
                     st.error(f"Erro na análise: {err}")
 
-    if st.session_state.get("resultado_pesquisa_nicho"):
-        st.markdown("---")
-        st.markdown(f"### 📊 Dossiê Executivo: {st.session_state.get('nicho_pesquisado_nome')}")
+    # EXIBIÇÃO DOS CAMPOS AUTOMÁTICOS & EDITÁVEIS NA ABA 1
+    st.markdown("---")
+    st.markdown("### ✏️ Arquitetura do Produto (Campos Automáticos & Editáveis):")
+    st.caption("Você pode alterar qualquer informação abaixo. Ao alterar, os campos correspondentes na VSL, na Apresentação e no Livro serão atualizados.")
 
-        aba_d1, aba_d2 = st.tabs(["📑 Raio-X & Estrutura do Produto", "👑 Kit Pronto: O Patrão Google Ads"])
+    col_ed1, col_ed2 = st.columns(2)
+    with col_ed1:
+        st.text_input("🏷️ Nome Sugerido do Produto:", key="miner_nome_produto", on_change=sincronizar_campos_mineracao)
+        st.text_input("⚡ Grande Promessa (Visceral):", key="miner_promessa", on_change=sincronizar_campos_mineracao)
+        st.text_input("🔑 Mecanismo Único (O Método):", key="miner_mecanismo", on_change=sincronizar_campos_mineracao)
+    with col_ed2:
+        st.text_input("🎯 Público-Alvo & Perfil:", key="miner_publico", on_change=sincronizar_campos_mineracao)
+        st.text_input("💰 Condição da Oferta & CTA Final:", key="miner_oferta", on_change=sincronizar_campos_mineracao)
+
+    st.text_area("⚡ As Maiores Dores Ocultas & Objeções:", key="miner_dores", height=85)
+
+    if st.button("🔄 Sincronizar Alterações com Todas as Abas (VSL, Pitch e Livro)", key="btn_sync_manual"):
+        sincronizar_campos_mineracao()
+        st.toast("Campos sincronizados com sucesso em todas as abas!", icon="✅")
+
+    if st.session_state.get("miner_dossie"):
+        st.markdown("---")
+        aba_d1, aba_d2 = st.tabs(["📑 Dossiê Executivo Completo", "👑 Kit Pronto: Google Ads & YouTube"])
         with aba_d1:
-            st.markdown(st.session_state["resultado_pesquisa_nicho"])
+            st.markdown(st.session_state["miner_dossie"])
         with aba_d2:
-            st.info("💡 **Campanha Pronta para Copiar e Colar:** Títulos, descrições RSA, negativas e gancho para YouTube Ads.")
-            st.text_area(
-                "📋 Conteúdo do Dossiê e Palavras-chave:",
-                value=st.session_state["resultado_pesquisa_nicho"],
-                height=350,
-                key="dossie_txt_area"
-            )
+            st.info("💡 **Campanha Pronta para Copiar e Colar:** Palavras-chave, negativas, anúncios e gancho de vídeo.")
+            conteudo_ads = st.session_state.get("miner_google_ads", "")
+            st.text_area("📋 Conteúdo da Campanha:", value=conteudo_ads, height=300, key="txt_kit_ads")
+            
             nome_arq_txt = f"campanha_google_ads_{re.sub(r'[^a-zA-Z0-9]', '_', st.session_state.get('nicho_pesquisado_nome', 'nicho').lower())}.txt"
             st.download_button(
                 "⬇️ Baixar Kit de Campanha (.txt)",
-                data=st.session_state["resultado_pesquisa_nicho"],
+                data=conteudo_ads,
                 file_name=nome_arq_txt,
                 mime="text/plain",
                 use_container_width=True,
-                key="btn_download_campanha"
+                key="btn_down_kit_ads"
             )
 
 # ------------------------------------------------------------------------------
-# ABA 2: CRIAR VSL & DUBLAGEM GLOBAL
+# ABA 2: CRIAR VSL & DUBLAGEM GLOBAL (2º ITEM: AUTOMÁTICO & EDITÁVEL)
 # ------------------------------------------------------------------------------
 with tab_vsl:
-    st.markdown("## 🚀 Criador de Vídeo de Vendas (VSL) & Dublagem Global")
-    
-    nicho_integrado = st.session_state.get("nicho_pesquisado_nome")
-    if nicho_integrado:
-        st.success(f"🎯 **Nicho Conectado da Mineração:** `{nicho_integrado}`")
+    st.markdown("## 🚀 2. Criador de VSL com Campos Automáticos & Editáveis")
+    st.caption("Os campos abaixo foram importados da Mineração. Edite o que desejar antes de renderizar.")
 
     col_plat_vsl1, col_plat_vsl2 = st.columns([2, 1])
     with col_plat_vsl1:
@@ -1882,12 +1957,13 @@ with tab_vsl:
     with col_plat_vsl2:
         st.info(f"📐 **Resolução Configurada:** `{PRESETS_PLATAFORMAS[plataforma_vsl_sel]['resolucao'][0]}x{PRESETS_PLATAFORMAS[plataforma_vsl_sel]['resolucao'][1]}`")
 
+    # CAMPOS AUTOMÁTICOS & EDITÁVEIS
     col_v1, col_v2 = st.columns(2)
     with col_v1:
-        tema_vsl = st.text_input("Tema / Produto da VSL:", key="vsl_input_tema")
-        promessa_vsl = st.text_input("Grande Promessa:", key="vsl_input_promessa")
+        tema_vsl = st.text_input("Tema / Nome do Produto:", key="vsl_input_tema")
+        promessa_vsl = st.text_input("Grande Promessa da VSL:", key="vsl_input_promessa")
     with col_v2:
-        publico_vsl = st.text_input("Público-Alvo da VSL:", key="vsl_input_publico")
+        publico_vsl = st.text_input("Público-Alvo:", key="vsl_input_publico")
         qtd_cenas = st.slider("Quantidade de Cenas (Cortes Dinâmicos):", 3, 10, 5, key="vsl_slider_cenas")
 
     col_opt1, col_opt2, col_opt3 = st.columns(3)
@@ -1895,7 +1971,7 @@ with tab_vsl:
         marca_dagua_input = st.text_input(
             "🔒 Marca d'água (Anti-Cópia):",
             value=st.session_state.get("vsl_marca_ativa", ""),
-            placeholder="Ex: @receitas.semgluten ou Manual Prático",
+            placeholder="Ex: @receitas.semgluten ou Minha Marca",
             help="Texto semi-transparente fixo na área segura do vídeo.",
             key="vsl_input_marca_dagua"
         )
@@ -2029,11 +2105,11 @@ with tab_vsl:
                 )
 
 # ------------------------------------------------------------------------------
-# ABA 3: APRESENTAÇÃO DO PRODUTO (PITCH DE 3 MINUTOS)
+# ABA 3: APRESENTAÇÃO DO PRODUTO (3º ITEM: AUTOMÁTICO & EDITÁVEL)
 # ------------------------------------------------------------------------------
 with tab_apresentacao:
-    st.markdown("## 🎥 Vídeo Longo de Apresentação do Produto (Pitch Comercial de 3 Minutos)")
-    st.caption("Gere um vídeo completo de vendas com gancho, revelação do produto, benefícios, quebra de objeções e chamada final de compra.")
+    st.markdown("## 🎥 3. Vídeo de Apresentação do Produto (Pitch Comercial de 3 Minutos)")
+    st.caption("Campos pré-preenchidos automaticamente pela Mineração com Safe Zones. Edite qualquer informação livremente.")
 
     col_plat1, col_plat2 = st.columns([2, 1])
     with col_plat1:
@@ -2047,37 +2123,18 @@ with tab_apresentacao:
     with col_plat2:
         st.info(f"📐 **Resolução:** `{PRESETS_PLATAFORMAS[plataforma_ap_sel]['resolucao'][0]}x{PRESETS_PLATAFORMAS[plataforma_ap_sel]['resolucao'][1]}`")
 
+    # CAMPOS AUTOMÁTICOS & EDITÁVEIS
     col_ap1, col_ap2 = st.columns(2)
     with col_ap1:
-        prod_nome = st.text_input(
-            "Nome do Produto:",
-            value=f"Método {st.session_state.get('nicho_pesquisado_nome', 'Confeitaria Lucrativa')}",
-            key="ap_prod_nome"
-        )
-        prod_nicho = st.text_input(
-            "Nicho de Atuação:",
-            value=st.session_state.get("nicho_pesquisado_nome", "Confeitaria Lucrativa & Bolos Caseiros"),
-            key="ap_prod_nicho"
-        )
-        prod_promessa = st.text_input(
-            "Promessa Central:",
-            value=st.session_state.get("vsl_input_promessa", "Aprenda a faturar da cozinha da sua casa com receitas profissionais"),
-            key="ap_prod_promessa"
-        )
+        prod_nome = st.text_input("Nome do Produto:", key="ap_prod_nome")
+        prod_nicho = st.text_input("Nicho de Atuação:", key="ap_prod_nicho")
+        prod_promessa = st.text_input("Promessa Central:", key="ap_prod_promessa")
 
     with col_ap2:
-        prod_publico = st.text_input(
-            "Público-Alvo:",
-            value=st.session_state.get("vsl_input_publico", "Mulheres que desejam criar um negócio próprio do zero"),
-            key="ap_prod_publico"
-        )
-        prod_oferta = st.text_input(
-            "Condição Especial & Chamada Final (CTA):",
-            value=f"{PRESETS_PLATAFORMAS[plataforma_ap_sel]['cta_padrao']} Apenas R$ 97,00 com garantia total.",
-            key="ap_prod_oferta"
-        )
+        prod_publico = st.text_input("Público-Alvo:", key="ap_prod_publico")
+        prod_oferta = st.text_input("Condição Especial & Chamada Final (CTA):", key="ap_prod_oferta")
         marca_ap = st.text_input(
-            "Marca d'água / Assinatura do Vídeo:",
+            "Marca d'água / Assinatura:",
             value=st.session_state.get("vsl_marca_ativa", ""),
             placeholder="Ex: @minhamarca.oficial",
             key="ap_marca_dagua"
@@ -2160,12 +2217,13 @@ with tab_apresentacao:
                 st.write(c.get("fala"))
 
 # ------------------------------------------------------------------------------
-# ABA 4: CRIAR LIVRO TÉCNICO & ORDER BUMP / BÔNUS COMPLEMENTAR
+# ABA 4: CRIAR LIVRO TÉCNICO & ORDER BUMP (4º ITEM: AUTOMÁTICO & EDITÁVEL)
 # ------------------------------------------------------------------------------
 with tab_ebook:
-    st.markdown("## 📚 Gerador de Livro Técnico & Produto Complementar (Order Bump)")
-    st.caption("Crie o manual técnico principal de alta densidade e, opcionalmente, o produto de Order Bump para dobrar seu ticket médio.")
+    st.markdown("## 📚 4. Gerador de Livro Técnico & Produto Complementar (Order Bump)")
+    st.caption("Campos preenchidos automaticamente com base no produto minerado. Totalmente editáveis.")
 
+    # CAMPOS AUTOMÁTICOS & EDITÁVEIS
     col_e1, col_e2 = st.columns(2)
     with col_e1:
         tema_ebook = st.text_input("Tema Central do Manual:", key="ebook_input_tema")
@@ -2376,7 +2434,7 @@ with tab_ads:
 
         with col_cfg1:
             st.markdown("##### 1. Configuração da Campanha")
-            nome_sugerido = f"Campanha VSL - {st.session_state.get('nicho_pesquisado_nome', 'Conversão')}"
+            nome_sugerido = f"Campanha VSL - {st.session_state.get('miner_nome_produto', 'Conversão')}"
             nome_camp = st.text_input("Nome da Campanha:", value=nome_sugerido)
             link_checkout = st.text_input(
                 "Link de Checkout da Kiwify / Página de Vendas:",
@@ -2392,7 +2450,7 @@ with tab_ads:
 
             copy_anuncio = st.text_area(
                 "Texto do Anúncio (Legenda):",
-                value=f"Descubra o passo a passo completo sobre {st.session_state.get('nicho_pesquisado_nome', 'este método')}! Toque em 'Saiba Mais'.",
+                value=f"{st.session_state.get('miner_promessa', 'Descubra este método exclusivo!')} Toque em 'Saiba Mais'.",
                 height=90
             )
 
