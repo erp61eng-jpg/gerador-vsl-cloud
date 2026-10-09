@@ -125,7 +125,6 @@ TRILHAS_PADRAO = {
 }
 
 def garantir_trilhas_padrao():
-    """Baixa faixas instrumentais gratuitas se a pasta temp_musicas estiver vazia."""
     os.makedirs(DIR_MUSICAS, exist_ok=True)
     existentes = [f for f in os.listdir(DIR_MUSICAS) if f.lower().endswith(".mp3")]
     if not existentes:
@@ -142,7 +141,6 @@ def garantir_trilhas_padrao():
 garantir_trilhas_padrao()
 
 def listar_musicas_locais() -> Dict[str, Optional[str]]:
-    """Varre a pasta temp_musicas e retorna opções formatadas para seleção."""
     os.makedirs(DIR_MUSICAS, exist_ok=True)
     arquivos = [f for f in os.listdir(DIR_MUSICAS) if f.lower().endswith(".mp3")]
     opcoes = {"Sem trilha sonora (Apenas voz)": None}
@@ -300,6 +298,62 @@ def gerar_roteiro_vsl_ia(nicho: str, promessa: str, publico: str, num_cenas: int
             {"fala": f"Descubra o método definitivo sobre {nicho}.", "termo_video": termo_generico},
             {"fala": promessa, "termo_video": f"{termo_generico} professional"},
             {"fala": "Aprenda o passo a passo testado para ter resultados reais.", "termo_video": f"{termo_generico} lifestyle"}
+        ]
+
+def gerar_roteiro_apresentacao_3min_ia(
+    nome_produto: str,
+    nicho: str,
+    promessa: str,
+    publico: str,
+    oferta_cta: str
+) -> List[Dict[str, str]]:
+    """Gera um roteiro de apresentação de produto de ~3 minutos (13 cenas cronológicas) com pitch e CTA."""
+    prompt = f"""
+    Atue como Especialista em Lançamentos Digitais e Diretor de Vídeo de Vendas (Pitch de 3 Minutos).
+    Crie o roteiro completo de apresentação e venda do produto:
+    - Nome do Produto: {nome_produto}
+    - Nicho: {nicho}
+    - Grande Promessa: {promessa}
+    - Público-Alvo: {publico}
+    - Oferta e Condição Especial (CTA Final): {oferta_cta}
+
+    ESTRUTURA OBRIGATÓRIA DOS 3 MINUTOS (13 Cenas cronológicas):
+    - Cenas 1 e 2 (0 a 30s) [GANCHO & DOR]: O erro fatal e a dor comum de quem tenta sozinho sem o método certo.
+    - Cenas 3 e 4 (30s a 60s) [HISTÓRIA & MECANISMO]: A virada de chave e a descoberta do método validado.
+    - Cenas 5, 6 e 7 (60s a 105s) [REVELAÇÃO DO PRODUTO]: Apresentação oficial do {nome_produto}, estrutura interna e ferramentas práticas.
+    - Cenas 8 e 9 (105s a 135s) [TRANSFORMAÇÃO REAL]: Os ganhos de velocidade, segurança e lucro que o cliente terá.
+    - Cenas 10 e 11 (135s a 160s) [GARANTIA & RISCO ZERO]: Quebra total de risco, suporte e acesso imediato.
+    - Cenas 12 e 13 (160s a 180s) [OFERTA & CHAMADA PARA COMPRA]: Condição especial, bônus, aviso de urgência e comando de clique no botão.
+
+    REGRAS TÉCNICAS:
+    1. Cada "fala" deve conter entre 28 e 35 palavras em português, com dicção natural, persuasiva e direta (totalizando ~420 palavras).
+    2. Cada "termo_video" deve ser um termo de 2 a 3 palavras em INGLÊS para busca precisa no acervo em HD do Pexels.
+
+    Retorne ESTRITAMENTE o JSON:
+    {{
+        "cenas": [
+            {{"fala": "...", "termo_video": "..."}}
+        ]
+    }}
+    """
+    resp = executar_prompt_ia(prompt, formato_json=True, temperatura=0.35)
+    termo_generico = re.sub(r'[^a-zA-Z0-9\s]', '', nicho).strip()
+    try:
+        dados = json.loads(resp)
+        cenas_raw = dados.get("cenas", [])
+        cenas_limpas = []
+        for c in cenas_raw:
+            if isinstance(c, dict) and c.get("fala"):
+                cenas_limpas.append({
+                    "fala": c["fala"].strip(),
+                    "termo_video": c.get("termo_video", termo_generico).strip()
+                })
+        return cenas_limpas if len(cenas_limpas) >= 8 else cenas_raw
+    except Exception:
+        return [
+            {"fala": f"Se você busca uma transformação real em {nicho}, preste muita atenção nos próximos três minutos.", "termo_video": f"{termo_generico} focus"},
+            {"fala": f"Apresentamos oficialmente o {nome_produto}, desenvolvido para entregar resultados rápidos e previsíveis.", "termo_video": f"{termo_generico} success"},
+            {"fala": f"Clique no botão oficial abaixo, aproveite esta condição especial e garanta seu acesso imediato hoje mesmo.", "termo_video": "click button buy now"}
         ]
 
 # ==============================================================================
@@ -1477,7 +1531,8 @@ def disparar_campanha_tiktok_completa(
     campaign_name: str,
     copy_text: str,
     landing_page_url: str,
-    orcamento_diario: float
+    orcamento_diario: float,
+    identity_id: Optional[str] = None
 ) -> dict:
     headers = {"Access-Token": access_token}
     headers_json = {"Access-Token": access_token, "Content-Type": "application/json"}
@@ -1534,18 +1589,24 @@ def disparar_campanha_tiktok_completa(
     
     adgroup_id = res_adgroup["data"]["adgroup_id"]
 
+    criativo = {
+        "ad_name": f"Criativo - {campaign_name}",
+        "ad_format": "SINGLE_VIDEO",
+        "video_id": video_id,
+        "ad_text": copy_text[:100],
+        "call_to_action": "LEARN_MORE",
+        "landing_page_url": landing_page_url
+    }
+
+    if identity_id and identity_id.strip():
+        criativo["identity_type"] = "CUSTOMIZED_USER"
+        criativo["identity_id"] = identity_id.strip()
+
     url_ad = f"{TIKTOK_API_BASE}/ad/create/"
     payload_ad = {
         "advertiser_id": advertiser_id,
         "adgroup_id": adgroup_id,
-        "creatives": [{
-            "ad_name": f"Criativo - {campaign_name}",
-            "ad_format": "SINGLE_VIDEO",
-            "video_id": video_id,
-            "ad_text": copy_text[:100],
-            "call_to_action": "LEARN_MORE",
-            "landing_page_url": landing_page_url
-        }]
+        "creatives": [criativo]
     }
     res_ad = requests.post(url_ad, headers=headers_json, json=payload_ad).json()
     if res_ad.get("code") != 0:
@@ -1658,12 +1719,13 @@ with st.sidebar:
 # ==============================================================================
 # 10. ABAS PRINCIPAIS DO SISTEMA
 # ==============================================================================
-tab_minerador, tab_vsl, tab_ebook, tab_ads, tab_master = st.tabs([
+tab_minerador, tab_vsl, tab_apresentacao, tab_ebook, tab_ads, tab_master = st.tabs([
     "🔍 1. Minerador & Google Ads",
     "🚀 2. Criar VSL & Dublagem Global",
-    "📚 3. Criar Livro Técnico & Order Bump",
-    "🎯 4. Central de Publicidade",
-    "👑 5. Gestão Master"
+    "🎥 3. Apresentação do Produto (3 Min)",
+    "📚 4. Criar Livro Técnico & Order Bump",
+    "🎯 5. Central de Publicidade",
+    "👑 6. Gestão Master"
 ])
 
 # ------------------------------------------------------------------------------
@@ -1712,6 +1774,7 @@ with tab_minerador:
                     chaves_para_limpar = [
                         "video_vsl_pronto", "roteiro_vsl", "video_dublado_pronto",
                         "video_dublado_idioma", "video_dublado_roteiro",
+                        "video_pitch_pronto", "roteiro_pitch_3min",
                         "pdf_ebook_pronto", "pdf_ebook_nome", "pdf_global_pronto",
                         "pdf_global_nome", "pdf_global_lingua", "dados_livro_sessao",
                         "pdf_bump_pronto", "pdf_bump_nome", "pdf_bump_global_pronto"
@@ -1915,7 +1978,132 @@ with tab_vsl:
                 )
 
 # ------------------------------------------------------------------------------
-# ABA 3: CRIAR LIVRO TÉCNICO & ORDER BUMP / BÔNUS COMPLEMENTAR
+# ABA 3: APRESENTAÇÃO DO PRODUTO (PITCH DE 3 MINUTOS)
+# ------------------------------------------------------------------------------
+with tab_apresentacao:
+    st.markdown("## 🎥 Vídeo Longo de Apresentação do Produto (Pitch Comercial de 3 Minutos)")
+    st.caption("Gere um vídeo completo de vendas para Landing Page ou YouTube: Gancho, Revelação do Produto, Benefícios, Garantia e CTA Final.")
+
+    col_ap1, col_ap2 = st.columns(2)
+    with col_ap1:
+        prod_nome = st.text_input(
+            "Nome do Produto:",
+            value=f"Método {st.session_state.get('nicho_pesquisado_nome', 'Confeitaria Lucrativa')}",
+            key="ap_prod_nome"
+        )
+        prod_nicho = st.text_input(
+            "Nicho de Atuação:",
+            value=st.session_state.get("nicho_pesquisado_nome", "Confeitaria Lucrativa & Bolos Caseiros"),
+            key="ap_prod_nicho"
+        )
+        prod_promessa = st.text_input(
+            "Promessa Central:",
+            value=st.session_state.get("vsl_input_promessa", "Aprenda a faturar da cozinha da sua casa com receitas profissionais"),
+            key="ap_prod_promessa"
+        )
+
+    with col_ap2:
+        prod_publico = st.text_input(
+            "Público-Alvo:",
+            value=st.session_state.get("vsl_input_publico", "Mulheres que desejam criar um negócio próprio do zero"),
+            key="ap_prod_publico"
+        )
+        prod_oferta = st.text_input(
+            "Condição Especial & Chamada Final (CTA):",
+            value="Apenas R$ 97,00 com acesso vitalício, 3 bônus exclusivos e 7 dias de garantia incondicional",
+            key="ap_prod_oferta"
+        )
+        formato_ap_vert = st.checkbox(
+            "Formato Vertical 9:16 (Reels/TikTok) — *Desmarque para 16:9 (Horizontal/Site/YouTube)*",
+            value=False,
+            key="ap_formato_vertical"
+        )
+
+    col_ap_opt1, col_ap_opt2 = st.columns(2)
+    with col_ap_opt1:
+        voz_ap_sel = st.selectbox(
+            "Locução do Pitch:",
+            ["onyx (Forte/Masculina)", "alloy (Neutra)", "nova (Energética/Feminina)", "echo (Suave)"],
+            key="ap_voz_sel"
+        )
+        voz_ap_cod = voz_ap_sel.split()[0]
+    with col_ap_opt2:
+        marca_ap = st.text_input(
+            "Marca d'água / Assinatura do Vídeo:",
+            value=st.session_state.get("vsl_marca_ativa", ""),
+            placeholder="Ex: @minhamarca.oficial",
+            key="ap_marca_dagua"
+        )
+
+    opcoes_musica = listar_musicas_locais()
+    trilha_ap = st.selectbox(
+        "Trilha Sonora de Fundo:",
+        options=list(opcoes_musica.keys()),
+        index=2 if len(opcoes_musica) > 2 else 0,
+        key="ap_trilha_sel"
+    )
+    musica_ap_path = opcoes_musica[trilha_ap]
+
+    if st.button("🎬 Gerar e Renderizar Apresentação de 3 Minutos (30 cr)", type="primary", key="btn_render_apresentacao"):
+        if saldo_atual < 30:
+            st.error("❌ Saldo insuficiente! Este vídeo longo consome 30 créditos.")
+        else:
+            barra_ap = st.progress(0.0)
+            status_ap = st.empty()
+            try:
+                status_ap.write("✍️ Estruturando roteiro cronológico de 3 minutos com copy de alta conversão...")
+                roteiro_pitch = gerar_roteiro_apresentacao_3min_ia(
+                    nome_produto=prod_nome,
+                    nicho=prod_nicho,
+                    promessa=prod_promessa,
+                    publico=prod_publico,
+                    oferta_cta=prod_oferta
+                )
+                st.session_state["roteiro_pitch_3min"] = roteiro_pitch
+
+                status_ap.write("🎥 Renderizando 13 cenas em alta definição, áudio sincronizado e trilha sonora...")
+                video_pitch = renderizar_vsl_completa(
+                    cenas=roteiro_pitch,
+                    vertical=formato_ap_vert,
+                    voz=voz_ap_cod,
+                    pexels_key=PEXELS_API_KEY,
+                    musica_fundo_path=musica_ap_path,
+                    volume_musica=0.07,
+                    marca_dagua=marca_ap,
+                    progress_bar=barra_ap
+                )
+
+                debitar_creditos_cloud(email_usuario, f"Apresentação 3 Min ({prod_nome})", 30)
+                st.session_state["video_pitch_pronto"] = video_pitch
+                status_ap.empty()
+                st.success("✅ Vídeo de Apresentação de 3 minutos renderizado com sucesso!")
+                st.rerun()
+            except Exception as e_pitch:
+                st.error(f"Erro ao compilar apresentação: {e_pitch}")
+
+    if st.session_state.get("video_pitch_pronto") and os.path.exists(st.session_state["video_pitch_pronto"]):
+        st.markdown("---")
+        st.markdown("### 🎬 Vídeo de Apresentação Finalizado (~3 Minutos):")
+        st.video(st.session_state["video_pitch_pronto"])
+
+        with open(st.session_state["video_pitch_pronto"], "rb") as f_ap:
+            st.download_button(
+                "⬇️ Baixar Vídeo de Apresentação Completo (.mp4)",
+                data=f_ap,
+                file_name=f"apresentacao_{re.sub(r'[^a-zA-Z0-9]', '_', prod_nome.lower())}.mp4",
+                mime="video/mp4",
+                type="primary",
+                use_container_width=True,
+                key="btn_down_pitch"
+            )
+
+        with st.expander("📜 Ver Roteiro Cronológico Completo das 13 Cenas"):
+            for i, c in enumerate(st.session_state.get("roteiro_pitch_3min", []), 1):
+                st.markdown(f"**Cena {i}** | *Busca visual: `{c.get('termo_video')}`*")
+                st.write(c.get("fala"))
+
+# ------------------------------------------------------------------------------
+# ABA 4: CRIAR LIVRO TÉCNICO & ORDER BUMP / BÔNUS COMPLEMENTAR
 # ------------------------------------------------------------------------------
 with tab_ebook:
     st.markdown("## 📚 Gerador de Livro Técnico & Produto Complementar (Order Bump)")
@@ -2099,7 +2287,7 @@ with tab_ebook:
                         )
 
 # ------------------------------------------------------------------------------
-# ABA 4: CENTRAL DE PUBLICIDADE MULTIPLATAFORMA
+# ABA 5: CENTRAL DE PUBLICIDADE MULTIPLATAFORMA
 # ------------------------------------------------------------------------------
 with tab_ads:
     st.markdown("## 🎯 Central de Tráfego & Publicidade Automática")
@@ -2172,15 +2360,22 @@ with tab_ads:
         adv_padrao = TIKTOK_ADVERTISER_ID
         tok_padrao = TIKTOK_ACCESS_TOKEN
 
-        col_c1, col_c2 = st.columns(2)
+        col_c1, col_c2, col_c3 = st.columns(3)
         with col_c1:
-            adv_id_input = st.text_input("Advertiser ID (Conta Central VSL):", value=adv_padrao)
+            adv_id_input = st.text_input("Advertiser ID (Conta):", value=adv_padrao)
         with col_c2:
             token_input = st.text_input(
                 "TikTok Access Token:",
                 value=tok_padrao,
                 type="password",
                 help="Token gerado no portal TikTok for Business Developers"
+            )
+        with col_c3:
+            identity_id_input = st.text_input(
+                "Identity ID (Marca / Perfil Anunciante):",
+                value="",
+                placeholder="Ex: 7123456789012345678",
+                help="ID numérico da Identidade Personalizada criada no TikTok Ads Manager (impede uso da sua foto/nome pessoal)."
             )
 
         aba_disparo, aba_manual_tt = st.tabs(["⚡ Disparo Automático (1 Clique)", "📥 Download & Atalho Manual"])
@@ -2204,7 +2399,8 @@ with tab_ads:
                                 campaign_name=nome_camp,
                                 copy_text=copy_anuncio,
                                 landing_page_url=link_checkout,
-                                orcamento_diario=orcamento
+                                orcamento_diario=orcamento,
+                                identity_id=identity_id_input
                             )
                             st.success("🎉 Campanha criada e enviada com sucesso ao TikTok Ads!")
                             st.json(res_publicacao)
@@ -2241,7 +2437,7 @@ with tab_ads:
         st.info("Módulo estruturado para disparo de YouTube Shorts e campanhas de Display/Search.")
 
 # ------------------------------------------------------------------------------
-# ABA 5: GESTÃO MASTER
+# ABA 6: GESTÃO MASTER
 # ------------------------------------------------------------------------------
 with tab_master:
     st.markdown("## 👑 Painel de Gestão Master")
