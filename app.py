@@ -6,7 +6,7 @@ import textwrap
 import subprocess
 import requests
 from datetime import datetime, timezone, timedelta
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Any
 
 import streamlit as st
 from openai import OpenAI
@@ -32,6 +32,34 @@ except ImportError:
         HAS_GENAI_LEGACY = True
     except ImportError:
         HAS_GENAI_LEGACY = False
+
+# ==============================================================================
+# FUNÇÃO AUXILIAR DE SANITIZAÇÃO DE TEXTO (EVITA TYPEERROR NO STREAMLIT)
+# ==============================================================================
+def sanitizar_texto(valor: Any) -> str:
+    """Converte listas, dicionários ou nulos retornados pela IA em texto puro formatado."""
+    if valor is None:
+        return ""
+    if isinstance(valor, str):
+        return valor
+    if isinstance(valor, list):
+        itens = []
+        for item in valor:
+            if isinstance(item, (dict, list)):
+                itens.append(sanitizar_texto(item))
+            else:
+                itens.append(str(item))
+        return "\n".join(f"• {x}" if not str(x).startswith("•") else str(x) for x in itens)
+    if isinstance(valor, dict):
+        linhas = []
+        for k, v in valor.items():
+            k_formatado = str(k).replace("_", " ").capitalize()
+            if isinstance(v, (list, dict)):
+                linhas.append(f"{k_formatado}:\n{sanitizar_texto(v)}")
+            else:
+                linhas.append(f"{k_formatado}: {v}")
+        return "\n".join(linhas)
+    return str(valor)
 
 # ==============================================================================
 # 1. CONFIGURAÇÕES INICIAIS, DIRETÓRIOS & CONSTANTES
@@ -252,7 +280,8 @@ def executar_prompt_ia(prompt: str, formato_json: bool = False, temperatura: flo
     raise ValueError("Nenhuma chave válida configurada para Gemini ou OpenAI.")
 
 def traduzir_texto_ia(texto: str, idioma_destino: str) -> str:
-    if not texto.strip():
+    texto_limpo = sanitizar_texto(texto).strip()
+    if not texto_limpo:
         return ""
     prompt = f"""
     Atue como tradutor nativo de elite e copywriter sênior no idioma '{idioma_destino}'.
@@ -265,14 +294,14 @@ def traduzir_texto_ia(texto: str, idioma_destino: str) -> str:
     4. Elimine gírias ou expressões locais brasileiras.
 
     Texto:
-    "{texto}"
+    "{texto_limpo}"
 
     Retorne estritamente o texto traduzido, sem aspas e sem explicações.
     """
     try:
         return executar_prompt_ia(prompt, formato_json=False, temperatura=0.25).strip()
     except Exception:
-        return texto
+        return texto_limpo
 
 def minerar_nicho_profundo_ia(nicho: str, profundidade: str) -> dict:
     prompt = f"""
@@ -283,23 +312,23 @@ def minerar_nicho_profundo_ia(nicho: str, profundidade: str) -> dict:
 
     Crie uma arquitetura comercial completa e extraia campos precisos de alta conversão.
 
-    Retorne ESTRITAMENTE um JSON com as seguintes chaves:
+    Retorne ESTRITAMENTE um JSON com as seguintes chaves (TODOS OS VALORES DEVEM SER STRINGS):
     {{
-        "nome_produto": "Nome comercial de alto impacto para o produto (ex: Método Bolos Lucrativos Sem Glúten)",
+        "nome_produto": "Nome comercial de alto impacto para o produto em texto único",
         "grande_promessa": "1 frase visceral de transformação com resultado prático e tangível",
-        "publico_alvo": "Descrição detalhada do cliente ideal (perfil, dor principal e objetivo)",
+        "publico_alvo": "Descrição detalhada do cliente ideal em texto corrido",
         "mecanismo_unico": "Nome e resumo curto do método ou mecanismo exclusivo por trás da solução",
-        "oferta_cta": "Condição irresistível de compra (ex: Apenas R$ 97,00 com acesso vitalício, 3 bônus exclusivos e 7 dias de garantia)",
-        "dores_objecoes": "As 3 maiores dores ocultas e as 3 principais objeções superadas",
-        "campanha_google_ads": "Kit completo: 10 Palavras-chave Fundo de Funil, 10 Negativas Obrigatórias, 5 Títulos RSA, 3 Descrições e Gancho YouTube Ads (5 segundos)",
-        "dossie_markdown": "Dossiê executivo e mercadológico completo em Markdown estruturado detalhando o mercado, público, estratégia de escala e precificação."
+        "oferta_cta": "Condição irresistível de compra e chamada para ação em texto",
+        "dores_objecoes": "Texto descritivo em parágrafo com as 3 maiores dores ocultas e as 3 principais objeções",
+        "campanha_google_ads": "Texto corrido formatado com palavras-chave, negativas, títulos e descrições",
+        "dossie_markdown": "Dossiê executivo e mercadológico completo em Markdown estruturado"
     }}
     """
     resp = executar_prompt_ia(prompt, formato_json=True, temperatura=0.35)
     try:
         dados = json.loads(resp)
-        if isinstance(dados, dict) and "nome_produto" in dados:
-            return dados
+        if isinstance(dados, dict):
+            return {k: sanitizar_texto(v) for k, v in dados.items()}
     except Exception:
         pass
 
@@ -311,7 +340,7 @@ def minerar_nicho_profundo_ia(nicho: str, profundidade: str) -> dict:
         "oferta_cta": "Apenas R$ 97,00 com acesso vitalício e 7 dias de garantia incondicional",
         "dores_objecoes": "Falta de direcionamento claro, medo de errar e desperdício de tempo e dinheiro",
         "campanha_google_ads": f"Palavras-chave: curso {nicho}, aprender {nicho}, como fazer {nicho}",
-        "dossie_markdown": resp if isinstance(resp, str) else f"### Dossiê de Análise: {nicho}"
+        "dossie_markdown": sanitizar_texto(resp)
     }
 
 def gerar_roteiro_vsl_ia(nicho: str, promessa: str, publico: str, num_cenas: int = 5) -> List[Dict[str, str]]:
@@ -342,8 +371,8 @@ def gerar_roteiro_vsl_ia(nicho: str, promessa: str, publico: str, num_cenas: int
         cenas_limpas = []
         for c in cenas_raw:
             if isinstance(c, dict):
-                fala = c.get("fala", "").strip()
-                termo = c.get("termo_video", termo_generico).strip()
+                fala = sanitizar_texto(c.get("fala", "")).strip()
+                termo = sanitizar_texto(c.get("termo_video", termo_generico)).strip()
                 if fala:
                     cenas_limpas.append({"fala": fala, "termo_video": termo})
         return cenas_limpas if cenas_limpas else [{"fala": promessa, "termo_video": termo_generico}]
@@ -399,8 +428,8 @@ def gerar_roteiro_apresentacao_3min_ia(
         for c in cenas_raw:
             if isinstance(c, dict) and c.get("fala"):
                 cenas_limpas.append({
-                    "fala": c["fala"].strip(),
-                    "termo_video": c.get("termo_video", termo_generico).strip()
+                    "fala": sanitizar_texto(c["fala"]).strip(),
+                    "termo_video": sanitizar_texto(c.get("termo_video", termo_generico)).strip()
                 })
         return cenas_limpas if len(cenas_limpas) >= 8 else cenas_raw
     except Exception:
@@ -1339,7 +1368,7 @@ def sintetizar_audio_tts(texto: str, output_path: str, voz: str = "onyx") -> boo
         return False
     try:
         client = OpenAI(api_key=OPENAI_API_KEY)
-        resp = client.audio.speech.create(model="tts-1", voice=voz, input=texto)
+        resp = client.audio.speech.create(model="tts-1", voice=voz, input=sanitizar_texto(texto))
         resp.stream_to_file(output_path)
         return True
     except Exception:
@@ -1422,8 +1451,8 @@ def renderizar_vsl_completa(
     total = len(cenas)
 
     filtro_marca = ""
-    if marca_dagua and marca_dagua.strip():
-        marca_limpa = re.sub(r"[':\\]", "", marca_dagua.strip())
+    if marca_dagua and str(marca_dagua).strip():
+        marca_limpa = re.sub(r"[':\\]", "", str(marca_dagua).strip())
         tam_fonte_marca = 30 if vertical else 24
         pos_y_m = config["pos_marca_y"]
         filtro_marca = (
@@ -1433,8 +1462,8 @@ def renderizar_vsl_completa(
         )
 
     for idx, item in enumerate(cenas):
-        frase = item.get("fala", "") if isinstance(item, dict) else str(item)
-        termo_video = item.get("termo_video", "business tutorial") if isinstance(item, dict) else "business tutorial"
+        frase = sanitizar_texto(item.get("fala", "") if isinstance(item, dict) else str(item))
+        termo_video = sanitizar_texto(item.get("termo_video", "business tutorial") if isinstance(item, dict) else "business tutorial")
 
         prefixo = f"cena_{idx}_{int(time.time())}"
         a_path = os.path.join(DIR_AUDIOS, f"{prefixo}.mp3")
@@ -1549,8 +1578,8 @@ def dublar_roteiro_e_renderizar_vsl(
     total_frases = len(cenas_originais)
 
     for idx_f, cena in enumerate(cenas_originais):
-        fala_orig = cena.get("fala", "") if isinstance(cena, dict) else str(cena)
-        termo_orig = cena.get("termo_video", "business tutorial") if isinstance(cena, dict) else "business tutorial"
+        fala_orig = sanitizar_texto(cena.get("fala", "") if isinstance(cena, dict) else str(cena))
+        termo_orig = sanitizar_texto(cena.get("termo_video", "business tutorial") if isinstance(cena, dict) else "business tutorial")
 
         texto_tr = traduzir_texto_ia(fala_orig, idioma_alvo)
         cenas_traduzidas.append({"fala": texto_tr, "termo_video": termo_orig})
@@ -1670,7 +1699,7 @@ def disparar_campanha_tiktok_completa(
     }
 
 # ==============================================================================
-# 9. INICIALIZAÇÃO DE ESTADOS GLOBAIS & CALLBACKS DE SINCRONIZAÇÃO
+# 9. INICIALIZAÇÃO DE ESTADOS GLOBAIS COM AUTOCURA CONTRA TYPEERROR
 # ==============================================================================
 ESTADOS_INICIAIS = {
     "nicho_pesquisado_nome": "Confeitaria Lucrativa & Bolos Caseiros",
@@ -1705,17 +1734,20 @@ ESTADOS_INICIAIS = {
     "ebook_input_publico": "Mulheres e empreendedoras que buscam renda extra com doces"
 }
 
+# Rotina de autocura: Garante que toda variável de texto seja estritamente do tipo 'str'
 for chave_k, valor_v in ESTADOS_INICIAIS.items():
     if chave_k not in st.session_state:
         st.session_state[chave_k] = valor_v
+    elif isinstance(valor_v, str) and not isinstance(st.session_state[chave_k], str):
+        st.session_state[chave_k] = sanitizar_texto(st.session_state[chave_k])
 
 def sincronizar_campos_mineracao():
     """Propaga imediatamente os valores editados na Mineração para as abas 2, 3 e 4."""
-    prod = st.session_state.get("miner_nome_produto", "")
-    prom = st.session_state.get("miner_promessa", "")
-    pub = st.session_state.get("miner_publico", "")
-    oft = st.session_state.get("miner_oferta", "")
-    nic = st.session_state.get("nicho_pesquisado_nome", "")
+    prod = sanitizar_texto(st.session_state.get("miner_nome_produto", ""))
+    prom = sanitizar_texto(st.session_state.get("miner_promessa", ""))
+    pub = sanitizar_texto(st.session_state.get("miner_publico", ""))
+    oft = sanitizar_texto(st.session_state.get("miner_oferta", ""))
+    nic = sanitizar_texto(st.session_state.get("nicho_pesquisado_nome", ""))
 
     # Aba 2 - VSL
     st.session_state["vsl_input_tema"] = prod
@@ -1879,15 +1911,15 @@ with tab_minerador:
 
                     resultado_miner = minerar_nicho_profundo_ia(nicho_final, profundidade)
 
-                    st.session_state["nicho_pesquisado_nome"] = nicho_final
-                    st.session_state["miner_nome_produto"] = resultado_miner.get("nome_produto", nicho_final)
-                    st.session_state["miner_promessa"] = resultado_miner.get("grande_promessa", f"Domine {nicho_final}")
-                    st.session_state["miner_publico"] = resultado_miner.get("publico_alvo", "Iniciantes e profissionais...")
-                    st.session_state["miner_mecanismo"] = resultado_miner.get("mecanismo_unico", "Método Passo a Passo")
-                    st.session_state["miner_oferta"] = resultado_miner.get("oferta_cta", "Apenas R$ 97,00 com garantia")
-                    st.session_state["miner_dores"] = resultado_miner.get("dores_objecoes", "")
-                    st.session_state["miner_google_ads"] = resultado_miner.get("campanha_google_ads", "")
-                    st.session_state["miner_dossie"] = resultado_miner.get("dossie_markdown", "")
+                    st.session_state["nicho_pesquisado_nome"] = sanitizar_texto(nicho_final)
+                    st.session_state["miner_nome_produto"] = sanitizar_texto(resultado_miner.get("nome_produto", nicho_final))
+                    st.session_state["miner_promessa"] = sanitizar_texto(resultado_miner.get("grande_promessa", f"Domine {nicho_final}"))
+                    st.session_state["miner_publico"] = sanitizar_texto(resultado_miner.get("publico_alvo", "Iniciantes e profissionais..."))
+                    st.session_state["miner_mecanismo"] = sanitizar_texto(resultado_miner.get("mecanismo_unico", "Método Passo a Passo"))
+                    st.session_state["miner_oferta"] = sanitizar_texto(resultado_miner.get("oferta_cta", "Apenas R$ 97,00 com garantia"))
+                    st.session_state["miner_dores"] = sanitizar_texto(resultado_miner.get("dores_objecoes", ""))
+                    st.session_state["miner_google_ads"] = sanitizar_texto(resultado_miner.get("campanha_google_ads", ""))
+                    st.session_state["miner_dossie"] = sanitizar_texto(resultado_miner.get("dossie_markdown", ""))
 
                     sincronizar_campos_mineracao()
 
@@ -1910,6 +1942,8 @@ with tab_minerador:
         st.text_input("🎯 Público-Alvo & Perfil:", key="miner_publico", on_change=sincronizar_campos_mineracao)
         st.text_input("💰 Condição da Oferta & CTA Final:", key="miner_oferta", on_change=sincronizar_campos_mineracao)
 
+    # Garantia de string limpa
+    st.session_state["miner_dores"] = sanitizar_texto(st.session_state.get("miner_dores", ""))
     st.text_area("⚡ As Maiores Dores Ocultas & Objeções:", key="miner_dores", height=85)
 
     if st.button("🔄 Sincronizar Alterações com Todas as Abas (VSL, Pitch e Livro)", key="btn_sync_manual"):
@@ -1920,13 +1954,13 @@ with tab_minerador:
         st.markdown("---")
         aba_d1, aba_d2 = st.tabs(["📑 Dossiê Executivo Completo", "👑 Kit Pronto: Google Ads & YouTube"])
         with aba_d1:
-            st.markdown(st.session_state["miner_dossie"])
+            st.markdown(sanitizar_texto(st.session_state["miner_dossie"]))
         with aba_d2:
             st.info("💡 **Campanha Pronta para Copiar e Colar:** Palavras-chave, negativas, anúncios e gancho de vídeo.")
-            conteudo_ads = st.session_state.get("miner_google_ads", "")
+            conteudo_ads = sanitizar_texto(st.session_state.get("miner_google_ads", ""))
             st.text_area("📋 Conteúdo da Campanha:", value=conteudo_ads, height=300, key="txt_kit_ads")
             
-            nome_arq_txt = f"campanha_google_ads_{re.sub(r'[^a-zA-Z0-9]', '_', st.session_state.get('nicho_pesquisado_nome', 'nicho').lower())}.txt"
+            nome_arq_txt = f"campanha_google_ads_{re.sub(r'[^a-zA-Z0-9]', '_', str(st.session_state.get('nicho_pesquisado_nome', 'nicho')).lower())}.txt"
             st.download_button(
                 "⬇️ Baixar Kit de Campanha (.txt)",
                 data=conteudo_ads,
@@ -2202,7 +2236,7 @@ with tab_apresentacao:
             st.download_button(
                 "⬇️ Baixar Vídeo de Apresentação Completo (.mp4)",
                 data=f_ap,
-                file_name=f"apresentacao_{re.sub(r'[^a-zA-Z0-9]', '_', prod_nome.lower())}.mp4",
+                file_name=f"apresentacao_{re.sub(r'[^a-zA-Z0-9]', '_', str(prod_nome).lower())}.mp4",
                 mime="video/mp4",
                 type="primary",
                 use_container_width=True,
@@ -2313,7 +2347,7 @@ with tab_ebook:
                 st.session_state["dados_livro_sessao"] = dados_livro
 
                 status_box.write("📑 Diagramando Manual Técnico Principal com ReportLab...")
-                nome_pdf = f"manual_tecnico_{re.sub(r'[^a-zA-Z0-9]', '_', tema_ebook.lower())[:22]}_{int(time.time())}.pdf"
+                nome_pdf = f"manual_tecnico_{re.sub(r'[^a-zA-Z0-9]', '_', str(tema_ebook).lower())[:22]}_{int(time.time())}.pdf"
                 caminho_pdf = os.path.join(DIR_EBOOKS, nome_pdf)
                 compilar_pdf_livro_tecnico(dados_livro, PEXELS_API_KEY, caminho_pdf)
 
@@ -2322,7 +2356,7 @@ with tab_ebook:
 
                 if gerar_bump_opt and dados_livro.get("order_bump"):
                     status_box.write("🎁 Diagramando Caderno de Campo / Order Bump...")
-                    nome_bump_pdf = f"order_bump_{re.sub(r'[^a-zA-Z0-9]', '_', tema_ebook.lower())[:20]}_{int(time.time())}.pdf"
+                    nome_bump_pdf = f"order_bump_{re.sub(r'[^a-zA-Z0-9]', '_', str(tema_ebook).lower())[:20]}_{int(time.time())}.pdf"
                     caminho_bump_pdf = os.path.join(DIR_EBOOKS, nome_bump_pdf)
                     compilar_pdf_order_bump(dados_livro["order_bump"], PEXELS_API_KEY, caminho_bump_pdf)
 
