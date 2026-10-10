@@ -1697,6 +1697,7 @@ ESTADOS_INICIAIS = {
     "ap_prod_promessa": "Domine as receitas mais pedidas e fature da cozinha da sua casa",
     "ap_prod_publico": "Mulheres e empreendedoras que buscam renda extra com doces",
     "ap_prod_oferta": "Apenas R$ 97,00 com acesso vitalício, 3 bônus exclusivos e 7 dias de garantia",
+    "ap_plataforma_ativa": "TikTok (Ads / Orgânico 9:16)",
     "ap_marca_dagua": "",
 
     # 4º ITEM (LIVRO TÉCNICO & ORDER BUMP)
@@ -1864,11 +1865,11 @@ with tab_minerador:
         else:
             with st.spinner("Minerando dados, criando mecanismo e preenchendo campos automáticos..."):
                 try:
-                    # Limpeza de arquivos de mídia anteriores
                     chaves_para_limpar = [
                         "video_vsl_pronto", "roteiro_vsl", "video_dublado_pronto",
                         "video_dublado_idioma", "video_dublado_roteiro",
                         "video_pitch_pronto", "roteiro_pitch_3min",
+                        "video_pitch_dublado_pronto", "video_pitch_dublado_idioma", "video_pitch_dublado_roteiro",
                         "pdf_ebook_pronto", "pdf_ebook_nome", "pdf_global_pronto",
                         "pdf_global_nome", "pdf_global_lingua", "dados_livro_sessao",
                         "pdf_bump_pronto", "pdf_bump_nome", "pdf_bump_global_pronto"
@@ -1878,7 +1879,6 @@ with tab_minerador:
 
                     resultado_miner = minerar_nicho_profundo_ia(nicho_final, profundidade)
 
-                    # Armazena os dados minerados
                     st.session_state["nicho_pesquisado_nome"] = nicho_final
                     st.session_state["miner_nome_produto"] = resultado_miner.get("nome_produto", nicho_final)
                     st.session_state["miner_promessa"] = resultado_miner.get("grande_promessa", f"Domine {nicho_final}")
@@ -1889,7 +1889,6 @@ with tab_minerador:
                     st.session_state["miner_google_ads"] = resultado_miner.get("campanha_google_ads", "")
                     st.session_state["miner_dossie"] = resultado_miner.get("dossie_markdown", "")
 
-                    # Sincroniza automaticamente com o 2º, 3º e 4º itens
                     sincronizar_campos_mineracao()
 
                     st.success("✅ Nicho minerado com sucesso! Os campos abaixo e nas abas seguintes foram preenchidos.")
@@ -1898,7 +1897,6 @@ with tab_minerador:
                 except Exception as err:
                     st.error(f"Erro na análise: {err}")
 
-    # EXIBIÇÃO DOS CAMPOS AUTOMÁTICOS & EDITÁVEIS NA ABA 1
     st.markdown("---")
     st.markdown("### ✏️ Arquitetura do Produto (Campos Automáticos & Editáveis):")
     st.caption("Você pode alterar qualquer informação abaixo. Ao alterar, os campos correspondentes na VSL, na Apresentação e no Livro serão atualizados.")
@@ -1957,7 +1955,6 @@ with tab_vsl:
     with col_plat_vsl2:
         st.info(f"📐 **Resolução Configurada:** `{PRESETS_PLATAFORMAS[plataforma_vsl_sel]['resolucao'][0]}x{PRESETS_PLATAFORMAS[plataforma_vsl_sel]['resolucao'][1]}`")
 
-    # CAMPOS AUTOMÁTICOS & EDITÁVEIS
     col_v1, col_v2 = st.columns(2)
     with col_v1:
         tema_vsl = st.text_input("Tema / Nome do Produto:", key="vsl_input_tema")
@@ -2105,11 +2102,11 @@ with tab_vsl:
                 )
 
 # ------------------------------------------------------------------------------
-# ABA 3: APRESENTAÇÃO DO PRODUTO (3º ITEM: AUTOMÁTICO & EDITÁVEL)
+# ABA 3: APRESENTAÇÃO DO PRODUTO (3º ITEM: AUTOMÁTICO, EDITÁVEL & DUBLAGEM 36 IDIOMAS)
 # ------------------------------------------------------------------------------
 with tab_apresentacao:
     st.markdown("## 🎥 3. Vídeo de Apresentação do Produto (Pitch Comercial de 3 Minutos)")
-    st.caption("Campos pré-preenchidos automaticamente pela Mineração com Safe Zones. Edite qualquer informação livremente.")
+    st.caption("Campos pré-preenchidos automaticamente pela Mineração com Safe Zones. Totalmente editáveis e com dublagem nativa global.")
 
     col_plat1, col_plat2 = st.columns([2, 1])
     with col_plat1:
@@ -2174,6 +2171,7 @@ with tab_apresentacao:
                     oferta_cta=prod_oferta
                 )
                 st.session_state["roteiro_pitch_3min"] = roteiro_pitch
+                st.session_state["ap_plataforma_ativa"] = plataforma_ap_sel
 
                 status_ap.write(f"🎥 Renderizando 13 cenas com Safe Zone para {plataforma_ap_sel}...")
                 video_pitch = renderizar_vsl_completa(
@@ -2197,7 +2195,7 @@ with tab_apresentacao:
 
     if st.session_state.get("video_pitch_pronto") and os.path.exists(st.session_state["video_pitch_pronto"]):
         st.markdown("---")
-        st.markdown("### 🎬 Vídeo de Apresentação Finalizado (~3 Minutos):")
+        st.markdown("### 🎬 Vídeo de Apresentação Original (~3 Minutos):")
         st.video(st.session_state["video_pitch_pronto"])
 
         with open(st.session_state["video_pitch_pronto"], "rb") as f_ap:
@@ -2216,6 +2214,69 @@ with tab_apresentacao:
                 st.markdown(f"**Cena {i}** | *Busca visual: `{c.get('termo_video')}`*")
                 st.write(c.get("fala"))
 
+        # SEÇÃO DE DUBLAGEM INTERNACIONAL DO VÍDEO DE 3 MINUTOS
+        st.markdown("---")
+        with st.container(border=True):
+            st.markdown("### 🌐 Dublar Vídeo de Apresentação em 36 Idiomas (DubfyAi Global)")
+            st.caption("Traduza todo o pitch de 3 minutos, localize valores e moedas e gere a locução nativa sincronizada com cortes de alta definição.")
+
+            col_ap_d1, col_ap_d2 = st.columns([2, 1])
+            with col_ap_d1:
+                idioma_pitch_sel = st.selectbox(
+                    "Selecione o Idioma para Dublar a Apresentação:",
+                    list(IDIOMAS_SISTEMA_36.keys()),
+                    key="ap_select_idioma_dub"
+                )
+            with col_ap_d2:
+                st.write("")
+                st.caption("Custo: 30 Créditos")
+                btn_dub_pitch = st.button("🎙 Dublar Apresentação Agora (30 cr)", type="primary", use_container_width=True, key="btn_exec_dub_pitch")
+
+            if btn_dub_pitch:
+                if saldo_atual < 30:
+                    st.error("❌ Saldo insuficiente para dublagem internacional da apresentação.")
+                elif not st.session_state.get("roteiro_pitch_3min"):
+                    st.error("Roteiro original da apresentação não encontrado na memória.")
+                else:
+                    nome_lingua_dub_pitch = IDIOMAS_SISTEMA_36[idioma_pitch_sel]
+                    barra_dub_pitch = st.progress(0.0)
+                    with st.spinner(f"Traduzindo roteiro de 3 minutos e sintetizando dublagem nativa para {idioma_pitch_sel}..."):
+                        try:
+                            plat_usar_ap = st.session_state.get("ap_plataforma_ativa", plataforma_ap_sel)
+                            v_pitch_dublado, rot_pitch_tr = dublar_roteiro_e_renderizar_vsl(
+                                cenas_originais=st.session_state["roteiro_pitch_3min"],
+                                idioma_alvo=nome_lingua_dub_pitch,
+                                plataforma_nome=plat_usar_ap,
+                                voz=voz_ap_cod,
+                                pexels_key=PEXELS_API_KEY,
+                                musica_fundo_path=musica_ap_path,
+                                volume_musica=0.07,
+                                marca_dagua=marca_ap,
+                                progress_bar=barra_dub_pitch
+                            )
+                            debitar_creditos_cloud(email_usuario, f"Dublagem Apresentação ({nome_lingua_dub_pitch})", 30)
+                            st.session_state["video_pitch_dublado_pronto"] = v_pitch_dublado
+                            st.session_state["video_pitch_dublado_idioma"] = idioma_pitch_sel
+                            st.session_state["video_pitch_dublado_roteiro"] = rot_pitch_tr
+                            st.success(f"✅ Apresentação de 3 minutos dublada com sucesso para {idioma_pitch_sel}!")
+                            st.rerun()
+                        except Exception as e_dub_pitch:
+                            st.error(f"Erro na dublagem da apresentação: {e_dub_pitch}")
+
+        if st.session_state.get("video_pitch_dublado_pronto") and os.path.exists(st.session_state["video_pitch_dublado_pronto"]):
+            st.markdown(f"#### 🎬 Apresentação Dublada em {st.session_state.get('video_pitch_dublado_idioma')}:")
+            st.video(st.session_state["video_pitch_dublado_pronto"])
+            with open(st.session_state["video_pitch_dublado_pronto"], "rb") as f_vpd:
+                st.download_button(
+                    f"⬇️ BAIXAR APRESENTAÇÃO DUBLADA EM {st.session_state.get('video_pitch_dublado_idioma').upper()} (.MP4)",
+                    data=f_vpd,
+                    file_name=os.path.basename(st.session_state["video_pitch_dublado_pronto"]),
+                    mime="video/mp4",
+                    type="primary",
+                    use_container_width=True,
+                    key="btn_down_pitch_dub"
+                )
+
 # ------------------------------------------------------------------------------
 # ABA 4: CRIAR LIVRO TÉCNICO & ORDER BUMP (4º ITEM: AUTOMÁTICO & EDITÁVEL)
 # ------------------------------------------------------------------------------
@@ -2223,7 +2284,6 @@ with tab_ebook:
     st.markdown("## 📚 4. Gerador de Livro Técnico & Produto Complementar (Order Bump)")
     st.caption("Campos preenchidos automaticamente com base no produto minerado. Totalmente editáveis.")
 
-    # CAMPOS AUTOMÁTICOS & EDITÁVEIS
     col_e1, col_e2 = st.columns(2)
     with col_e1:
         tema_ebook = st.text_input("Tema Central do Manual:", key="ebook_input_tema")
@@ -2428,7 +2488,12 @@ with tab_ads:
     if st.session_state["plataforma_ativa"] == "TikTok":
         st.subheader("🎵 Disparo de Anúncios no TikTok Ads")
 
-        video_atual = st.session_state.get("video_vsl_pronto") or st.session_state.get("video_pitch_pronto")
+        video_atual = (
+            st.session_state.get("video_pitch_dublado_pronto") or
+            st.session_state.get("video_pitch_pronto") or
+            st.session_state.get("video_dublado_pronto") or
+            st.session_state.get("video_vsl_pronto")
+        )
 
         col_cfg1, col_cfg2 = st.columns([1.2, 1])
 
