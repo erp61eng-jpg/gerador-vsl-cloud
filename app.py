@@ -21,7 +21,7 @@ from reportlab.platypus import (
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.pdfgen import canvas
 
-# Tentativa de importação compatível do SDK do Google Gemini
+# Compatibilidade do SDK do Google Gemini
 try:
     from google import genai
     HAS_GENAI_NEW = True
@@ -248,9 +248,9 @@ def debitar_creditos_cloud(email: str, operacao: str, quantidade: int) -> bool:
         return False
 
 # ==============================================================================
-# 3. MOTORES DE IA: GERAÇÃO, TRANSCIAÇÃO & MINERAÇÃO
+# 3. MOTORES DE IA COM TRAVA MANDATÓRIA EM PORTUGUÊS (PT-BR)
 # ==============================================================================
-def executar_prompt_ia(prompt: str, formato_json: bool = False, temperatura: float = 0.3) -> str:
+def executar_prompt_ia(prompt: str, formato_json: bool = False, temperatura: float = 0.25) -> str:
     if GEMINI_API_KEY:
         try:
             if HAS_GENAI_NEW:
@@ -307,7 +307,8 @@ def minerar_nicho_profundo_ia(nicho: str, profundidade: str) -> dict:
     NICHO: "{nicho}"
     NÍVEL DE PROFUNDIDADE: {profundidade}
 
-    Crie uma arquitetura comercial completa e extraia campos precisos de alta conversão.
+    REGRA MANDATÓRIA DE IDIOMA:
+    Todo o conteúdo DEVE ser redigido ESTRITAMENTE em Português do Brasil (PT-BR). É proibido responder em Espanhol.
 
     Retorne ESTRITAMENTE um JSON com as seguintes chaves (TODOS OS VALORES DEVEM SER STRINGS):
     {{
@@ -321,7 +322,7 @@ def minerar_nicho_profundo_ia(nicho: str, profundidade: str) -> dict:
         "dossie_markdown": "Dossiê executivo e mercadológico completo em Markdown estruturado"
     }}
     """
-    resp = executar_prompt_ia(prompt, formato_json=True, temperatura=0.35)
+    resp = executar_prompt_ia(prompt, formato_json=True, temperatura=0.3)
     try:
         dados = json.loads(resp)
         if isinstance(dados, dict):
@@ -348,10 +349,14 @@ def gerar_roteiro_vsl_ia(nicho: str, promessa: str, publico: str, num_cenas: int
     - Promessa Principal: {promessa}
     - Público-Alvo: {publico}
     
+    REGRA MANDATÓRIA DE IDIOMA:
+    O texto da chave 'fala' DEVE ser redigido ESTRITAMENTE em Português do Brasil (PT-BR).
+    É TOTALMENTE PROIBIDO usar palavras ou frases em Espanhol.
+    
     Gere exatamente {num_cenas} cenas cronológicas.
     Para cada cena:
     1. "fala": Frase falada em português (curta, de 10 a 16 palavras, impactante).
-    2. "termo_video": Termo em INGLÊS de 2 a 4 palavras para buscar vídeos em HD no Pexels que retratem exatamente o nicho '{nicho}'.
+    2. "termo_video": Termo em INGLÊS de 2 a 4 palavras para buscar vídeos em HD no Pexels que retratem o nicho.
     
     Retorne estritamente um JSON:
     {{
@@ -360,7 +365,7 @@ def gerar_roteiro_vsl_ia(nicho: str, promessa: str, publico: str, num_cenas: int
         ]
     }}
     """
-    resp = executar_prompt_ia(prompt, formato_json=True, temperatura=0.4)
+    resp = executar_prompt_ia(prompt, formato_json=True, temperatura=0.25)
     termo_generico = re.sub(r'[^a-zA-Z0-9\s]', '', nicho).strip()
     try:
         dados = json.loads(resp)
@@ -388,13 +393,17 @@ def gerar_roteiro_apresentacao_3min_ia(
     oferta_cta: str
 ) -> List[Dict[str, str]]:
     prompt = f"""
-    Atue como Especialista em Lançamentos Digitais e Diretor de Vídeo de Vendas (Pitch de 3 Minutos).
+    Atue como Diretor de Vídeo de Vendas e Copywriter de Alta Conversão (Pitch de 2 a 3 Minutos).
     Crie o roteiro completo de apresentação e venda do produto:
     - Nome do Produto: {nome_produto}
     - Nicho: {nicho}
     - Grande Promessa: {promessa}
     - Público-Alvo: {publico}
-    - Oferta e Condição Especial (CTA Final): {oferta_cta}
+    - Oferta e CTA Final: {oferta_cta}
+
+    REGRA MANDATÓRIA DE IDIOMA:
+    O roteiro DEVE ser escrito ESTRITAMENTE em Português do Brasil (PT-BR).
+    É TERMINANTEMENTE PROIBIDO gerar texto em Espanhol ou misturar línguas.
 
     ESTRUTURA OBRIGATÓRIA DOS 3 MINUTOS (13 Cenas cronológicas):
     - Cenas 1 e 2 (0 a 30s) [GANCHO & DOR]: O erro fatal e a dor comum de quem tenta sozinho sem o método certo.
@@ -405,8 +414,8 @@ def gerar_roteiro_apresentacao_3min_ia(
     - Cenas 12 e 13 (160s a 180s) [OFERTA & CHAMADA PARA COMPRA]: Condição especial, bônus, aviso de urgência e comando de clique no botão.
 
     REGRAS TÉCNICAS:
-    1. Cada "fala" deve conter entre 28 e 35 palavras em português, com dicção natural, persuasiva e direta (totalizando ~420 palavras).
-    2. Cada "termo_video" deve ser um termo de 2 a 3 palavras em INGLÊS para busca precisa no acervo em HD do Pexels.
+    1. Cada "fala" deve conter entre 26 e 34 palavras em Português do Brasil (PT-BR).
+    2. Cada "termo_video" deve ser um termo de 2 a 3 palavras em INGLÊS para o Pexels.
 
     Retorne ESTRITAMENTE o JSON:
     {{
@@ -415,7 +424,7 @@ def gerar_roteiro_apresentacao_3min_ia(
         ]
     }}
     """
-    resp = executar_prompt_ia(prompt, formato_json=True, temperatura=0.35)
+    resp = executar_prompt_ia(prompt, formato_json=True, temperatura=0.25)
     termo_generico = re.sub(r'[^a-zA-Z0-9\s]', '', nicho).strip()
     try:
         dados = json.loads(resp)
@@ -436,15 +445,15 @@ def gerar_roteiro_apresentacao_3min_ia(
         ]
 
 # ==============================================================================
-# 4. ENGENHARIA DE GERAÇÃO DO LIVRO TÉCNICO & ORDER BUMP (REPORTLAB)
+# 4. ENGENHARIA DO LIVRO TÉCNICO & REPORTLAB
 # ==============================================================================
 def gerar_blueprint_ebook_ia(tema: str, publico: str) -> dict:
     prompt = f"""
     Atue como Autoridade Máxima e Escritor de Livros Técnicos e Comerciais no tema: '{tema}'.
     Público: {publico}
+    REGRA DE IDIOMA: Escreva estritamente em Português do Brasil (PT-BR).
 
-    Planeje a ARQUITETURA MESTRA de um MANUAL TÉCNICO E COMERCIAL AVANÇADO.
-    O livro terá exatamente 5 Módulos Temáticos de alta densidade técnica.
+    Planeje a ARQUITETURA MESTRA de um MANUAL TÉCNICO E COMERCIAL AVANÇADO com 5 Módulos Temáticos de alta densidade técnica.
     
     Retorne ESTRITAMENTE o JSON:
     {{
@@ -466,9 +475,8 @@ def gerar_blueprint_ebook_ia(tema: str, publico: str) -> dict:
 def gerar_introducao_profunda_ia(tema: str, publico: str, blueprint: dict) -> str:
     prompt = f"""
     Escreva a INTRODUÇÃO TÉCNICA E EXECUTIVA do manual: '{blueprint.get('titulo')}'.
-    TEMA: {tema}
-    PÚBLICO: {publico}
-    EXIGÊNCIAS: Texto denso, analítico e sem clichês (entre 400 e 600 palavras).
+    TEMA: {tema} | PÚBLICO: {publico}
+    REGRA: Redija em Português do Brasil (PT-BR) com densidade técnica (400 a 600 palavras).
     Retorne APENAS o texto em parágrafos.
     """
     return executar_prompt_ia(prompt, formato_json=False, temperatura=0.3)
@@ -477,7 +485,17 @@ def gerar_capitulo_individual_ia(tema: str, publico: str, modulo_info: dict) -> 
     prompt = f"""
     Atue como Consultor de Elite no tema '{tema}'.
     Escreva o CONTEÚDO TÉCNICO EXAUSTIVO DO MÓDULO {modulo_info.get('numero')}: '{modulo_info.get('titulo')}'.
-    Tópicos: {', '.join(modulo_info.get('topicos', []))}. Público: {publico}
+    Tópicos a cobrir: {', '.join(modulo_info.get('topicos', []))}.
+    Público: {publico}
+    REGRA: Todo o texto DEVE ser em Português do Brasil (PT-BR).
+
+    DIRETRIZES:
+    1. Desenvolva 3 subseções ricas em detalhes (mínimo 130 palavras cada).
+    2. Crie uma TABELA DE PARÂMETROS contendo 4 linhas técnicas com especificações mensuráveis.
+    3. Crie um Procedimento Operacional Padrão (POP) com 5 passos detalhados.
+    4. Destaque um ALERTA TÉCNICO CRÍTICO sobre o erro mais fatal desta etapa.
+    5. Forneça 2 termos em inglês para o Pexels.
+
     Retorne ESTRITAMENTE o JSON:
     {{
         "numero": {modulo_info.get('numero')},
@@ -495,9 +513,15 @@ def gerar_capitulo_individual_ia(tema: str, publico: str, modulo_info: dict) -> 
             {{"item": "...", "parametro": "...", "funcao": "..."}},
             {{"item": "...", "parametro": "...", "funcao": "..."}}
         ],
-        "passos_operacionais": ["Passo 1 detalhado...", "Passo 2 detalhado...", "Passo 3 detalhado...", "Passo 4 detalhado...", "Passo 5 detalhado..."],
-        "termo_busca_foto_processo": "termo em inglês",
-        "termo_busca_foto_resultado": "termo em inglês",
+        "passos_operacionais": [
+            "Passo 1 detalhado...",
+            "Passo 2 detalhado...",
+            "Passo 3 detalhado...",
+            "Passo 4 detalhado...",
+            "Passo 5 detalhado..."
+        ],
+        "termo_busca_foto_processo": "termo em inglês de 2 a 3 palavras",
+        "termo_busca_foto_resultado": "termo em inglês de 2 a 3 palavras",
         "legenda_resultado": "Legenda analítica do resultado visual..."
     }}
     """
@@ -507,6 +531,9 @@ def gerar_capitulo_individual_ia(tema: str, publico: str, modulo_info: dict) -> 
 def gerar_apendice_economico_ia(tema: str, publico: str) -> dict:
     prompt = f"""
     Escreva a seção final de 'DOSSIÊ CLÍNICO DE FALHAS & ENGENHARIA DE PRECIFICAÇÃO' para: '{tema}'.
+    Público: {publico}
+    REGRA: Todo o texto em Português do Brasil (PT-BR).
+
     Retorne ESTRITAMENTE o JSON:
     {{
         "titulo": "Dossiê Clínico de Resolução de Falhas & Engenharia de Lucro",
@@ -516,11 +543,11 @@ def gerar_apendice_economico_ia(tema: str, publico: str) -> dict:
             {{"defeito": "...", "causa_raiz": "...", "correcao": "..."}}
         ],
         "custos_matriz": [
-            {{"componente": "Insumos Base", "valor_estimado": "Valor realista", "detalhe": "Composição básica"}},
-            {{"componente": "Custos Operacionais", "valor_estimado": "Valor realista", "detalhe": "Rateio técnico"}},
-            {{"componente": "Preço de Venda Sugerido", "valor_estimado": "Margem 100% a 180%", "detalhe": "Posicionamento premium"}}
+            {{"componente": "Insumos Base / Custos Diretos", "valor_estimado": "Valor médio realista", "detalhe": "Composição básica"}},
+            {{"componente": "Custos Operacionais e Energia/Tempo", "valor_estimado": "Valor médio realista", "detalhe": "Rateio técnico"}},
+            {{"componente": "Preço de Comercialização Sugerido", "valor_estimado": "Margem de 100% a 180%", "detalhe": "Posicionamento premium"}}
         ],
-        "conclusao_executiva": "Texto técnico e motivador de encerramento."
+        "conclusao_executiva": "Texto técnico e motivador de encerramento com foco em consistência operacional."
     }}
     """
     resp = executar_prompt_ia(prompt, formato_json=True, temperatura=0.3)
@@ -528,20 +555,23 @@ def gerar_apendice_economico_ia(tema: str, publico: str) -> dict:
 
 def gerar_order_bump_ia(tema: str, publico: str, titulo_principal: str) -> dict:
     prompt = f"""
-    Crie o PRODUTO COMPLEMENTAR (ORDER BUMP / ACELERADOR PRÁTICO) para acompanhar: '{titulo_principal}'.
+    Atue como Especialista em Otimização de Conversão e Crie o PRODUTO COMPLEMENTAR (ORDER BUMP / ACELERADOR PRÁTICO) para: '{titulo_principal}'.
+    TEMA: {tema} | PÚBLICO: {publico}
+    REGRA: Todo o conteúdo em Português do Brasil (PT-BR).
+
     Retorne ESTRITAMENTE o JSON:
     {{
         "titulo_bump": "Checklist de Campo",
         "subtitulo_bump": "Protocolo Rápido de Execução e Auditoria",
-        "copy_oferta_kiwify": "Adicione o checklist prático por apenas R$ 19,90 e garanta execução sem erros.",
+        "copy_oferta_kiwify": "Adicione este checklist prático por apenas R$ 19,90 e audite seus processos sem margem de erro.",
         "termo_capa": "practical checklist tool",
         "checklist_rotina": [
-            {{"fase": "Pré-Execução", "item": "Auditoria de insumos e setup inicial", "criterio_aprovacao": "100% conforme"}},
-            {{"fase": "Durante Operação", "item": "Monitoramento de temperatura e tempo", "criterio_aprovacao": "Dentro da tolerância"}},
-            {{"fase": "Inspeção Final", "item": "Conferência visual de acabamento", "criterio_aprovacao": "Padrão comercial"}}
+            {{"fase": "Pré-Execução", "item": "Auditoria de insumos e calibragem", "criterio_aprovacao": "100% conforme"}},
+            {{"fase": "Durante Operação", "item": "Monitoramento de temperatura e fluxo", "criterio_aprovacao": "Dentro da tolerância"}},
+            {{"fase": "Inspeção Final", "item": "Conferência de acabamento comercial", "criterio_aprovacao": "Padrão aprovado"}}
         ],
         "tabela_emergencia": [
-            {{"anomalia": "Desvio de consistência", "risco_imediato": "Perda de lote", "comando_correcao": "Ajustar proporção imediata"}}
+            {{"anomalia": "Desvio crítico de consistência", "risco_imediato": "Perda do lote de produção", "comando_correcao": "Ajustar proporção imediata em 5 minutos"}}
         ]
     }}
     """
@@ -549,31 +579,25 @@ def gerar_order_bump_ia(tema: str, publico: str, titulo_principal: str) -> dict:
     return json.loads(resp)
 
 def pipeline_geracao_livro_completo(tema: str, publico: str, gerar_bump: bool = True, status_placeholder=None, progress_bar=None) -> dict:
-    if status_placeholder: status_placeholder.write("📐 [1/6] Projetando arquitetura técnica...")
-    if progress_bar: progress_bar.progress(0.10)
+    if status_placeholder: status_placeholder.write("📐 [1/5] Projetando arquitetura técnica...")
+    if progress_bar: progress_bar.progress(0.15)
     blueprint = gerar_blueprint_ebook_ia(tema, publico)
 
-    if status_placeholder: status_placeholder.write("✍ [2/6] Escrevendo introdução técnica...")
-    if progress_bar: progress_bar.progress(0.20)
+    if status_placeholder: status_placeholder.write("✍ [2/5] Escrevendo introdução técnica profunda...")
+    if progress_bar: progress_bar.progress(0.30)
     introducao = gerar_introducao_profunda_ia(tema, publico, blueprint)
 
     modulos_completos = []
     total_mod = len(blueprint.get("modulos", []))
     for idx_m, mod in enumerate(blueprint.get("modulos", [])):
-        if status_placeholder: status_placeholder.write(f"🔬 [3/6] Redigindo Módulo {mod.get('numero')}...")
+        if status_placeholder: status_placeholder.write(f"🔬 [3/5] Redigindo Módulo {mod.get('numero')} ({mod.get('titulo')})...")
         cap_dados = gerar_capitulo_individual_ia(tema, publico, mod)
         modulos_completos.append(cap_dados)
-        if progress_bar: progress_bar.progress(0.20 + ((idx_m + 1) / total_mod) * 0.45)
+        if progress_bar: progress_bar.progress(0.30 + ((idx_m + 1) / total_mod) * 0.40)
 
-    if status_placeholder: status_placeholder.write("📊 [4/6] Compilando Troubleshooting...")
-    if progress_bar: progress_bar.progress(0.75)
     apendice = gerar_apendice_economico_ia(tema, publico)
-
-    dados_bump = None
-    if gerar_bump:
-        if status_placeholder: status_placeholder.write("🎁 [5/6] Construindo Order Bump...")
-        dados_bump = gerar_order_bump_ia(tema, publico, blueprint.get("titulo"))
-        if progress_bar: progress_bar.progress(0.90)
+    dados_bump = gerar_order_bump_ia(tema, publico, blueprint.get("titulo")) if gerar_bump else None
+    if progress_bar: progress_bar.progress(0.95)
 
     return {
         "titulo": blueprint.get("titulo"),
@@ -583,98 +607,6 @@ def pipeline_geracao_livro_completo(tema: str, publico: str, gerar_bump: bool = 
         "modulos": modulos_completos,
         "apendice": apendice,
         "order_bump": dados_bump
-    }
-
-def traduzir_livro_completo_ia(dados_livro: dict, idioma_destino: str, progress_bar=None) -> dict:
-    total_etapas = 2 + len(dados_livro.get("modulos", [])) + 1
-    if dados_livro.get("order_bump"): total_etapas += 1
-    etapa = 0
-
-    titulo_tr = traduzir_texto_ia(dados_livro.get("titulo", ""), idioma_destino)
-    subtitulo_tr = traduzir_texto_ia(dados_livro.get("subtitulo", ""), idioma_destino)
-    etapa += 1
-    if progress_bar: progress_bar.progress(etapa / total_etapas)
-
-    intro_tr = traduzir_texto_ia(dados_livro.get("introducao", ""), idioma_destino)
-    etapa += 1
-    if progress_bar: progress_bar.progress(etapa / total_etapas)
-
-    modulos_tr = []
-    for mod in dados_livro.get("modulos", []):
-        t_mod = traduzir_texto_ia(mod.get("titulo", ""), idioma_destino)
-        alerta_tr = traduzir_texto_ia(mod.get("alerta_tecnico", ""), idioma_destino)
-        legenda_tr = traduzir_texto_ia(mod.get("legenda_resultado", ""), idioma_destino)
-
-        subsecoes_tr = []
-        for sub in mod.get("subsecoes", []):
-            subsecoes_tr.append({
-                "subtitulo": traduzir_texto_ia(sub.get("subtitulo", ""), idioma_destino),
-                "conteudo": traduzir_texto_ia(sub.get("conteudo", ""), idioma_destino)
-            })
-
-        tabela_tr = []
-        for item in mod.get("tabela_parametros", []):
-            tabela_tr.append({
-                "item": traduzir_texto_ia(item.get("item", ""), idioma_destino),
-                "parametro": traduzir_texto_ia(item.get("parametro", ""), idioma_destino),
-                "funcao": traduzir_texto_ia(item.get("funcao", ""), idioma_destino)
-            })
-
-        passos_tr = [traduzir_texto_ia(p, idioma_destino) for p in mod.get("passos_operacionais", [])]
-        modulos_tr.append({
-            "numero": mod.get("numero"),
-            "titulo": t_mod,
-            "alerta_tecnico": alerta_tr,
-            "subsecoes": subsecoes_tr,
-            "nome_tabela": traduzir_texto_ia(mod.get("nome_tabela", "Tabela Técnica"), idioma_destino),
-            "tabela_parametros": tabela_tr,
-            "passos_operacionais": passos_tr,
-            "termo_busca_foto_processo": mod.get("termo_busca_foto_processo", ""),
-            "termo_busca_foto_resultado": mod.get("termo_busca_foto_resultado", ""),
-            "legenda_resultado": legenda_tr
-        })
-        etapa += 1
-        if progress_bar: progress_bar.progress(etapa / total_etapas)
-
-    ap_raw = dados_livro.get("apendice", {})
-    falhas_tr = [{"defeito": traduzir_texto_ia(f.get("defeito", ""), idioma_destino),
-                  "causa_raiz": traduzir_texto_ia(f.get("causa_raiz", ""), idioma_destino),
-                  "correcao": traduzir_texto_ia(f.get("correcao", ""), idioma_destino)} for f in ap_raw.get("falhas", [])]
-    custos_tr = [{"componente": traduzir_texto_ia(c.get("componente", ""), idioma_destino),
-                  "valor_estimado": c.get("valor_estimado", ""),
-                  "detalhe": traduzir_texto_ia(c.get("detalhe", ""), idioma_destino)} for c in ap_raw.get("custos_matriz", [])]
-
-    apendice_tr = {
-        "titulo": traduzir_texto_ia(ap_raw.get("titulo", "Dossiê Clínico de Falhas"), idioma_destino),
-        "falhas": falhas_tr,
-        "custos_matriz": custos_tr,
-        "conclusao_executiva": traduzir_texto_ia(ap_raw.get("conclusao_executiva", ""), idioma_destino)
-    }
-    etapa += 1
-
-    bump_tr = None
-    if dados_livro.get("order_bump"):
-        b_raw = dados_livro["order_bump"]
-        chk_tr = [{"fase": traduzir_texto_ia(chk.get("fase", ""), idioma_destino),
-                   "item": traduzir_texto_ia(chk.get("item", ""), idioma_destino),
-                   "criterio_aprovacao": traduzir_texto_ia(chk.get("criterio_aprovacao", ""), idioma_destino)} for chk in b_raw.get("checklist_rotina", [])]
-        tab_em_tr = [{"anomalia": traduzir_texto_ia(em.get("anomalia", ""), idioma_destino),
-                      "risco_imediato": traduzir_texto_ia(em.get("risco_imediato", ""), idioma_destino),
-                      "comando_correcao": traduzir_texto_ia(em.get("comando_correcao", ""), idioma_destino)} for em in b_raw.get("tabela_emergencia", [])]
-        bump_tr = {
-            "titulo_bump": traduzir_texto_ia(b_raw.get("titulo_bump", ""), idioma_destino),
-            "subtitulo_bump": traduzir_texto_ia(b_raw.get("subtitulo_bump", ""), idioma_destino),
-            "copy_oferta_kiwify": traduzir_texto_ia(b_raw.get("copy_oferta_kiwify", ""), idioma_destino),
-            "termo_capa": b_raw.get("termo_capa", ""),
-            "checklist_rotina": chk_tr,
-            "tabela_emergencia": tab_em_tr
-        }
-        etapa += 1
-
-    if progress_bar: progress_bar.progress(1.0)
-    return {
-        "titulo": titulo_tr, "subtitulo": subtitulo_tr, "termo_capa": dados_livro.get("termo_capa", ""),
-        "introducao": intro_tr, "modulos": modulos_tr, "apendice": apendice_tr, "order_bump": bump_tr
     }
 
 class NumeradorPaginas(canvas.Canvas):
@@ -688,21 +620,18 @@ class NumeradorPaginas(canvas.Canvas):
         num_paginas = len(self.pages)
         for page in self.pages:
             self.__dict__.update(page)
-            self.draw_footer(num_paginas)
+            if self._pageNumber > 1:
+                self.saveState()
+                self.setFont("Helvetica", 8.5)
+                self.setFillColor(colors.HexColor("#64748B"))
+                self.drawString(36, 18, "MANUAL DE PROCEDIMENTOS | EDIÇÃO PROFISSIONAL")
+                self.drawRightString(576, 18, f"Página {self._pageNumber} de {num_paginas}")
+                self.setStrokeColor(colors.HexColor("#CBD5E1"))
+                self.setLineWidth(0.6)
+                self.line(36, 26, 576, 26)
+                self.restoreState()
             super().showPage()
         super().save()
-    def draw_footer(self, page_count):
-        if self._pageNumber > 1:
-            self.saveState()
-            self.setFont("Helvetica-Bold", 8.5)
-            self.setFillColor(colors.HexColor("#64748B"))
-            self.drawString(36, 18, "MANUAL DE ENGENHARIA & PROCEDIMENTOS | EDIÇÃO PROFISSIONAL")
-            texto_pag = f"Página {self._pageNumber} de {page_count}"
-            self.drawRightString(576, 18, texto_pag)
-            self.setStrokeColor(colors.HexColor("#CBD5E1"))
-            self.setLineWidth(0.6)
-            self.line(36, 26, 576, 26)
-            self.restoreState()
 
 class NumeradorPaginasBump(canvas.Canvas):
     def __init__(self, *args, **kwargs):
@@ -715,48 +644,14 @@ class NumeradorPaginasBump(canvas.Canvas):
         num_paginas = len(self.pages)
         for page in self.pages:
             self.__dict__.update(page)
-            self.draw_footer(num_paginas)
+            self.saveState()
+            self.setFont("Helvetica", 8.5)
+            self.setFillColor(colors.HexColor("#64748B"))
+            self.drawString(36, 16, "CADERNO DE EXECUÇÃO & CHECKLIST OPERACIONAL")
+            self.drawRightString(576, 16, f"Pág. {self._pageNumber} de {num_paginas}")
+            self.restoreState()
             super().showPage()
         super().save()
-    def draw_footer(self, page_count):
-        self.saveState()
-        self.setFont("Helvetica-Bold", 8.5)
-        self.setFillColor(colors.HexColor("#64748B"))
-        self.drawString(36, 16, "CADERNO DE EXECUÇÃO & CHECKLIST OPERACIONAL | USO PRÁTICO")
-        texto_pag = f"Pág. {self._pageNumber} de {page_count}"
-        self.drawRightString(576, 16, texto_pag)
-        self.setStrokeColor(colors.HexColor("#CBD5E1"))
-        self.setLineWidth(0.6)
-        self.line(36, 24, 576, 24)
-        self.restoreState()
-
-def buscar_foto_pexels(query: str, pexels_key: str, dest_path: str) -> bool:
-    if not pexels_key or not query: return False
-    try:
-        url = f"https://api.pexels.com/v1/search?query={requests.utils.quote(query)}&per_page=1&orientation=landscape"
-        headers = {"Authorization": pexels_key}
-        res = requests.get(url, headers=headers, timeout=12)
-        if res.status_code == 200:
-            data = res.json()
-            if data.get("photos"):
-                img_url = data["photos"][0]["src"]["large"]
-                img_data = requests.get(img_url, timeout=12).content
-                with open(dest_path, "wb") as f: f.write(img_data)
-                return True
-    except Exception:
-        pass
-    return False
-
-def recortar_foto_proporcional(orig_path: str, dest_path: str, target_w: int, target_h: int) -> bool:
-    if not os.path.exists(orig_path): return False
-    try:
-        with PILImage.open(orig_path) as img:
-            img_rgb = img.convert("RGB")
-            img_cortada = ImageOps.fit(img_rgb, (target_w, target_h), method=PILImage.Resampling.LANCZOS)
-            img_cortada.save(dest_path, "JPEG", quality=92)
-        return True
-    except Exception:
-        return False
 
 def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: str) -> str:
     doc = SimpleDocTemplate(caminho_pdf, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=38, bottomMargin=36)
@@ -774,33 +669,54 @@ def compilar_pdf_livro_tecnico(dados_livro: dict, pexels_key: str, caminho_pdf: 
 
     flowables = [
         Spacer(1, 20),
-        Paragraph(dados_livro.get("titulo", "Manual Técnico"), estilo_capa_tit),
-        Paragraph(dados_livro.get("subtitulo", "Guia Operacional"), estilo_capa_sub)
+        Paragraph(dados_livro.get("titulo", "Manual Técnico Profissional"), estilo_capa_tit),
+        Paragraph(dados_livro.get("subtitulo", "Guia Técnico Avançado"), estilo_capa_sub),
+        PageBreak(),
+        Paragraph("Sumário Executivo", estilo_h1),
+        HRFlowable(width="100%", thickness=1, color=cor_azul, spaceAfter=10)
     ]
-    flowables.append(Spacer(1, 15))
-    flowables.append(PageBreak())
 
-    flowables.append(Paragraph("Sumário Executivo", estilo_h1))
-    flowables.append(HRFlowable(width="100%", thickness=1, color=cor_azul, spaceAfter=10))
-    sumario_data = [[Paragraph("<b>Seção</b>", estilo_celula_h), Paragraph("<b>Módulo</b>", estilo_celula_h)]]
+    sumario_data = [[Paragraph("<b>Seção</b>", estilo_celula_h), Paragraph("<b>Módulo Técnico</b>", estilo_celula_h)]]
     for mod in dados_livro.get("modulos", []):
         sumario_data.append([Paragraph(f"Módulo {mod.get('numero')}", estilo_celula), Paragraph(mod.get("titulo", ""), estilo_celula)])
+    
     tab_s = Table(sumario_data, colWidths=[110, 430])
-    tab_s.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, 0), cor_azul), ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1"))]))
+    tab_s.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), cor_azul),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
+        ('PADDING', (0, 0), (-1, -1), 4)
+    ]))
     flowables.append(tab_s)
     flowables.append(PageBreak())
 
-    flowables.append(Paragraph("Introdução Geral", estilo_h1))
+    flowables.append(Paragraph("Introdução Geral & Fundamentos", estilo_h1))
     for p in dados_livro.get("introducao", "").split("\n"):
         if p.strip(): flowables.append(Paragraph(p.strip(), estilo_corpo))
 
     for mod in dados_livro.get("modulos", []):
         flowables.append(Spacer(1, 10))
         flowables.append(Paragraph(f"Módulo {mod.get('numero')}: {mod.get('titulo')}", estilo_h1))
+        flowables.append(HRFlowable(width="100%", thickness=0.8, color=cor_azul, spaceAfter=6))
+        
         for sub in mod.get("subsecoes", []):
             flowables.append(Paragraph(sub.get("subtitulo", ""), estilo_h2))
             for p_sub in sub.get("conteudo", "").split("\n"):
                 if p_sub.strip(): flowables.append(Paragraph(p_sub.strip(), estilo_corpo))
+
+        itens_tab = mod.get("tabela_parametros", [])
+        if itens_tab:
+            flowables.append(Paragraph(f"📋 {mod.get('nome_tabela', 'Matriz Técnica')}", estilo_h2))
+            dados_t = [[Paragraph("<b>Componente</b>", estilo_celula_h), Paragraph("<b>Especificação</b>", estilo_celula_h), Paragraph("<b>Função</b>", estilo_celula_h)]]
+            for it in itens_tab:
+                dados_t.append([Paragraph(it.get("item", ""), estilo_celula), Paragraph(it.get("parametro", ""), estilo_celula), Paragraph(it.get("funcao", ""), estilo_celula)])
+            tab_p = Table(dados_t, colWidths=[160, 120, 260])
+            tab_p.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), cor_azul),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+                ('PADDING', (0, 0), (-1, -1), 4)
+            ]))
+            flowables.append(tab_p)
 
     doc.build(flowables, canvasmaker=NumeradorPaginas)
     return caminho_pdf
@@ -822,7 +738,7 @@ def compilar_pdf_order_bump(dados_bump: dict, pexels_key: str, caminho_pdf: str)
     return caminho_pdf
 
 # ==============================================================================
-# 5. PROCESSAMENTO DE VÍDEO (TTS, PEXELS, CONCAT E FUSÃO MASTER)
+# 5. PROCESSAMENTO DE ÁUDIO E VÍDEO (FASTSTART + THREADS LIMITADAS)
 # ==============================================================================
 def sintetizar_audio_tts(texto: str, output_path: str, voz: str = "onyx") -> bool:
     if not OPENAI_API_KEY: return False
@@ -901,18 +817,18 @@ def renderizar_vsl_completa(
                 f"drawtext=textfile='{legenda_path_escapado}':fontcolor=white:fontsize={tam_fonte}:box=1:boxcolor=black@0.80:boxborderw=16:line_spacing=12:x=(w-text_w)/2:y={pos_y_legenda}"
             )
             cmd = [
-                "ffmpeg", "-y", "-stream_loop", "-1", "-i", v_raw_path, "-i", a_path,
+                "ffmpeg", "-y", "-threads", "2", "-stream_loop", "-1", "-i", v_raw_path, "-i", a_path,
                 "-map", "0:v:0", "-map", "1:a:0", "-t", f"{duracao:.2f}", "-vf", vf,
-                "-c:v", "libx264", "-preset", "ultrafast", "-crf", "22", "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2", "-pix_fmt", "yuv420p", cena_out
+                "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2", "-pix_fmt", "yuv420p", cena_out
             ]
         else:
             vf = (
                 f"setsar=1,fps=30,drawtext=textfile='{legenda_path_escapado}':fontcolor=white:fontsize={tam_fonte+4}:box=1:boxcolor=blue@0.65:boxborderw=20:line_spacing=14:x=(w-text_w)/2:y=(h-text_h)/2"
             )
             cmd = [
-                "ffmpeg", "-y", "-f", "lavfi", "-i", f"color=c=0x0F172A:s={res_w}x{res_h}:d={duracao:.2f}", "-i", a_path,
+                "ffmpeg", "-y", "-threads", "2", "-f", "lavfi", "-i", f"color=c=0x0F172A:s={res_w}x{res_h}:d={duracao:.2f}", "-i", a_path,
                 "-map", "0:v:0", "-map", "1:a:0", "-t", f"{duracao:.2f}", "-vf", vf,
-                "-c:v", "libx264", "-preset", "ultrafast", "-crf", "22", "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2", "-pix_fmt", "yuv420p", cena_out
+                "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2", "-pix_fmt", "yuv420p", cena_out
             ]
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
         cenas_clipes.append(cena_out)
@@ -923,38 +839,24 @@ def renderizar_vsl_completa(
         for c in cenas_clipes: f.write(f"file '{c.replace(os.sep, '/')}'\n")
 
     vsl_sem_trilha = os.path.join(DIR_VSL, f"vsl_base_{int(time.time())}.mp4")
-    cmd_concat = ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", concat_txt_path, "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2", vsl_sem_trilha]
+    cmd_concat = ["ffmpeg", "-y", "-threads", "2", "-f", "concat", "-safe", "0", "-i", concat_txt_path, "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2", vsl_sem_trilha]
     subprocess.run(cmd_concat, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
 
     vsl_final = os.path.join(DIR_VSL, f"vsl_final_{int(time.time())}.mp4")
     if musica_fundo_path and os.path.exists(musica_fundo_path):
         cmd_final = [
-            "ffmpeg", "-y", "-i", vsl_sem_trilha, "-stream_loop", "-1", "-i", musica_fundo_path,
+            "ffmpeg", "-y", "-threads", "2", "-i", vsl_sem_trilha, "-stream_loop", "-1", "-i", musica_fundo_path,
             "-filter_complex", f"[1:a]volume={volume_musica}[bg];[0:a][bg]amix=inputs=2:duration=first:dropout_transition=2[aout]",
             "-map", "0:v", "-map", "[aout]", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", "-shortest", vsl_final
         ]
         subprocess.run(cmd_final, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
     else:
-        cmd_fs = ["ffmpeg", "-y", "-i", vsl_sem_trilha, "-c", "copy", "-movflags", "+faststart", vsl_final]
+        cmd_fs = ["ffmpeg", "-y", "-threads", "2", "-i", vsl_sem_trilha, "-c", "copy", "-movflags", "+faststart", vsl_final]
         subprocess.run(cmd_fs, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
     return vsl_final
 
-def dublar_roteiro_e_renderizar_vsl(
-    cenas_originais: List[Dict[str, str]], idioma_alvo: str, plataforma_nome: str, voz: str, pexels_key: str,
-    musica_fundo_path: Optional[str] = None, volume_musica: float = 0.08, marca_dagua: Optional[str] = None, progress_bar = None
-) -> Tuple[str, List[Dict[str, str]]]:
-    cenas_traduzidas = []
-    total = len(cenas_originais)
-    for idx, c in enumerate(cenas_originais):
-        fala = traduzir_texto_ia(c.get("fala", ""), idioma_alvo)
-        cenas_traduzidas.append({"fala": fala, "termo_video": c.get("termo_video", "business")})
-        if progress_bar: progress_bar.progress((idx + 1) / (total * 2))
-
-    vid = renderizar_vsl_completa(cenas_traduzidas, plataforma_nome, voz, pexels_key, musica_fundo_path, volume_musica, marca_dagua, progress_bar)
-    return vid, cenas_traduzidas
-
 # ==============================================================================
-# MOTOR DE FUSÃO DE VÍDEOS (FASTSTART + BUFFER SEGURO SEM TRAVAMENTO)
+# FUSÃO DE VÍDEOS COM FASTSTART E BUFFER SEGURO
 # ==============================================================================
 def fundir_videos_com_trilha(
     video1_path: str,
@@ -970,8 +872,7 @@ def fundir_videos_com_trilha(
     dur_v1 = obter_duracao_audio(video1_path)
     dur_v2 = obter_duracao_audio(video2_path)
     dur_total = dur_v1 + dur_v2
-    if dur_total <= 0:
-        dur_total = 180.0
+    if dur_total <= 0: dur_total = 180.0
 
     if musica_path and os.path.exists(musica_path):
         filter_complex = (
@@ -984,14 +885,14 @@ def fundir_videos_com_trilha(
             f"[acat][bg]amix=inputs=2:duration=first:dropout_transition=2[aout]"
         )
         cmd = [
-            "ffmpeg", "-y",
+            "ffmpeg", "-y", "-threads", "2",
             "-i", video1_path,
             "-i", video2_path,
             "-stream_loop", "-1", "-i", musica_path,
             "-filter_complex", filter_complex,
             "-map", "[vcat]", "-map", "[aout]",
             "-t", f"{dur_total:.2f}",
-            "-c:v", "libx264", "-preset", "veryfast", "-crf", "22", "-pix_fmt", "yuv420p",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p",
             "-c:a", "aac", "-b:a", "192k",
             "-movflags", "+faststart",
             output_path
@@ -1005,13 +906,13 @@ def fundir_videos_com_trilha(
             f"[v0][a0][v1][a1]concat=n=2:v=1:a=1[vcat][aout]"
         )
         cmd = [
-            "ffmpeg", "-y",
+            "ffmpeg", "-y", "-threads", "2",
             "-i", video1_path,
             "-i", video2_path,
             "-filter_complex", filter_complex,
             "-map", "[vcat]", "-map", "[aout]",
             "-t", f"{dur_total:.2f}",
-            "-c:v", "libx264", "-preset", "veryfast", "-crf", "22", "-pix_fmt", "yuv420p",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p",
             "-c:a", "aac", "-b:a", "192k",
             "-movflags", "+faststart",
             output_path
@@ -1025,7 +926,7 @@ def fundir_videos_com_trilha(
     return output_path
 
 # ==============================================================================
-# MOTOR TIKTOK MARKETING API COM MACROS DINÂMICAS & LANDING PAGE COM REPASSE
+# MOTOR TIKTOK MARKETING API COM MACROS & GERADOR DE LANDING PAGE
 # ==============================================================================
 TIKTOK_API_BASE = "https://business-api.tiktok.com/open_api/v1.3"
 
@@ -1035,24 +936,24 @@ def disparar_campanha_tiktok_completa(
 ) -> dict:
     headers = {"Access-Token": access_token}
     headers_json = {"Access-Token": access_token, "Content-Type": "application/json"}
-    if not os.path.exists(video_path): raise FileNotFoundError(f"Arquivo de vídeo não encontrado em: {video_path}")
+    if not os.path.exists(video_path): raise FileNotFoundError(f"Arquivo de vídeo não encontrado: {video_path}")
 
-    # 1. Upload do Vídeo
+    # 1. Upload
     url_upload = f"{TIKTOK_API_BASE}/file/video/ad/upload/"
     with open(video_path, "rb") as vf:
         res_upload = requests.post(url_upload, headers=headers, data={"advertiser_id": advertiser_id, "upload_type": "UPLOAD_BY_FILE"}, files={"video_file": vf}).json()
-    if res_upload.get("code") != 0: raise Exception(f"Erro no Upload do Vídeo: {res_upload.get('message')}")
+    if res_upload.get("code") != 0: raise Exception(f"Erro Upload: {res_upload.get('message')}")
     video_id = res_upload["data"]["video_id"]
 
-    # 2. Criar Campanha
+    # 2. Campanha
     res_camp = requests.post(
         f"{TIKTOK_API_BASE}/campaign/create/", headers=headers_json,
         json={"advertiser_id": advertiser_id, "campaign_name": campaign_name, "objective_type": "WEB_CONVERSIONS", "budget_mode": "BUDGET_MODE_DYNAMIC"}
     ).json()
-    if res_camp.get("code") != 0: raise Exception(f"Erro ao criar Campanha: {res_camp.get('message')}")
+    if res_camp.get("code") != 0: raise Exception(f"Erro Campanha: {res_camp.get('message')}")
     campaign_id = res_camp["data"]["campaign_id"]
 
-    # 3. Criar Ad Group
+    # 3. Ad Group
     data_formatada = (datetime.now(timezone.utc) + timedelta(minutes=10)).strftime("%Y-%m-%d %H:%M:%S")
     payload_adgroup = {
         "advertiser_id": advertiser_id, "campaign_id": campaign_id, "adgroup_name": f"Grupo - {campaign_name}",
@@ -1061,10 +962,10 @@ def disparar_campanha_tiktok_completa(
         "schedule_start_time": data_formatada, "billing_event": "OCPM", "bid_type": "BID_TYPE_NO_BID", "optimization_goal": "CLICK"
     }
     res_adgroup = requests.post(f"{TIKTOK_API_BASE}/adgroup/create/", headers=headers_json, json=payload_adgroup).json()
-    if res_adgroup.get("code") != 0: raise Exception(f"Erro ao criar AdGroup: {res_adgroup.get('message')}")
+    if res_adgroup.get("code") != 0: raise Exception(f"Erro AdGroup: {res_adgroup.get('message')}")
     adgroup_id = res_adgroup["data"]["adgroup_id"]
 
-    # 4. Criar Anúncio com INJEÇÃO AUTOMÁTICA DE UTMS DINÂMICAS DO TIKTOK E SRC KIWIFY
+    # 4. Criativo com UTMs Dinâmicas
     separador = "&" if "?" in landing_page_url else "?"
     url_com_utms = (
         f"{landing_page_url}{separador}"
@@ -1077,19 +978,15 @@ def disparar_campanha_tiktok_completa(
     )
 
     criativo = {
-        "ad_name": f"Criativo - {campaign_name}",
-        "ad_format": "SINGLE_VIDEO",
-        "video_id": video_id,
-        "ad_text": copy_text[:100],
-        "call_to_action": "LEARN_MORE",
-        "landing_page_url": url_com_utms
+        "ad_name": f"Criativo - {campaign_name}", "ad_format": "SINGLE_VIDEO", "video_id": video_id,
+        "ad_text": copy_text[:100], "call_to_action": "LEARN_MORE", "landing_page_url": url_com_utms
     }
     if identity_id and identity_id.strip():
         criativo["identity_type"] = "CUSTOMIZED_USER"
         criativo["identity_id"] = identity_id.strip()
 
     res_ad = requests.post(f"{TIKTOK_API_BASE}/ad/create/", headers=headers_json, json={"advertiser_id": advertiser_id, "adgroup_id": adgroup_id, "creatives": [criativo]}).json()
-    if res_ad.get("code") != 0: raise Exception(f"Erro ao publicar Anúncio: {res_ad.get('message')}")
+    if res_ad.get("code") != 0: raise Exception(f"Erro Anúncio: {res_ad.get('message')}")
 
     return {"video_id": video_id, "campaign_id": campaign_id, "adgroup_id": adgroup_id, "ad_id": res_ad["data"]["ad_ids"][0]}
 
@@ -1378,7 +1275,7 @@ with tab_minerador:
             )
 
 # ------------------------------------------------------------------------------
-# ABA 2: CRIAR VSL CURTA (27S) & DUBLAGEM
+# ABA 2: CRIAR VSL CURTA (27S)
 # ------------------------------------------------------------------------------
 with tab_vsl:
     st.markdown("## 🚀 2. Criador de VSL Curta (27s - Gancho de Tráfego)")
@@ -1410,7 +1307,7 @@ with tab_vsl:
             st.error("❌ Saldo insuficiente!")
         else:
             barra_vsl = st.progress(0.0)
-            with st.spinner("Renderizando cenas da VSL curta..."):
+            with st.spinner("Renderizando cenas da VSL curta em Português..."):
                 try:
                     cenas_estruturadas = gerar_roteiro_vsl_ia(tema_vsl, promessa_vsl, publico_vsl, qtd_cenas)
                     st.session_state["roteiro_vsl"] = cenas_estruturadas
@@ -1445,45 +1342,8 @@ with tab_vsl:
             key="btn_down_vsl_curta"
         )
 
-        st.markdown("---")
-        with st.container(border=True):
-            st.markdown("### 🌐 Dublar VSL Curta em 36 Idiomas (DubfyAi Global)")
-            col_d1, col_d2 = st.columns([2, 1])
-            with col_d1:
-                idioma_dub_sel = st.selectbox("Selecione o Idioma:", list(IDIOMAS_SISTEMA_36.keys()), key="vsl_dub_sel")
-            with col_d2:
-                st.write("")
-                st.caption("Custo: 20 Créditos")
-                btn_dub = st.button("🎙 Dublar Vídeo Curto (20 cr)", type="primary", use_container_width=True, key="btn_exec_dub_vsl")
-
-            if btn_dub:
-                if saldo_atual < 20:
-                    st.error("❌ Saldo insuficiente!")
-                else:
-                    barra_d = st.progress(0.0)
-                    with st.spinner("Dublando vídeo curto..."):
-                        try:
-                            nome_ling = IDIOMAS_SISTEMA_36[idioma_dub_sel]
-                            v_dub, _ = dublar_roteiro_e_renderizar_vsl(
-                                cenas_originais=st.session_state["roteiro_vsl"], idioma_alvo=nome_ling,
-                                plataforma_nome=st.session_state.get("vsl_plataforma_ativa", plataforma_vsl_sel),
-                                voz=voz_codigo, pexels_key=PEXELS_API_KEY, musica_fundo_path=None,
-                                volume_musica=0.0, marca_dagua=st.session_state.get("vsl_marca_ativa", ""), progress_bar=barra_d
-                            )
-                            debitar_creditos_cloud(email_usuario, f"Dublagem VSL ({nome_ling})", 20)
-                            st.session_state["video_dublado_pronto"] = v_dub
-                            st.session_state["video_dublado_idioma"] = idioma_dub_sel
-                            st.success(f"✅ Vídeo curto dublado em {idioma_dub_sel}!")
-                            st.rerun()
-                        except Exception as e_d:
-                            st.error(f"Erro na dublagem: {e_d}")
-
-            if st.session_state.get("video_dublado_pronto") and os.path.exists(st.session_state["video_dublado_pronto"]):
-                st.markdown(f"#### 🎬 Vídeo Curto Dublado ({st.session_state.get('video_dublado_idioma')}):")
-                st.video(st.session_state["video_dublado_pronto"])
-
 # ------------------------------------------------------------------------------
-# ABA 3: APRESENTAÇÃO DO PRODUTO (3 MIN) & DUBLAGEM
+# ABA 3: APRESENTAÇÃO DO PRODUTO (3 MIN)
 # ------------------------------------------------------------------------------
 with tab_apresentacao:
     st.markdown("## 🎥 3. Apresentação do Produto (Pitch Longo de 2 a 3 Min)")
@@ -1515,12 +1375,12 @@ with tab_apresentacao:
             barra_ap = st.progress(0.0)
             status_ap = st.empty()
             try:
-                status_ap.write("✍️ Estruturando 13 cenas com técnica de retenção...")
+                status_ap.write("✍️ Estruturando 13 cenas com técnica de retenção em Português...")
                 roteiro_pitch = gerar_roteiro_apresentacao_3min_ia(prod_nome, prod_nicho, prod_promessa, prod_publico, prod_oferta)
                 st.session_state["roteiro_pitch_3min"] = roteiro_pitch
                 st.session_state["ap_plataforma_ativa"] = plataforma_ap_sel
 
-                status_ap.write("🎥 Renderizando cortes e legendas...")
+                status_ap.write("🎥 Renderizando cortes e legendas (Low-RAM Mode)...")
                 video_pitch = renderizar_vsl_completa(
                     cenas=roteiro_pitch, plataforma_nome=plataforma_ap_sel, voz=voz_ap_cod,
                     pexels_key=PEXELS_API_KEY, musica_fundo_path=None, volume_musica=0.0,
@@ -1549,43 +1409,6 @@ with tab_apresentacao:
             use_container_width=True,
             key="btn_down_pitch_pronto"
         )
-
-        st.markdown("---")
-        with st.container(border=True):
-            st.markdown("### 🌐 Dublar Vídeo de Apresentação em 36 Idiomas (DubfyAi Global)")
-            col_ap_d1, col_ap_d2 = st.columns([2, 1])
-            with col_ap_d1:
-                idioma_pitch_sel = st.selectbox("Selecione o Idioma para Dublar:", list(IDIOMAS_SISTEMA_36.keys()), key="ap_dub_sel")
-            with col_ap_d2:
-                st.write("")
-                st.caption("Custo: 30 Créditos")
-                btn_dub_pitch = st.button("🎙 Dublar Apresentação (30 cr)", type="primary", use_container_width=True, key="btn_exec_dub_ap")
-
-            if btn_dub_pitch:
-                if saldo_atual < 30:
-                    st.error("❌ Saldo insuficiente!")
-                else:
-                    barra_ap_d = st.progress(0.0)
-                    with st.spinner("Dublando apresentação de 3 minutos..."):
-                        try:
-                            nome_ling_ap = IDIOMAS_SISTEMA_36[idioma_pitch_sel]
-                            v_pitch_dub, _ = dublar_roteiro_e_renderizar_vsl(
-                                cenas_originais=st.session_state["roteiro_pitch_3min"], idioma_alvo=nome_ling_ap,
-                                plataforma_nome=st.session_state.get("ap_plataforma_ativa", plataforma_ap_sel),
-                                voz=voz_ap_cod, pexels_key=PEXELS_API_KEY, musica_fundo_path=None,
-                                volume_musica=0.0, marca_dagua=st.session_state.get("ap_marca_dagua", ""), progress_bar=barra_ap_d
-                            )
-                            debitar_creditos_cloud(email_usuario, f"Dublagem Apresentação ({nome_ling_ap})", 30)
-                            st.session_state["video_pitch_dublado_pronto"] = v_pitch_dub
-                            st.session_state["video_pitch_dublado_idioma"] = idioma_pitch_sel
-                            st.success(f"✅ Apresentação dublada com sucesso para {idioma_pitch_sel}!")
-                            st.rerun()
-                        except Exception as e_d_ap:
-                            st.error(f"Erro na dublagem da apresentação: {e_d_ap}")
-
-            if st.session_state.get("video_pitch_dublado_pronto") and os.path.exists(st.session_state["video_pitch_dublado_pronto"]):
-                st.markdown(f"#### 🎬 Apresentação Dublada ({st.session_state.get('video_pitch_dublado_idioma')}):")
-                st.video(st.session_state["video_pitch_dublado_pronto"])
 
 # ------------------------------------------------------------------------------
 # ABA 4: JUNÇÃO CONTÍNUA DOS VÍDEOS & TRILHA DE FUNDO
@@ -1653,7 +1476,7 @@ with tab_fusao:
         elif not caminho_v2 or not os.path.exists(caminho_v2):
             st.error("Selecione ou envie o Vídeo 2 (Apresentação).")
         else:
-            with st.spinner("Concatenando vídeos e aplicando trilha sonora calibrada..."):
+            with st.spinner("Concatenando vídeos com buffer seguro e FastStart..."):
                 try:
                     nome_saida = f"vsl_master_fundida_{int(time.time())}.mp4"
                     destino_final = os.path.join(DIR_FUSAO, nome_saida)
@@ -1684,7 +1507,7 @@ with tab_fusao:
         )
 
 # ------------------------------------------------------------------------------
-# ABA 5: LIVRO TÉCNICO & ORDER BUMP COM TRADUÇÃO GLOBAL
+# ABA 5: LIVRO TÉCNICO & ORDER BUMP
 # ------------------------------------------------------------------------------
 with tab_ebook:
     st.markdown("## 📚 5. Gerador de Livro Técnico & Order Bump")
@@ -1734,42 +1557,6 @@ with tab_ebook:
                 with open(st.session_state["pdf_bump_pronto"], "rb") as f_bp:
                     bytes_bump = f_bp.read()
                 st.download_button("⬇️ Baixar Order Bump (.PDF)", data=bytes_bump, file_name="order_bump.pdf", mime="application/pdf", type="primary", use_container_width=True, key="btn_down_pdf_bump")
-
-        st.markdown("---")
-        with st.container(border=True):
-            st.markdown("### 🌐 Tradução Global do Kit (36 Idiomas)")
-            col_tr1, col_tr2 = st.columns([2, 1])
-            with col_tr1:
-                idioma_eb_sel = st.selectbox("Selecione o Idioma de Destino:", list(IDIOMAS_SISTEMA_36.keys()), key="eb_trad_sel")
-            with col_tr2:
-                st.write("")
-                st.caption("Custo: 10 Créditos")
-                btn_trad_eb = st.button("🌍 Traduzir Kit (10 cr)", type="primary", use_container_width=True, key="btn_exec_trad_ebook")
-
-            if btn_trad_eb:
-                if saldo_atual < 10:
-                    st.error("❌ Saldo insuficiente!")
-                else:
-                    barra_eb_tr = st.progress(0.0)
-                    with st.spinner("Traduzindo e diagramando PDFs em idioma estrangeiro..."):
-                        try:
-                            nome_ling_eb = IDIOMAS_SISTEMA_36[idioma_eb_sel]
-                            dados_tr = traduzir_livro_completo_ia(st.session_state["dados_livro_sessao"], nome_ling_eb, progress_bar=barra_eb_tr)
-                            caminho_tr = os.path.join(DIR_EBOOKS, f"manual_{int(time.time())}.pdf")
-                            compilar_pdf_livro_tecnico(dados_tr, PEXELS_API_KEY, caminho_tr)
-                            st.session_state["pdf_global_pronto"] = caminho_tr
-                            st.session_state["pdf_global_lingua"] = idioma_eb_sel
-                            debitar_creditos_cloud(email_usuario, f"Tradução Kit ({nome_ling_eb})", 10)
-                            st.success(f"✅ Kit traduzido com sucesso para {idioma_eb_sel}!")
-                            st.rerun()
-                        except Exception as e_tr_eb:
-                            st.error(f"Erro na tradução: {e_tr_eb}")
-
-            if st.session_state.get("pdf_global_pronto") and os.path.exists(st.session_state["pdf_global_pronto"]):
-                st.success(f"✅ Kit traduzido para: {st.session_state.get('pdf_global_lingua')}")
-                with open(st.session_state["pdf_global_pronto"], "rb") as f_gtr:
-                    bytes_gtr = f_gtr.read()
-                st.download_button(f"⬇️ Baixar Manual em {st.session_state.get('pdf_global_lingua')} (.PDF)", data=bytes_gtr, file_name="manual_traduzido.pdf", mime="application/pdf", use_container_width=True, key="btn_down_pdf_gtr")
 
 # ------------------------------------------------------------------------------
 # ABA 6: CENTRAL TIKTOK ADS & LANDING PAGE (COM UTMS AUTOMÁTICAS)
