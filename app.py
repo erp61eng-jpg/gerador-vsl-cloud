@@ -211,7 +211,7 @@ def garantir_video_abaixo_50mb(caminho_mp4: str, max_mb: float = 42.0, status_pl
         "-maxrate", f"{int(bitrate_video_k * 1.3)}k",
         "-bufsize", f"{bitrate_video_k * 2}k",
         "-preset", "faster", "-pix_fmt", "yuv420p",
-        "-c:a", "aac", "-b:a", "128k",
+        "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
         "-movflags", "+faststart",
         saida_comprimida
     ]
@@ -434,7 +434,7 @@ def gerar_roteiro_apresentacao_3min_ia(nome_produto: str, nicho: str, promessa: 
         return [{"fala": f"Descubra agora o {nome_produto}.", "termo_video": termo_generico}]
 
 # ==============================================================================
-# 4. RENDERIZAÇÃO E FUSÃO COM VÍDEO & ÁUDIO
+# 4. RENDERIZAÇÃO E FUSÃO (ÁUDIO 44.1kHz ESTÉREO CORRIGIDO)
 # ==============================================================================
 def sintetizar_audio_tts(texto: str, output_path: str, voz: str = "onyx") -> bool:
     if not OPENAI_API_KEY: return False
@@ -506,6 +506,7 @@ def renderizar_vsl_completa(
         with open(legenda_txt, "w", encoding="utf-8") as f_l: f_l.write(texto_formatado)
         legenda_path_escapado = legenda_txt.replace(os.sep, "/").replace(":", "\\:")
 
+        # Garante áudio forçado em AAC 44.1kHz estéreo em cada clipe
         if tem_video and os.path.exists(v_raw_path):
             vf = (
                 f"scale={res_w}:{res_h}:force_original_aspect_ratio=increase,crop={res_w}:{res_h},setsar=1,fps=30,"
@@ -516,7 +517,9 @@ def renderizar_vsl_completa(
             cmd = [
                 "ffmpeg", "-y", "-threads", "2", "-stream_loop", "-1", "-i", v_raw_path, "-i", a_path,
                 "-map", "0:v:0", "-map", "1:a:0", "-t", f"{duracao:.2f}", "-vf", vf,
-                "-c:v", "libx264", "-preset", "faster", "-crf", "26", "-c:a", "aac", "-b:a", "128k", "-pix_fmt", "yuv420p", cena_out
+                "-c:v", "libx264", "-preset", "faster", "-crf", "26",
+                "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2",
+                "-pix_fmt", "yuv420p", cena_out
             ]
         else:
             vf = (
@@ -527,30 +530,49 @@ def renderizar_vsl_completa(
             cmd = [
                 "ffmpeg", "-y", "-threads", "2", "-f", "lavfi", "-i", f"color=c=0x0F172A:s={res_w}x{res_h}:d={duracao:.2f}", "-i", a_path,
                 "-map", "0:v:0", "-map", "1:a:0", "-t", f"{duracao:.2f}", "-vf", vf,
-                "-c:v", "libx264", "-preset", "faster", "-crf", "26", "-c:a", "aac", "-b:a", "128k", "-pix_fmt", "yuv420p", cena_out
+                "-c:v", "libx264", "-preset", "faster", "-crf", "26",
+                "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2",
+                "-pix_fmt", "yuv420p", cena_out
             ]
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
         cenas_clipes.append(cena_out)
         if progress_bar: progress_bar.progress((idx + 0.8) / total)
 
+    # Concatenação reencodando o áudio para evitar perda de faixa
     concat_txt_path = os.path.join(DIR_VSL, f"concat_{int(time.time())}.txt")
     with open(concat_txt_path, "w", encoding="utf-8") as f:
         for c in cenas_clipes: f.write(f"file '{c.replace(os.sep, '/')}'\n")
 
     vsl_sem_trilha = os.path.join(DIR_VSL, f"vsl_base_{int(time.time())}.mp4")
-    cmd_concat = ["ffmpeg", "-y", "-threads", "2", "-f", "concat", "-safe", "0", "-i", concat_txt_path, "-c:v", "copy", "-c:a", "copy", vsl_sem_trilha]
+    cmd_concat = [
+        "ffmpeg", "-y", "-threads", "2", "-f", "concat", "-safe", "0", "-i", concat_txt_path,
+        "-c:v", "copy",
+        "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2",
+        vsl_sem_trilha
+    ]
     subprocess.run(cmd_concat, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
 
     vsl_final = os.path.join(DIR_VSL, f"vsl_final_{int(time.time())}.mp4")
     if musica_fundo_path and os.path.exists(musica_fundo_path):
         cmd_final = [
             "ffmpeg", "-y", "-threads", "2", "-i", vsl_sem_trilha, "-stream_loop", "-1", "-i", musica_fundo_path,
-            "-filter_complex", f"[1:a]volume={volume_musica}[bg];[0:a][bg]amix=inputs=2:duration=first:dropout_transition=2[aout]",
-            "-map", "0:v", "-map", "[aout]", "-c:v", "copy", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", "-shortest", vsl_final
+            "-filter_complex", (
+                f"[1:a]volume={volume_musica},aformat=sample_rates=44100:channel_layouts=stereo[bg];"
+                f"[0:a]aformat=sample_rates=44100:channel_layouts=stereo[vox];"
+                f"[vox][bg]amix=inputs=2:duration=first:dropout_transition=2[aout]"
+            ),
+            "-map", "0:v", "-map", "[aout]",
+            "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2",
+            "-movflags", "+faststart", "-shortest", vsl_final
         ]
         subprocess.run(cmd_final, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
     else:
-        cmd_fs = ["ffmpeg", "-y", "-threads", "2", "-i", vsl_sem_trilha, "-c", "copy", "-movflags", "+faststart", vsl_final]
+        cmd_fs = [
+            "ffmpeg", "-y", "-threads", "2", "-i", vsl_sem_trilha,
+            "-map", "0:v", "-map", "0:a",
+            "-c:v", "copy", "-c:a", "copy",
+            "-movflags", "+faststart", vsl_final
+        ]
         subprocess.run(cmd_fs, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
     return vsl_final
 
@@ -558,7 +580,7 @@ def fundir_videos_com_trilha(
     video1_path: str, video2_path: str, output_path: str,
     musica_path: Optional[str] = None, volume_musica: float = 0.08, plataforma: str = "TikTok (Ads / Orgânico 9:16)"
 ) -> str:
-    """Funde os dois vídeos já aplicando compressão CRF 27 e FastStart (resultado em ~25 a 35 MB)."""
+    """Funde os dois vídeos garantindo áudio padronizado em 44.1kHz e compressão CRF 27."""
     config = PRESETS_PLATAFORMAS.get(plataforma, PRESETS_PLATAFORMAS["TikTok (Ads / Orgânico 9:16)"])
     w, h = config["resolucao"]
 
@@ -583,7 +605,7 @@ def fundir_videos_com_trilha(
             "-map", "[vcat]", "-map", "[aout]",
             "-t", f"{dur_total:.2f}",
             "-c:v", "libx264", "-preset", "faster", "-crf", "27", "-pix_fmt", "yuv420p",
-            "-c:a", "aac", "-b:a", "128k",
+            "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2",
             "-movflags", "+faststart",
             output_path
         ]
@@ -602,7 +624,7 @@ def fundir_videos_com_trilha(
             "-map", "[vcat]", "-map", "[aout]",
             "-t", f"{dur_total:.2f}",
             "-c:v", "libx264", "-preset", "faster", "-crf", "27", "-pix_fmt", "yuv420p",
-            "-c:a", "aac", "-b:a", "128k",
+            "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2",
             "-movflags", "+faststart",
             output_path
         ]
@@ -1053,7 +1075,7 @@ with tab_minerador:
         st.markdown(st.session_state.get("miner_dossie", ""))
 
 # ------------------------------------------------------------------------------
-# ABA 2: VSL CURTA (27S)
+# ABA 2: VSL CURTA (27S) COM DOWNLOAD DIRETO E ÁUDIO CORRIGIDO
 # ------------------------------------------------------------------------------
 with tab_vsl:
     st.markdown("## 🚀 2. Criador de VSL Curta (27s - Criativo de Anúncio)")
@@ -1072,21 +1094,35 @@ with tab_vsl:
             st.error("❌ Saldo insuficiente!")
         else:
             barra = st.progress(0.0)
-            with st.spinner("Gerando roteiro e renderizando cenas..."):
+            with st.spinner("Gerando roteiro e renderizando cenas com áudio estéreo..."):
                 cenas = gerar_roteiro_vsl_ia(tema_vsl, promessa_vsl, publico_vsl, 5)
                 v_pronto = renderizar_vsl_completa(cenas, plat_vsl, voz_vsl, PEXELS_API_KEY, marca_dagua=marca_vsl, progress_bar=barra)
                 debitar_creditos_cloud(email_usuario, "VSL Curta", 20)
                 st.session_state["video_vsl_pronto"] = v_pronto
                 st.session_state["vsl_marca_ativa"] = marca_vsl
-                st.success("✅ VSL Curta finalizada com sucesso!")
+                st.success("✅ VSL Curta finalizada com áudio perfeito!")
                 st.rerun()
 
-    if st.session_state.get("video_vsl_pronto") and os.path.exists(st.session_state["video_vsl_pronto"]):
-        st.markdown("#### Pré-visualização do Vídeo de 27s:")
-        st.video(st.session_state["video_vsl_pronto"])
+    caminho_vsl_pronto = st.session_state.get("video_vsl_pronto")
+    if caminho_vsl_pronto and os.path.exists(caminho_vsl_pronto):
+        st.markdown("---")
+        st.markdown("#### 🎬 Vídeo Pronto para Uso:")
+        tam_mb = os.path.getsize(caminho_vsl_pronto) / (1024 * 1024)
+        st.caption(f"📁 **Salvo no computador em:** `{caminho_vsl_pronto}` ({tam_mb:.1f} MB)")
+        st.video(caminho_vsl_pronto)
+
+        with open(caminho_vsl_pronto, "rb") as arq_vsl:
+            st.download_button(
+                label="⬇️ Baixar Vídeo MP4 no Computador (27s)",
+                data=arq_vsl.read(),
+                file_name="vsl_curta_27s.mp4",
+                mime="video/mp4",
+                type="primary",
+                use_container_width=True
+            )
 
 # ------------------------------------------------------------------------------
-# ABA 3: APRESENTAÇÃO 3 MIN
+# ABA 3: APRESENTAÇÃO 3 MIN COM DOWNLOAD DIRETO E ÁUDIO CORRIGIDO
 # ------------------------------------------------------------------------------
 with tab_apresentacao:
     st.markdown("## 🎥 3. Apresentação Longa (Pitch de 3 Minutos)")
@@ -1112,15 +1148,29 @@ with tab_apresentacao:
                 v_pitch = renderizar_vsl_completa(cenas_p, plat_ap, voz_ap, PEXELS_API_KEY, marca_dagua=m_ap, progress_bar=barra_ap)
                 debitar_creditos_cloud(email_usuario, "Apresentação Pitch", 30)
                 st.session_state["video_pitch_pronto"] = v_pitch
-                st.success("✅ Apresentação de 3 minutos pronta!")
+                st.success("✅ Apresentação de 3 minutos pronta com áudio estéreo!")
                 st.rerun()
 
-    if st.session_state.get("video_pitch_pronto") and os.path.exists(st.session_state["video_pitch_pronto"]):
-        st.markdown("#### Pré-visualização da Apresentação:")
-        st.video(st.session_state["video_pitch_pronto"])
+    caminho_pitch_pronto = st.session_state.get("video_pitch_pronto")
+    if caminho_pitch_pronto and os.path.exists(caminho_pitch_pronto):
+        st.markdown("---")
+        st.markdown("#### 🎬 Apresentação Pronta para Uso:")
+        tam_mb_pitch = os.path.getsize(caminho_pitch_pronto) / (1024 * 1024)
+        st.caption(f"📁 **Salvo no computador em:** `{caminho_pitch_pronto}` ({tam_mb_pitch:.1f} MB)")
+        st.video(caminho_pitch_pronto)
+
+        with open(caminho_pitch_pronto, "rb") as arq_pitch:
+            st.download_button(
+                label="⬇️ Baixar Apresentação MP4 no Computador (3 Min)",
+                data=arq_pitch.read(),
+                file_name="apresentacao_3min.mp4",
+                mime="video/mp4",
+                type="primary",
+                use_container_width=True
+            )
 
 # ------------------------------------------------------------------------------
-# ABA 4: JUNÇÃO CONTÍNUA & TRILHA DE FUNDO
+# ABA 4: JUNÇÃO CONTÍNUA & TRILHA DE FUNDO COM DOWNLOAD
 # ------------------------------------------------------------------------------
 with tab_fusao:
     st.markdown("## 🎞️ 4. Junção Contínua dos Vídeos & Masterização")
@@ -1163,7 +1213,7 @@ with tab_fusao:
         elif not caminho_v2 or not os.path.exists(caminho_v2):
             st.error("Selecione ou gere o Vídeo 2 (Apresentação).")
         else:
-            with st.spinner("Concatenando e masterizando com áudio contínuo..."):
+            with st.spinner("Concatenando e masterizando com áudio estéreo contínuo..."):
                 try:
                     saida_fusao = os.path.join(DIR_FUSAO, f"vsl_master_fundida_{int(time.time())}.mp4")
                     fundir_videos_com_trilha(caminho_v1, caminho_v2, saida_fusao, caminho_m, vol_m)
@@ -1174,9 +1224,23 @@ with tab_fusao:
                 except Exception as e_f:
                     st.error(f"Erro na fusão dos vídeos: {e_f}")
 
-    if st.session_state.get("video_master_fundido") and os.path.exists(st.session_state["video_master_fundido"]):
-        st.markdown("#### Vídeo Master Fundido:")
-        st.video(st.session_state["video_master_fundido"])
+    caminho_fusao_pronto = st.session_state.get("video_master_fundido")
+    if caminho_fusao_pronto and os.path.exists(caminho_fusao_pronto):
+        st.markdown("---")
+        st.markdown("#### 🎬 Vídeo Master Fundido:")
+        tam_mb_f = os.path.getsize(caminho_fusao_pronto) / (1024 * 1024)
+        st.caption(f"📁 **Salvo no computador em:** `{caminho_fusao_pronto}` ({tam_mb_f:.1f} MB)")
+        st.video(caminho_fusao_pronto)
+
+        with open(caminho_fusao_pronto, "rb") as arq_fusao:
+            st.download_button(
+                label="⬇️ Baixar Vídeo Master Fundido (.mp4)",
+                data=arq_fusao.read(),
+                file_name="vsl_master_fundido.mp4",
+                mime="video/mp4",
+                type="primary",
+                use_container_width=True
+            )
 
 # ------------------------------------------------------------------------------
 # ABA 5: LIVRO TÉCNICO & ORDER BUMP (REPORTLAB COMPLETO)
