@@ -144,14 +144,14 @@ IDIOMAS_SISTEMA_36 = {
     "🇿🇦 Africâner": "Afrikaans"
 }
 
-# PRESETS COM LEGENDA NA PARTE INFERIOR (SEM TAPAR ROSTO)
+# PRESETS COM LEGENDA NA PARTE INFERIOR (SEM TAPAR O ROSTO DOS ATORES)
 PRESETS_PLATAFORMAS = {
     "TikTok (Ads / Orgânico 9:16)": {
         "resolucao": (1080, 1920),
         "vertical": True,
         "largura_linha": 22,
         "fontsize": 40,
-        "pos_y": "h-text_h-420",  # Terço inferior seguro (fora da cara dos atores)
+        "pos_y": "h-text_h-420",  # Terço inferior seguro
         "pos_marca_y": 140,
         "cta_padrao": "Toque no botão vermelho abaixo para garantir agora!"
     },
@@ -178,7 +178,7 @@ PRESETS_PLATAFORMAS = {
         "vertical": False,
         "largura_linha": 42,
         "fontsize": 44,
-        "pos_y": "h-text_h-95",  # Posição clássica inferior de VSL horizontal
+        "pos_y": "h-text_h-95",
         "pos_marca_y": 50,
         "cta_padrao": "Clique no botão oficial logo abaixo deste vídeo!"
     }
@@ -216,8 +216,28 @@ def listar_musicas_locais() -> Dict[str, Optional[str]]:
     return opcoes
 
 # ==============================================================================
-# 2. MOTOR DE CRÉDITOS & SUPABASE
+# 2. MOTOR DE CRÉDITOS & SUPABASE (COM HOSPEDAGEM DE VÍDEO)
 # ==============================================================================
+def hospedar_video_supabase(caminho_local: str, bucket: str = "videos") -> Optional[str]:
+    """Envia o arquivo MP4 local para o Supabase Storage e retorna a URL pública."""
+    if not supabase_client or not os.path.exists(caminho_local):
+        return None
+    try:
+        nome_arquivo = f"vsl_master_{int(time.time())}.mp4"
+        with open(caminho_local, "rb") as f:
+            dados = f.read()
+        
+        supabase_client.storage.from_(bucket).upload(
+            path=nome_arquivo,
+            file=dados,
+            file_options={"content-type": "video/mp4"}
+        )
+        url = supabase_client.storage.from_(bucket).get_public_url(nome_arquivo)
+        return url
+    except Exception as e:
+        st.error(f"Erro ao hospedar no Supabase Storage: {e}")
+        return None
+
 def obter_dados_usuario(email: str) -> dict:
     if not supabase_client or not email:
         return {"saldo": 0, "total_compras": 0}
@@ -786,14 +806,14 @@ def renderizar_vsl_completa(
     config = PRESETS_PLATAFORMAS.get(plataforma_nome, PRESETS_PLATAFORMAS["TikTok (Ads / Orgânico 9:16)"])
     res_w, res_h = config["resolucao"]
     vertical = config["vertical"]
-    pos_y_legenda = config["pos_y"]  # Já calibrado no terço inferior (h-text_h-420)
+    pos_y_legenda = config["pos_y"]
     tam_fonte = config["fontsize"]
     largura_wrap = config["largura_linha"]
 
     cenas_clipes = []
     total = len(cenas)
 
-    # 1. Filtro de Marca d'água Restaurado
+    # Filtro de Marca d'água Restaurado
     filtro_marca = ""
     if marca_dagua and str(marca_dagua).strip():
         marca_limpa = re.sub(r"[':\\]", "", str(marca_dagua).strip())
@@ -824,7 +844,6 @@ def renderizar_vsl_completa(
         with open(legenda_txt, "w", encoding="utf-8") as f_l: f_l.write(texto_formatado)
         legenda_path_escapado = legenda_txt.replace(os.sep, "/").replace(":", "\\:")
 
-        # Filtro com legenda no terço inferior (fora do rosto) + marca d'água
         if tem_video and os.path.exists(v_raw_path):
             vf = (
                 f"scale={res_w}:{res_h}:force_original_aspect_ratio=increase,crop={res_w}:{res_h},setsar=1,fps=30,"
@@ -958,14 +977,12 @@ def disparar_campanha_tiktok_completa(
     headers_json = {"Access-Token": access_token, "Content-Type": "application/json"}
     if not os.path.exists(video_path): raise FileNotFoundError(f"Arquivo de vídeo não encontrado: {video_path}")
 
-    # 1. Upload
     url_upload = f"{TIKTOK_API_BASE}/file/video/ad/upload/"
     with open(video_path, "rb") as vf:
         res_upload = requests.post(url_upload, headers=headers, data={"advertiser_id": advertiser_id, "upload_type": "UPLOAD_BY_FILE"}, files={"video_file": vf}).json()
     if res_upload.get("code") != 0: raise Exception(f"Erro Upload: {res_upload.get('message')}")
     video_id = res_upload["data"]["video_id"]
 
-    # 2. Campanha
     res_camp = requests.post(
         f"{TIKTOK_API_BASE}/campaign/create/", headers=headers_json,
         json={"advertiser_id": advertiser_id, "campaign_name": campaign_name, "objective_type": "WEB_CONVERSIONS", "budget_mode": "BUDGET_MODE_DYNAMIC"}
@@ -973,7 +990,6 @@ def disparar_campanha_tiktok_completa(
     if res_camp.get("code") != 0: raise Exception(f"Erro Campanha: {res_camp.get('message')}")
     campaign_id = res_camp["data"]["campaign_id"]
 
-    # 3. Ad Group
     data_formatada = (datetime.now(timezone.utc) + timedelta(minutes=10)).strftime("%Y-%m-%d %H:%M:%S")
     payload_adgroup = {
         "advertiser_id": advertiser_id, "campaign_id": campaign_id, "adgroup_name": f"Grupo - {campaign_name}",
@@ -985,7 +1001,6 @@ def disparar_campanha_tiktok_completa(
     if res_adgroup.get("code") != 0: raise Exception(f"Erro AdGroup: {res_adgroup.get('message')}")
     adgroup_id = res_adgroup["data"]["adgroup_id"]
 
-    # 4. Criativo com UTMs Dinâmicas
     separador = "&" if "?" in landing_page_url else "?"
     url_com_utms = (
         f"{landing_page_url}{separador}"
@@ -1579,44 +1594,65 @@ with tab_ebook:
                 st.download_button("⬇️ Baixar Order Bump (.PDF)", data=bytes_bump, file_name="order_bump.pdf", mime="application/pdf", type="primary", use_container_width=True, key="btn_down_pdf_bump")
 
 # ------------------------------------------------------------------------------
-# ABA 6: CENTRAL TIKTOK ADS & LANDING PAGE (COM UTMS AUTOMÁTICAS)
+# ABA 6: CENTRAL TIKTOK ADS & LANDING PAGE (COM UPLOAD ATIVO E HOSPEDAGEM)
 # ------------------------------------------------------------------------------
 with tab_ads:
     st.markdown("## 🎯 6. Central TikTok Ads & Funil de Conversão")
-    st.caption("Gere a Landing Page oficial com delay e faça o upload direto do vídeo na API com injeção automática de UTMs dinâmicas.")
-
-    video_final_anuncio = (
-        st.session_state.get("video_master_fundido") or
-        st.session_state.get("video_vsl_pronto")
-    )
+    st.caption("Faça upload do criativo para o anúncio e hospede o vídeo da Landing Page no Supabase.")
 
     aba_tt_disp, aba_tt_lp = st.tabs(["🚀 Disparo no TikTok Ads", "🌐 Gerador da Landing Page (index.html)"])
 
+    # ---------------------------------------------------------
+    # SUB-ABA 1: DISPARO DO ANÚNCIO (COM UPLOAD MANUAL E SESSÃO)
+    # ---------------------------------------------------------
     with aba_tt_disp:
         col_ad1, col_ad2 = st.columns([1.2, 1])
+        
+        with col_ad2:
+            st.markdown("##### 1. Selecionar Vídeo do Anúncio (Criativo)")
+            origem_ad_video = st.radio(
+                "Fonte do arquivo de vídeo:",
+                ["Vídeo Curto de 27s (Aba 2)", "Vídeo Fundido Master (Aba 4)", "Enviar arquivo MP4 do Computador"],
+                key="ad_video_source"
+            )
+
+            video_final_anuncio = None
+            if origem_ad_video == "Vídeo Curto de 27s (Aba 2)":
+                video_final_anuncio = st.session_state.get("video_vsl_pronto")
+            elif origem_ad_video == "Vídeo Fundido Master (Aba 4)":
+                video_final_anuncio = st.session_state.get("video_master_fundido")
+            else:
+                up_ad = st.file_uploader("Selecione o arquivo .MP4 do seu computador:", type=["mp4"], key="up_ad_manual")
+                if up_ad:
+                    caminho_up_ad = os.path.join(DIR_VSL, f"upload_anuncio_{int(time.time())}.mp4")
+                    with open(caminho_up_ad, "wb") as f_up:
+                        f_up.write(up_ad.read())
+                    video_final_anuncio = caminho_up_ad
+
+            if video_final_anuncio and os.path.exists(video_final_anuncio):
+                st.video(video_final_anuncio)
+                dur = obter_duracao_audio(video_final_anuncio)
+                st.success(f"✅ Vídeo pronto para envio ({dur:.1f} segundos)")
+            else:
+                st.warning("Nenhum vídeo carregado. Selecione uma opção acima.")
+
         with col_ad1:
+            st.markdown("##### 2. Configurações da Campanha")
             nome_camp = st.text_input("Nome da Campanha:", value=f"Campanha Conversão - {datetime.now().strftime('%d/%m')}")
-            url_lp = st.text_input("URL da Landing Page de Destino:", placeholder="https://meusite.com/vsl")
-            st.info("ℹ️ **Rastreamento Dinâmico:** As macros oficiais (`__CAMPAIGN_NAME__`, `__AID_NAME__`, `__CID__` e `src=...`) são injetadas automaticamente na URL ao publicar.")
+            url_lp = st.text_input("URL da Landing Page de Destino:", placeholder="https://seusite.netlify.app")
             orcamento = st.number_input("Orçamento Diário (R$):", min_value=30.0, value=60.0, step=10.0)
             copy_ad = st.text_area("Texto do Anúncio:", value="Método revelado em menos de 3 minutos! Toque em Saiba Mais.")
             adv_id = st.text_input("Advertiser ID:", value=TIKTOK_ADVERTISER_ID)
             tok_ad = st.text_input("TikTok Access Token:", value=TIKTOK_ACCESS_TOKEN, type="password")
             identity_ad = st.text_input("Identity ID (Opcional):", placeholder="Ex: 7123456789012345678")
 
-        with col_ad2:
-            st.markdown("##### Vídeo Selecionado para a Campanha:")
-            if video_final_anuncio and os.path.exists(video_final_anuncio):
-                st.video(video_final_anuncio)
-                dur = obter_duracao_audio(video_final_anuncio)
-                st.info(f"⏱️ Duração do arquivo: **{dur:.1f} segundos**")
-            else:
-                st.warning("Nenhum vídeo fundido encontrado. Gere o vídeo na Aba 4.")
-
         if st.button("🚀 Publicar Campanha Completa no TikTok Ads", type="primary", use_container_width=True):
-            if not tok_ad: st.error("Informe o Access Token do TikTok.")
-            elif not url_lp: st.error("Informe a URL da Landing Page.")
-            elif not video_final_anuncio or not os.path.exists(video_final_anuncio): st.error("Nenhum vídeo disponível.")
+            if not tok_ad:
+                st.error("Informe o Access Token do TikTok.")
+            elif not url_lp:
+                st.error("Informe a URL da Landing Page.")
+            elif not video_final_anuncio or not os.path.exists(video_final_anuncio):
+                st.error("Selecione ou faça upload de um vídeo válido.")
             else:
                 with st.spinner("Publicando anúncio via TikTok Marketing API com UTMs dinâmicas..."):
                     try:
@@ -1630,14 +1666,52 @@ with tab_ads:
                     except Exception as err:
                         st.error(f"Erro ao publicar: {err}")
 
+    # ---------------------------------------------------------
+    # SUB-ABA 2: GERADOR DA LANDING PAGE COM HOSPEDAGEM DO VÍDEO
+    # ---------------------------------------------------------
     with aba_tt_lp:
         st.markdown("### 📄 Gerador da Landing Page Oficial do Funil")
-        st.caption("A página já inclui o repasse automático de todos os parâmetros UTM e SRC da URL diretamente para o botão de compra.")
+        st.caption("Gere o index.html com o vídeo longo hospedado na nuvem e o botão de checkout com delay.")
+
+        st.markdown("##### 1. Hospedagem do Vídeo para a Página")
+        vid_para_hospedar = st.session_state.get("video_master_fundido")
+        
+        col_hosp1, col_hosp2 = st.columns([1.5, 1])
+        with col_hosp1:
+            if vid_para_hospedar and os.path.exists(vid_para_hospedar):
+                st.info(f"Vídeo Master Fundido detectado: `{os.path.basename(vid_para_hospedar)}`")
+                if st.button("☁️ Hospedar Vídeo Fundido no Supabase (Gera URL Direta)", key="btn_hospedar_supa"):
+                    with st.spinner("Enviando vídeo para o Supabase Storage..."):
+                        url_gerada = hospedar_video_supabase(vid_para_hospedar)
+                        if url_gerada:
+                            st.session_state["lp_video_url_ativa"] = url_gerada
+                            st.success("✅ Vídeo hospedado com sucesso!")
+            else:
+                up_lp_vid = st.file_uploader("Ou envie o arquivo .MP4 do vídeo fundido do seu PC:", type=["mp4"], key="up_lp_video")
+                if up_lp_vid:
+                    temp_p = os.path.join(DIR_FUSAO, f"upload_lp_{int(time.time())}.mp4")
+                    with open(temp_p, "wb") as f_tmp:
+                        f_tmp.write(up_lp_vid.read())
+                    if st.button("☁️ Hospedar este arquivo no Supabase", key="btn_hospedar_up"):
+                        with st.spinner("Enviando arquivo para o Supabase Storage..."):
+                            url_gerada = hospedar_video_supabase(temp_p)
+                            if url_gerada:
+                                st.session_state["lp_video_url_ativa"] = url_gerada
+                                st.success("✅ Vídeo hospedado com sucesso!")
+
+        with col_hosp2:
+            st.caption("Caso hospede fora (VTurb, Panda Video ou Cloudflare Stream), cole o link direto (.mp4) abaixo:")
+
+        st.markdown("---")
+        st.markdown("##### 2. Configurações da Página")
         col_lp1, col_lp2 = st.columns(2)
         with col_lp1:
             lp_tit = st.text_input("Título da Página:", value="Apresentação Exclusiva")
             lp_prom = st.text_input("Headline do Topo:", value=st.session_state.get("miner_promessa", "Descubra o Método Exato"))
-            lp_v_url = st.text_input("URL Direta do Vídeo Hospedado (.mp4):", placeholder="https://meustorage.com/vsl_master.mp4")
+            
+            url_padrao = st.session_state.get("lp_video_url_ativa", "")
+            lp_v_url = st.text_input("URL Direta do Vídeo (.mp4):", value=url_padrao, placeholder="https://meustorage.com/video.mp4")
+        
         with col_lp2:
             lp_chk = st.text_input("Link de Pagamento (Kiwify):", placeholder="https://pay.kiwify.com.br/...")
             lp_delay = st.number_input("Tempo para Revelar Botão (Segundos):", value=147)
@@ -1652,9 +1726,11 @@ with tab_ads:
                 "⬇️ Baixar index.html Pronto para Hospedagem", data=html_p,
                 file_name="index.html", mime="text/html", type="primary", use_container_width=True
             )
+        else:
+            st.info("💡 Preencha a URL do vídeo e o link da Kiwify para liberar o download do index.html.")
 
 # ------------------------------------------------------------------------------
-# ABA 7: GESTÃO MASTER
+# ABA 7: GESTÃO MASTER (COM .from_() CORRIGIDO)
 # ------------------------------------------------------------------------------
 with tab_master:
     st.markdown("## 👑 Painel de Gestão Master")
