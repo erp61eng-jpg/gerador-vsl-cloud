@@ -1230,7 +1230,7 @@ with tab_ebook:
                 )
 
 # ------------------------------------------------------------------------------
-# ABA 6: CENTRAL DE LANÇAMENTO & LANDING PAGE (DIRETO E SEM TOKEN)
+# ABA 6: CENTRAL DE LANÇAMENTO & LANDING PAGE (COM UPLOAD MANUAL DE CRIATIVO)
 # ------------------------------------------------------------------------------
 with tab_ads:
     st.markdown("## 🎯 6. Central de Lançamento & Funil de Vendas")
@@ -1252,16 +1252,26 @@ with tab_ads:
             v_master = st.session_state.get("video_master_fundido")
             caminho_para_enviar = None
 
-            if v_master and os.path.exists(v_master):
-                mb_v = os.path.getsize(v_master) / (1024 * 1024)
-                st.success(f"✅ Vídeo Master Fundido detectado: `{os.path.basename(v_master)}` ({mb_v:.1f} MB)")
-                caminho_para_enviar = v_master
+            origem_lp = st.radio(
+                "Fonte do Vídeo da Página:",
+                ["Usar Vídeo Master Fundido (Aba 4)", "Enviar arquivo .MP4 do meu PC"],
+                key="origem_lp_radio"
+            )
+
+            if origem_lp == "Usar Vídeo Master Fundido (Aba 4)":
+                if v_master and os.path.exists(v_master):
+                    mb_v = os.path.getsize(v_master) / (1024 * 1024)
+                    st.success(f"✅ Vídeo Master Fundido detectado: `{os.path.basename(v_master)}` ({mb_v:.1f} MB)")
+                    caminho_para_enviar = v_master
+                else:
+                    st.warning("⚠️ Gere a fusão na Aba 4 ou envie o arquivo MP4 diretamente.")
             else:
-                up_mp4 = st.file_uploader("Ou envie o arquivo .MP4 do seu computador:", type=["mp4"], key="up_mp4_direto")
+                up_mp4 = st.file_uploader("Selecione o arquivo .MP4 do seu computador:", type=["mp4"], key="up_mp4_direto")
                 if up_mp4:
                     p_up = os.path.join(DIR_FUSAO, f"upload_lp_{int(time.time())}.mp4")
                     with open(p_up, "wb") as f_u: f_u.write(up_mp4.read())
                     caminho_para_enviar = p_up
+                    st.success(f"✅ Arquivo carregado: `{up_mp4.name}`")
 
             if st.button("☁️ Hospedar Vídeo na Nuvem (Comprime & Gera URL)", type="primary", use_container_width=True):
                 if not caminho_para_enviar or not os.path.exists(caminho_para_enviar):
@@ -1321,29 +1331,48 @@ with tab_ads:
         else:
             st.info("💡 Cole o link de checkout da Kiwify e garanta a URL do vídeo para liberar o download do index.html.")
 
-    # SUB-ABA 2: SUBIR NO TIKTOK ADS (DIRETO E SEM TOKEN)
+    # SUB-ABA 2: SUBIR NO TIKTOK ADS (COM UPLOAD MANUAL DIRETO)
     with aba_tt_manual:
         st.markdown("### 🚀 Subir Campanha no TikTok Ads (Sem API / Sem Token)")
-        st.caption("Pegue os arquivos prontos e os links rastreados para colar direto no gerenciador de anúncios.")
+        st.caption("Envie o criativo que você tem no PC ou use o gerado no app, pegue seu link rastreado e suba o anúncio.")
 
         col_an1, col_an2 = st.columns(2)
         with col_an1:
-            st.markdown("##### 1. Criativo do Anúncio (Vídeo de 27s)")
-            video_para_ad = st.session_state.get("video_vsl_pronto")
+            st.markdown("##### 1. Criativo do Anúncio (Vídeo)")
+            origem_ad = st.radio(
+                "Origem do Vídeo do Anúncio:",
+                ["Enviar arquivo MP4 do meu PC (Vídeo Pronto)", "Usar Vídeo da Aba 2 (27s)"],
+                key="origem_ad_manual_sel"
+            )
+
+            video_para_ad = None
+            if origem_ad == "Enviar arquivo MP4 do meu PC (Vídeo Pronto)":
+                up_ad_manual = st.file_uploader("Selecione o arquivo do criativo (.mp4):", type=["mp4"], key="up_ad_manual_file")
+                if up_ad_manual:
+                    p_up_ad = os.path.join(DIR_VSL, f"ad_manual_{int(time.time())}.mp4")
+                    with open(p_up_ad, "wb") as f_mad:
+                        f_mad.write(up_ad_manual.read())
+                    video_para_ad = p_up_ad
+                    st.session_state["video_vsl_pronto"] = p_up_ad
+                    st.success(f"✅ Criativo carregado: `{up_ad_manual.name}`")
+            else:
+                v_aba2 = st.session_state.get("video_vsl_pronto")
+                if v_aba2 and os.path.exists(v_aba2):
+                    video_para_ad = v_aba2
+                else:
+                    st.warning("⚠️ O vídeo da Aba 2 ainda não foi gerado.")
 
             if video_para_ad and os.path.exists(video_para_ad):
                 st.video(video_para_ad)
                 with open(video_para_ad, "rb") as vf_ad:
                     st.download_button(
-                        "⬇️ Baixar Vídeo do Anúncio (.mp4)",
+                        "⬇️ Baixar Criativo do Anúncio (.mp4)",
                         data=vf_ad.read(),
-                        file_name="anuncio_tiktok_27s.mp4",
+                        file_name="anuncio_tiktok.mp4",
                         mime="video/mp4",
                         type="primary",
                         use_container_width=True
                     )
-            else:
-                st.warning("⚠️ O vídeo de 27s ainda não foi gerado na Aba 2.")
 
         with col_an2:
             st.markdown("##### 2. Link Rastreado da Landing Page")
@@ -1373,7 +1402,7 @@ with tab_ads:
         with col_cta_tt1:
             st.link_button("🚀 Abrir TikTok Ads Manager", "https://ads.tiktok.com", type="primary", use_container_width=True)
         with col_cta_tt2:
-            st.info("💡 **Como publicar no TikTok:** No painel que abrir, clique em **Criar Campanha** > suba o vídeo baixado > cole a URL rastreada acima > publique.")
+            st.info("💡 **Como publicar:** No gerenciador que abrir, clique em **Criar Campanha** > suba o vídeo acima > cole a URL rastreada > publique.")
 
     # SUB-ABA 3: DISPARO VIA API (OPCIONAL/AVANÇADO)
     with aba_tt_api:
@@ -1389,14 +1418,14 @@ with tab_ads:
             tok_ad_api = st.text_input("TikTok Access Token:", value=TIKTOK_ACCESS_TOKEN, type="password")
 
         if st.button("Disparar Campanha via API", use_container_width=True):
-            video_para_ad = st.session_state.get("video_vsl_pronto")
-            if not tok_ad_api or not url_lp_api or not video_para_ad:
-                st.error("Preencha o Token, a URL da Landing Page e garanta que o vídeo de 27s existe.")
+            video_para_ad_api = st.session_state.get("video_vsl_pronto")
+            if not tok_ad_api or not url_lp_api or not video_para_ad_api:
+                st.error("Preencha o Token, a URL da Landing Page e selecione ou envie o vídeo do anúncio.")
             else:
                 with st.spinner("Publicando via API..."):
                     try:
                         res = disparar_campanha_tiktok_completa(
-                            advertiser_id=adv_id_api, access_token=tok_ad_api, video_path=video_para_ad,
+                            advertiser_id=adv_id_api, access_token=tok_ad_api, video_path=video_para_ad_api,
                             campaign_name=nome_camp_api, copy_text=copy_ad_api, landing_page_url=url_lp_api,
                             orcamento_diario=orcamento_api
                         )
