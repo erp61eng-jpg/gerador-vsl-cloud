@@ -16,7 +16,7 @@ from PIL import Image as PILImage, ImageOps
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Image as RLImage, PageBreak, Table, TableStyle, HRFlowable, KeepTogether
+    SimpleDocTemplate, Paragraph, Spacer, Image as RLImage, PageBreak, Table, TableStyle, HRFlowable
 )
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.pdfgen import canvas
@@ -931,11 +931,12 @@ def renderizar_vsl_completa(
         cmd_final = [
             "ffmpeg", "-y", "-i", vsl_sem_trilha, "-stream_loop", "-1", "-i", musica_fundo_path,
             "-filter_complex", f"[1:a]volume={volume_musica}[bg];[0:a][bg]amix=inputs=2:duration=first:dropout_transition=2[aout]",
-            "-map", "0:v", "-map", "[aout]", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-shortest", vsl_final
+            "-map", "0:v", "-map", "[aout]", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", "-shortest", vsl_final
         ]
         subprocess.run(cmd_final, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
     else:
-        vsl_final = vsl_sem_trilha
+        cmd_fs = ["ffmpeg", "-y", "-i", vsl_sem_trilha, "-c", "copy", "-movflags", "+faststart", vsl_final]
+        subprocess.run(cmd_fs, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
     return vsl_final
 
 def dublar_roteiro_e_renderizar_vsl(
@@ -953,7 +954,7 @@ def dublar_roteiro_e_renderizar_vsl(
     return vid, cenas_traduzidas
 
 # ==============================================================================
-# MOTOR DE FUSÃO DE VÍDEOS (27S + 2-3MIN COM TRILHA EM LOOP SEGURO)
+# MOTOR DE FUSÃO DE VÍDEOS (FASTSTART + BUFFER SEGURO SEM TRAVAMENTO)
 # ==============================================================================
 def fundir_videos_com_trilha(
     video1_path: str,
@@ -969,6 +970,8 @@ def fundir_videos_com_trilha(
     dur_v1 = obter_duracao_audio(video1_path)
     dur_v2 = obter_duracao_audio(video2_path)
     dur_total = dur_v1 + dur_v2
+    if dur_total <= 0:
+        dur_total = 180.0
 
     if musica_path and os.path.exists(musica_path):
         filter_complex = (
@@ -989,7 +992,9 @@ def fundir_videos_com_trilha(
             "-map", "[vcat]", "-map", "[aout]",
             "-t", f"{dur_total:.2f}",
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "22", "-pix_fmt", "yuv420p",
-            "-c:a", "aac", "-b:a", "192k", output_path
+            "-c:a", "aac", "-b:a", "192k",
+            "-movflags", "+faststart",
+            output_path
         ]
     else:
         filter_complex = (
@@ -1007,9 +1012,16 @@ def fundir_videos_com_trilha(
             "-map", "[vcat]", "-map", "[aout]",
             "-t", f"{dur_total:.2f}",
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "22", "-pix_fmt", "yuv420p",
-            "-c:a", "aac", "-b:a", "192k", output_path
+            "-c:a", "aac", "-b:a", "192k",
+            "-movflags", "+faststart",
+            output_path
         ]
-    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+
+    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if res.returncode != 0:
+        erro_msg = res.stderr.decode("utf-8", errors="ignore")[-400:]
+        raise RuntimeError(f"Erro no FFmpeg: {erro_msg}")
+
     return output_path
 
 # ==============================================================================
@@ -1135,14 +1147,12 @@ def gerar_html_landing_page(titulo: str, promessa: str, url_video_mp4: str, link
     const oferta = document.getElementById('oferta-container');
     const checkoutBtn = document.getElementById('checkoutBtn');
 
-    // Desbloqueio de áudio com clique
     overlay.addEventListener('click', () => {{
       video.muted = false;
       video.play();
       overlay.style.display = 'none';
     }});
 
-    // Persistência de estado da oferta
     function liberar() {{
       oferta.style.display = 'block';
       localStorage.setItem('oferta_liberada_{abs(hash(titulo)) % 10000}', 'true');
@@ -1158,7 +1168,6 @@ def gerar_html_landing_page(titulo: str, promessa: str, url_video_mp4: str, link
       }}
     }});
 
-    // REPASSE AUTOMÁTICO DE UTMS DO TIKTOK PARA O CHECKOUT DA KIWIFY
     window.addEventListener('DOMContentLoaded', () => {{
       const params = window.location.search;
       if (params && checkoutBtn) {{
@@ -1426,7 +1435,15 @@ with tab_vsl:
         st.video(st.session_state["video_vsl_pronto"])
 
         with open(st.session_state["video_vsl_pronto"], "rb") as f_v:
-            st.download_button("⬇️ Baixar VSL Curta (.mp4)", data=f_v, file_name="vsl_curta_27s.mp4", mime="video/mp4", use_container_width=True)
+            bytes_vsl_curta = f_v.read()
+        st.download_button(
+            "⬇️ Baixar VSL Curta (.mp4)",
+            data=bytes_vsl_curta,
+            file_name="vsl_curta_27s.mp4",
+            mime="video/mp4",
+            use_container_width=True,
+            key="btn_down_vsl_curta"
+        )
 
         st.markdown("---")
         with st.container(border=True):
@@ -1523,7 +1540,15 @@ with tab_apresentacao:
         st.video(st.session_state["video_pitch_pronto"])
 
         with open(st.session_state["video_pitch_pronto"], "rb") as f_ap:
-            st.download_button("⬇️ Baixar Apresentação (.mp4)", data=f_ap, file_name="apresentacao_pitch.mp4", mime="video/mp4", use_container_width=True)
+            bytes_pitch = f_ap.read()
+        st.download_button(
+            "⬇️ Baixar Apresentação (.mp4)",
+            data=bytes_pitch,
+            file_name="apresentacao_pitch.mp4",
+            mime="video/mp4",
+            use_container_width=True,
+            key="btn_down_pitch_pronto"
+        )
 
         st.markdown("---")
         with st.container(border=True):
@@ -1647,11 +1672,16 @@ with tab_fusao:
         st.markdown("### 🎬 Vídeo Master Unificado:")
         st.video(st.session_state["video_master_fundido"])
         with open(st.session_state["video_master_fundido"], "rb") as f_mf:
-            st.download_button(
-                "⬇️ Baixar Vídeo Master Fundido (.mp4)", data=f_mf,
-                file_name=os.path.basename(st.session_state["video_master_fundido"]),
-                mime="video/mp4", type="primary", use_container_width=True
-            )
+            bytes_master = f_mf.read()
+        st.download_button(
+            "⬇️ Baixar Vídeo Master Fundido (.mp4)",
+            data=bytes_master,
+            file_name=os.path.basename(st.session_state["video_master_fundido"]),
+            mime="video/mp4",
+            type="primary",
+            use_container_width=True,
+            key="btn_down_master_fundido"
+        )
 
 # ------------------------------------------------------------------------------
 # ABA 5: LIVRO TÉCNICO & ORDER BUMP COM TRADUÇÃO GLOBAL
@@ -1697,11 +1727,13 @@ with tab_ebook:
         col_dw1, col_dw2 = st.columns(2)
         with col_dw1:
             with open(st.session_state["pdf_ebook_pronto"], "rb") as f_eb:
-                st.download_button("⬇️ Baixar Manual (.PDF)", data=f_eb, file_name="manual_tecnico.pdf", mime="application/pdf", use_container_width=True)
+                bytes_manual = f_eb.read()
+            st.download_button("⬇️ Baixar Manual (.PDF)", data=bytes_manual, file_name="manual_tecnico.pdf", mime="application/pdf", use_container_width=True, key="btn_down_pdf_eb")
         with col_dw2:
             if st.session_state.get("pdf_bump_pronto") and os.path.exists(st.session_state["pdf_bump_pronto"]):
                 with open(st.session_state["pdf_bump_pronto"], "rb") as f_bp:
-                    st.download_button("⬇️ Baixar Order Bump (.PDF)", data=f_bp, file_name="order_bump.pdf", mime="application/pdf", type="primary", use_container_width=True)
+                    bytes_bump = f_bp.read()
+                st.download_button("⬇️ Baixar Order Bump (.PDF)", data=bytes_bump, file_name="order_bump.pdf", mime="application/pdf", type="primary", use_container_width=True, key="btn_down_pdf_bump")
 
         st.markdown("---")
         with st.container(border=True):
@@ -1736,7 +1768,8 @@ with tab_ebook:
             if st.session_state.get("pdf_global_pronto") and os.path.exists(st.session_state["pdf_global_pronto"]):
                 st.success(f"✅ Kit traduzido para: {st.session_state.get('pdf_global_lingua')}")
                 with open(st.session_state["pdf_global_pronto"], "rb") as f_gtr:
-                    st.download_button(f"⬇️ Baixar Manual em {st.session_state.get('pdf_global_lingua')} (.PDF)", data=f_gtr, file_name="manual_traduzido.pdf", mime="application/pdf", use_container_width=True)
+                    bytes_gtr = f_gtr.read()
+                st.download_button(f"⬇️ Baixar Manual em {st.session_state.get('pdf_global_lingua')} (.PDF)", data=bytes_gtr, file_name="manual_traduzido.pdf", mime="application/pdf", use_container_width=True, key="btn_down_pdf_gtr")
 
 # ------------------------------------------------------------------------------
 # ABA 6: CENTRAL TIKTOK ADS & LANDING PAGE (COM UTMS AUTOMÁTICAS)
@@ -1814,7 +1847,7 @@ with tab_ads:
             )
 
 # ------------------------------------------------------------------------------
-# ABA 7: GESTÃO MASTER
+# ABA 7: GESTÃO MASTER (CORRIGIDO SYNTAX ERROR DO SUPABASE)
 # ------------------------------------------------------------------------------
 with tab_master:
     st.markdown("## 👑 Painel de Gestão Master")
@@ -1824,7 +1857,7 @@ with tab_master:
         try:
             res_u = supabase_client.from_("usuarios").select("*").execute()
             usuarios_lista = res_u.data if res_u.data else []
-            res_p = supabase_client.from("pedidos_kiwify").select("*").execute()
+            res_p = supabase_client.from_("pedidos_kiwify").select("*").execute()
             pedidos_lista = res_p.data if res_p.data else []
 
             fat_total = sum(float(p.get("valor_pago", 0)) for p in pedidos_lista)
