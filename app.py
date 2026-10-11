@@ -651,7 +651,6 @@ def compilar_livro_tecnico_pdf(titulo: str, subtitulo: str, publico: str, caminh
     estilo_capa_tit = ParagraphStyle("CapaTit", parent=estilos["Title"], fontName="Helvetica-Bold", fontSize=26, leading=32, textColor=colors.HexColor("#0F172A"), alignment=TA_CENTER)
     estilo_capa_sub = ParagraphStyle("CapaSub", parent=estilos["Normal"], fontName="Helvetica", fontSize=14, leading=18, textColor=colors.HexColor("#334155"), alignment=TA_CENTER)
     estilo_h1 = ParagraphStyle("H1", parent=estilos["Heading1"], fontName="Helvetica-Bold", fontSize=18, leading=22, textColor=colors.HexColor("#1E3A8A"), spaceBefore=18, spaceAfter=8)
-    estilo_h2 = ParagraphStyle("H2", parent=estilos["Heading2"], fontName="Helvetica-Bold", fontSize=13, leading=16, textColor=colors.HexColor("#0F172A"), spaceBefore=12, spaceAfter=6)
     estilo_corpo = ParagraphStyle("Corpo", parent=estilos["Normal"], fontName="Helvetica", fontSize=10.5, leading=15, textColor=colors.HexColor("#1E293B"), alignment=TA_JUSTIFY, spaceAfter=8)
 
     flowables = []
@@ -678,34 +677,23 @@ def compilar_livro_tecnico_pdf(titulo: str, subtitulo: str, publico: str, caminh
     flowables.append(tab_info)
     flowables.append(PageBreak())
 
-    # Introdução
-    flowables.append(Paragraph("1. Introdução & Fundamentos Operacionais", estilo_h1))
-    flowables.append(Paragraph(
-        "Este manual técnico foi desenvolvido como um guia de execução imediata. Cada diretriz estabelecida aqui tem o objetivo "
-        "de eliminar erros comuns de implementação, garantindo previsibilidade de resultados e domínio completo do método.",
-        estilo_corpo
-    ))
-    flowables.append(Paragraph(
-        "Diferente de teorias genéricas, este conteúdo foca na prática diária, detalhando processos comprovados para atingir metas consistentes.",
-        estilo_corpo
-    ))
-
     # Módulos Práticos
     modulos = [
-        ("2. O Mecanismo Único de Execução", "Compreenda a lógica estrutural que separa amadores de profissionais no setor."),
-        ("3. Passo a Passo de Implementação", "A rotina exata a ser seguida desde o primeiro dia de trabalho até a escala."),
-        ("4. Resolução de Falhas Críticas", "Os 5 maiores gargalos enfrentados na operação e como contornar cada um com facilidade."),
-        ("5. Otimização e Escala Contínua", "Como padronizar seus processos para multiplicar resultados sem aumentar a carga horária.")
+        ("1. Introdução & Fundamentos Operacionais", "Este manual técnico foi desenvolvido como um guia de execução imediata para garantir previsibilidade e domínio técnico."),
+        ("2. O Mecanismo Único de Execução", "Compreenda a lógica estrutural que separa amadores de profissionais no setor e implemente com precisão."),
+        ("3. Passo a Passo de Implementação", "A rotina exata a ser seguida desde o primeiro dia de trabalho até a escala dos seus resultados."),
+        ("4. Resolução de Falhas Críticas", "Os maiores gargalos enfrentados na operação diária e como contornar cada um com agilidade."),
+        ("5. Otimização e Escala Contínua", "Como padronizar seus processos para multiplicar resultados com consistência e segurança.")
     ]
 
     for tit_m, desc_m in modulos:
-        flowables.append(Spacer(1, 10))
         flowables.append(Paragraph(tit_m, estilo_h1))
         flowables.append(Paragraph(desc_m, estilo_corpo))
         flowables.append(Paragraph(
-            "Certifique-se de preencher as métricas diárias e manter o controle rigoroso dos seus registros para avaliação semanal.",
+            "Execute cada etapa conforme as orientações e valide os registros semanais de controle para garantir a máxima eficiência do método.",
             estilo_corpo
         ))
+        flowables.append(Spacer(1, 10))
 
     doc.build(flowables, canvasmaker=NumberedCanvas)
     return caminho_pdf
@@ -1242,21 +1230,25 @@ with tab_ebook:
                 )
 
 # ------------------------------------------------------------------------------
-# ABA 6: CENTRAL TIKTOK ADS & LANDING PAGE (TOTALMENTE AUTOMATIZADA)
+# ABA 6: CENTRAL DE LANÇAMENTO & LANDING PAGE (DIRETO E SEM TOKEN)
 # ------------------------------------------------------------------------------
 with tab_ads:
-    st.markdown("## 🎯 6. Central TikTok Ads & Funil de Conversão")
-    st.caption("Compressão automática de vídeo, envio transparente com barra de progresso e geração instantânea da Landing Page.")
+    st.markdown("## 🎯 6. Central de Lançamento & Funil de Vendas")
+    st.caption("Gere a Landing Page, pegue seu criativo pronto e suba a campanha no TikTok Ads em minutos.")
 
-    aba_tt_lp, aba_tt_disp = st.tabs(["🌐 1. Gerador da Landing Page (index.html)", "🚀 2. Disparo no TikTok Ads"])
+    aba_tt_lp, aba_tt_manual, aba_tt_api = st.tabs([
+        "🌐 1. Gerador da Landing Page (index.html)",
+        "🚀 2. Subir Anúncio no TikTok Ads (Recomendado)",
+        "⚙️ 3. Disparo Automático via API (Avançado)"
+    ])
 
     # SUB-ABA 1: GERADOR LANDING PAGE
     with aba_tt_lp:
-        st.markdown("### 📄 Hospedagem Direta & Configuração da Página")
+        st.markdown("### 📄 Hospedagem do Vídeo & Criação do index.html")
 
         col_h1, col_h2 = st.columns([1.4, 1])
         with col_h1:
-            st.markdown("##### 1. Vídeo da Página")
+            st.markdown("##### 1. Vídeo da Apresentação (Master Fundido)")
             v_master = st.session_state.get("video_master_fundido")
             caminho_para_enviar = None
 
@@ -1314,58 +1306,104 @@ with tab_ads:
                 link_kiwify=lp_chk, delay_segundos=int(lp_delay), pixel_id=lp_px
             )
             st.markdown("---")
-            st.download_button(
-                "⬇️ Baixar index.html Pronto para Hospedagem",
-                data=html_final,
-                file_name="index.html",
-                mime="text/html",
-                type="primary",
-                use_container_width=True
-            )
+            col_d1, col_d2 = st.columns([1, 1])
+            with col_d1:
+                st.download_button(
+                    "⬇️ 1. Baixar index.html Pronto",
+                    data=html_final,
+                    file_name="index.html",
+                    mime="text/html",
+                    type="primary",
+                    use_container_width=True
+                )
+            with col_d2:
+                st.link_button("🌐 2. Abrir Netlify Drop (Publicar Site)", "https://app.netlify.com/drop", use_container_width=True)
         else:
             st.info("💡 Cole o link de checkout da Kiwify e garanta a URL do vídeo para liberar o download do index.html.")
 
-    # SUB-ABA 2: DISPARO DE CAMPANHA NO TIKTOK ADS
-    with aba_tt_disp:
-        st.markdown("### 🚀 Disparo de Campanha no TikTok Ads")
-        col_ad1, col_ad2 = st.columns(2)
-        with col_ad1:
-            nome_camp = st.text_input("Nome da Campanha:", value=f"CONV - {datetime.now().strftime('%d/%m')}")
-            url_lp = st.text_input("URL da Landing Page (gerada no Netlify):", placeholder="https://sua-pagina.netlify.app")
-            orcamento = st.number_input("Orçamento Diário (R$):", min_value=30.0, value=60.0, step=10.0)
-            copy_ad = st.text_area("Texto do Anúncio:", value="Método revelado em menos de 3 minutos! Toque em Saiba Mais 👇")
-        with col_ad2:
-            st.markdown("##### Criativo do Anúncio (27s)")
+    # SUB-ABA 2: SUBIR NO TIKTOK ADS (DIRETO E SEM TOKEN)
+    with aba_tt_manual:
+        st.markdown("### 🚀 Subir Campanha no TikTok Ads (Sem API / Sem Token)")
+        st.caption("Pegue os arquivos prontos e os links rastreados para colar direto no gerenciador de anúncios.")
+
+        col_an1, col_an2 = st.columns(2)
+        with col_an1:
+            st.markdown("##### 1. Criativo do Anúncio (Vídeo de 27s)")
             video_para_ad = st.session_state.get("video_vsl_pronto")
+
             if video_para_ad and os.path.exists(video_para_ad):
                 st.video(video_para_ad)
-                st.success("✅ Vídeo de 27s selecionado como criativo.")
+                with open(video_para_ad, "rb") as vf_ad:
+                    st.download_button(
+                        "⬇️ Baixar Vídeo do Anúncio (.mp4)",
+                        data=vf_ad.read(),
+                        file_name="anuncio_tiktok_27s.mp4",
+                        mime="video/mp4",
+                        type="primary",
+                        use_container_width=True
+                    )
             else:
-                st.warning("Gere a VSL Curta na Aba 2 ou envie um arquivo MP4.")
-                up_ad_m = st.file_uploader("Enviar MP4 do criativo:", type=["mp4"])
-                if up_ad_m:
-                    p_ad = os.path.join(DIR_VSL, f"ad_{int(time.time())}.mp4")
-                    with open(p_ad, "wb") as f_ad: f_ad.write(up_ad_m.read())
-                    video_para_ad = p_ad
+                st.warning("⚠️ O vídeo de 27s ainda não foi gerado na Aba 2.")
 
-            adv_id = st.text_input("Advertiser ID:", value=TIKTOK_ADVERTISER_ID)
-            tok_ad = st.text_input("TikTok Access Token:", value=TIKTOK_ACCESS_TOKEN, type="password")
+        with col_an2:
+            st.markdown("##### 2. Link Rastreado da Landing Page")
+            url_site_netlify = st.text_input(
+                "Cole o link do seu site no Netlify:",
+                placeholder="https://sua-pagina.netlify.app"
+            )
 
-        if st.button("🚀 Publicar Campanha no TikTok Ads", type="primary", use_container_width=True):
-            if not tok_ad or not url_lp or not video_para_ad:
-                st.error("Preencha o Token, a URL da Landing Page e selecione o vídeo do anúncio.")
+            nome_campanha_utm = st.text_input("Nome de Identificação da Campanha:", value="CONV_PROD01_V1")
+
+            separador = "&" if "?" in url_site_netlify else "?"
+            url_rastreada = f"{url_site_netlify}{separador}utm_source=tiktok&utm_medium=cpc&utm_campaign={nome_campanha_utm}&src={nome_campanha_utm}" if url_site_netlify else ""
+
+            if url_rastreada:
+                st.markdown("**Copie esta URL para colocar no anúncio:**")
+                st.code(url_rastreada, language="text")
+
+            st.markdown("##### 3. Legenda Sugerida para o Anúncio")
+            copy_sugerida = st.text_area(
+                "Texto do Anúncio:",
+                value="Método revelado em menos de 3 minutos! Toque em Saiba Mais 👇",
+                height=70
+            )
+
+        st.markdown("---")
+        col_cta_tt1, col_cta_tt2 = st.columns([1, 2])
+        with col_cta_tt1:
+            st.link_button("🚀 Abrir TikTok Ads Manager", "https://ads.tiktok.com", type="primary", use_container_width=True)
+        with col_cta_tt2:
+            st.info("💡 **Como publicar no TikTok:** No painel que abrir, clique em **Criar Campanha** > suba o vídeo baixado > cole a URL rastreada acima > publique.")
+
+    # SUB-ABA 3: DISPARO VIA API (OPCIONAL/AVANÇADO)
+    with aba_tt_api:
+        st.markdown("### ⚙️ Disparo Automático via API (Para quem já tem App aprovado)")
+        col_ad_api1, col_ad_api2 = st.columns(2)
+        with col_ad_api1:
+            nome_camp_api = st.text_input("Nome da Campanha (API):", value=f"CONV - {datetime.now().strftime('%d/%m')}")
+            url_lp_api = st.text_input("URL da Landing Page (API):", placeholder="https://sua-pagina.netlify.app")
+            orcamento_api = st.number_input("Orçamento Diário (R$):", min_value=30.0, value=60.0, step=10.0)
+            copy_ad_api = st.text_area("Texto do Anúncio (API):", value="Método revelado em menos de 3 minutos! Toque em Saiba Mais 👇")
+        with col_ad_api2:
+            adv_id_api = st.text_input("Advertiser ID:", value=TIKTOK_ADVERTISER_ID)
+            tok_ad_api = st.text_input("TikTok Access Token:", value=TIKTOK_ACCESS_TOKEN, type="password")
+
+        if st.button("Disparar Campanha via API", use_container_width=True):
+            video_para_ad = st.session_state.get("video_vsl_pronto")
+            if not tok_ad_api or not url_lp_api or not video_para_ad:
+                st.error("Preencha o Token, a URL da Landing Page e garanta que o vídeo de 27s existe.")
             else:
-                with st.spinner("Publicando campanha via TikTok Marketing API com UTMs dinâmicas..."):
+                with st.spinner("Publicando via API..."):
                     try:
                         res = disparar_campanha_tiktok_completa(
-                            advertiser_id=adv_id, access_token=tok_ad, video_path=video_para_ad,
-                            campaign_name=nome_camp, copy_text=copy_ad, landing_page_url=url_lp,
-                            orcamento_diario=orcamento
+                            advertiser_id=adv_id_api, access_token=tok_ad_api, video_path=video_para_ad,
+                            campaign_name=nome_camp_api, copy_text=copy_ad_api, landing_page_url=url_lp_api,
+                            orcamento_diario=orcamento_api
                         )
-                        st.success("🎉 Campanha publicada com sucesso no TikTok Ads!")
+                        st.success("Campanha publicada!")
                         st.json(res)
                     except Exception as e_ad:
-                        st.error(f"Erro ao publicar no TikTok: {e_ad}")
+                        st.error(f"Erro na API: {e_ad}")
 
 # ------------------------------------------------------------------------------
 # ABA 7: GESTÃO MASTER
