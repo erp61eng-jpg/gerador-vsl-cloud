@@ -62,7 +62,7 @@ def sanitizar_texto(valor: Any) -> str:
     return str(valor)
 
 # ==============================================================================
-# 1. CONFIGURAÇÕES INICIAIS, DIRETÓRIOS & CONSTANTES
+# 1. CONFIGURAÇÕES INICIAIS, DIRETÓRIOS & PRESETS (SAFE ZONES INFERIORES)
 # ==============================================================================
 st.set_page_config(
     page_title="Central VSL & DubfyAi Global",
@@ -144,13 +144,14 @@ IDIOMAS_SISTEMA_36 = {
     "🇿🇦 Africâner": "Afrikaans"
 }
 
+# PRESETS COM LEGENDA NA PARTE INFERIOR (SEM TAPAR ROSTO)
 PRESETS_PLATAFORMAS = {
     "TikTok (Ads / Orgânico 9:16)": {
         "resolucao": (1080, 1920),
         "vertical": True,
-        "largura_linha": 20,
-        "fontsize": 44,
-        "pos_y": "(h-text_h)/2 + 100",
+        "largura_linha": 22,
+        "fontsize": 40,
+        "pos_y": "h-text_h-420",  # Terço inferior seguro (fora da cara dos atores)
         "pos_marca_y": 140,
         "cta_padrao": "Toque no botão vermelho abaixo para garantir agora!"
     },
@@ -158,7 +159,7 @@ PRESETS_PLATAFORMAS = {
         "resolucao": (1080, 1920),
         "vertical": True,
         "largura_linha": 22,
-        "fontsize": 44,
+        "fontsize": 40,
         "pos_y": "h-text_h-420",
         "pos_marca_y": 120,
         "cta_padrao": "Toque em Saiba Mais ou no link da bio para começar!"
@@ -167,7 +168,7 @@ PRESETS_PLATAFORMAS = {
         "resolucao": (1080, 1920),
         "vertical": True,
         "largura_linha": 22,
-        "fontsize": 44,
+        "fontsize": 40,
         "pos_y": "h-text_h-380",
         "pos_marca_y": 120,
         "cta_padrao": "Acesse o primeiro link fixado nos comentários!"
@@ -176,8 +177,8 @@ PRESETS_PLATAFORMAS = {
         "resolucao": (1920, 1080),
         "vertical": False,
         "largura_linha": 42,
-        "fontsize": 46,
-        "pos_y": "h-text_h-85",
+        "fontsize": 44,
+        "pos_y": "h-text_h-95",  # Posição clássica inferior de VSL horizontal
         "pos_marca_y": 50,
         "cta_padrao": "Clique no botão oficial logo abaixo deste vídeo!"
     }
@@ -308,7 +309,7 @@ def minerar_nicho_profundo_ia(nicho: str, profundidade: str) -> dict:
     NÍVEL DE PROFUNDIDADE: {profundidade}
 
     REGRA MANDATÓRIA DE IDIOMA:
-    Todo o conteúdo DEVE ser redigido ESTRITAMENTE em Português do Brasil (PT-BR). É proibido responder em Espanhol.
+    Todo o conteúdo DEVE ser redigido ESTRITAMENTE em Português do Brasil (PT-BR). É expressamente proibido responder em Espanhol.
 
     Retorne ESTRITAMENTE um JSON com as seguintes chaves (TODOS OS VALORES DEVEM SER STRINGS):
     {{
@@ -322,7 +323,7 @@ def minerar_nicho_profundo_ia(nicho: str, profundidade: str) -> dict:
         "dossie_markdown": "Dossiê executivo e mercadológico completo em Markdown estruturado"
     }}
     """
-    resp = executar_prompt_ia(prompt, formato_json=True, temperatura=0.3)
+    resp = executar_prompt_ia(prompt, formato_json=True, temperatura=0.25)
     try:
         dados = json.loads(resp)
         if isinstance(dados, dict):
@@ -415,7 +416,7 @@ def gerar_roteiro_apresentacao_3min_ia(
 
     REGRAS TÉCNICAS:
     1. Cada "fala" deve conter entre 26 e 34 palavras em Português do Brasil (PT-BR).
-    2. Cada "termo_video" deve ser um termo de 2 a 3 palavras em INGLÊS para o Pexels.
+    2. Cada "termo_video" deve ser um termo de 2 a 3 palavras em INGLÊS para busca precisa no Pexels.
 
     Retorne ESTRITAMENTE o JSON:
     {{
@@ -738,7 +739,7 @@ def compilar_pdf_order_bump(dados_bump: dict, pexels_key: str, caminho_pdf: str)
     return caminho_pdf
 
 # ==============================================================================
-# 5. PROCESSAMENTO DE ÁUDIO E VÍDEO (FASTSTART + THREADS LIMITADAS)
+# 5. PROCESSAMENTO DE VÍDEO (MARCA D'ÁGUA + LEGENDA INFERIOR FORA DO ROSTO)
 # ==============================================================================
 def sintetizar_audio_tts(texto: str, output_path: str, voz: str = "onyx") -> bool:
     if not OPENAI_API_KEY: return False
@@ -785,12 +786,24 @@ def renderizar_vsl_completa(
     config = PRESETS_PLATAFORMAS.get(plataforma_nome, PRESETS_PLATAFORMAS["TikTok (Ads / Orgânico 9:16)"])
     res_w, res_h = config["resolucao"]
     vertical = config["vertical"]
-    pos_y_legenda = config["pos_y"]
+    pos_y_legenda = config["pos_y"]  # Já calibrado no terço inferior (h-text_h-420)
     tam_fonte = config["fontsize"]
     largura_wrap = config["largura_linha"]
 
     cenas_clipes = []
     total = len(cenas)
+
+    # 1. Filtro de Marca d'água Restaurado
+    filtro_marca = ""
+    if marca_dagua and str(marca_dagua).strip():
+        marca_limpa = re.sub(r"[':\\]", "", str(marca_dagua).strip())
+        tam_fonte_marca = 28 if vertical else 22
+        pos_y_m = config.get("pos_marca_y", 140)
+        filtro_marca = (
+            f",drawtext=text='{marca_limpa}':fontcolor=white@0.75:"
+            f"fontsize={tam_fonte_marca}:box=1:boxcolor=black@0.45:boxborderw=8:"
+            f"x=45:y={pos_y_m}"
+        )
 
     for idx, item in enumerate(cenas):
         frase = sanitizar_texto(item.get("fala", "") if isinstance(item, dict) else str(item))
@@ -811,10 +824,14 @@ def renderizar_vsl_completa(
         with open(legenda_txt, "w", encoding="utf-8") as f_l: f_l.write(texto_formatado)
         legenda_path_escapado = legenda_txt.replace(os.sep, "/").replace(":", "\\:")
 
+        # Filtro com legenda no terço inferior (fora do rosto) + marca d'água
         if tem_video and os.path.exists(v_raw_path):
             vf = (
                 f"scale={res_w}:{res_h}:force_original_aspect_ratio=increase,crop={res_w}:{res_h},setsar=1,fps=30,"
-                f"drawtext=textfile='{legenda_path_escapado}':fontcolor=white:fontsize={tam_fonte}:box=1:boxcolor=black@0.80:boxborderw=16:line_spacing=12:x=(w-text_w)/2:y={pos_y_legenda}"
+                f"drawtext=textfile='{legenda_path_escapado}':fontcolor=white:fontsize={tam_fonte}:"
+                f"box=1:boxcolor=black@0.80:boxborderw=14:line_spacing=10:"
+                f"x=(w-text_w)/2:y={pos_y_legenda}"
+                f"{filtro_marca}"
             )
             cmd = [
                 "ffmpeg", "-y", "-threads", "2", "-stream_loop", "-1", "-i", v_raw_path, "-i", a_path,
@@ -823,7 +840,10 @@ def renderizar_vsl_completa(
             ]
         else:
             vf = (
-                f"setsar=1,fps=30,drawtext=textfile='{legenda_path_escapado}':fontcolor=white:fontsize={tam_fonte+4}:box=1:boxcolor=blue@0.65:boxborderw=20:line_spacing=14:x=(w-text_w)/2:y=(h-text_h)/2"
+                f"setsar=1,fps=30,drawtext=textfile='{legenda_path_escapado}':fontcolor=white:fontsize={tam_fonte+4}:"
+                f"box=1:boxcolor=blue@0.65:boxborderw=18:line_spacing=12:"
+                f"x=(w-text_w)/2:y={pos_y_legenda}"
+                f"{filtro_marca}"
             )
             cmd = [
                 "ffmpeg", "-y", "-threads", "2", "-f", "lavfi", "-i", f"color=c=0x0F172A:s={res_w}x{res_h}:d={duracao:.2f}", "-i", a_path,
@@ -1297,7 +1317,7 @@ with tab_vsl:
 
     col_opt1, col_opt2 = st.columns(2)
     with col_opt1:
-        marca_dagua_input = st.text_input("🔒 Marca d'água:", value=st.session_state.get("vsl_marca_ativa", ""), key="vsl_input_marca_dagua")
+        marca_dagua_input = st.text_input("🔒 Marca d'água / Assinatura do Vídeo:", value=st.session_state.get("vsl_marca_ativa", ""), key="vsl_input_marca_dagua")
     with col_opt2:
         voz_sel = st.selectbox("Locução:", ["onyx (Forte/Masculina)", "alloy (Neutra)", "nova (Energética/Feminina)"], key="vsl_select_voz")
         voz_codigo = voz_sel.split()[0]
@@ -1307,7 +1327,7 @@ with tab_vsl:
             st.error("❌ Saldo insuficiente!")
         else:
             barra_vsl = st.progress(0.0)
-            with st.spinner("Renderizando cenas da VSL curta em Português..."):
+            with st.spinner("Renderizando cenas da VSL curta em Português com legenda no terço inferior..."):
                 try:
                     cenas_estruturadas = gerar_roteiro_vsl_ia(tema_vsl, promessa_vsl, publico_vsl, qtd_cenas)
                     st.session_state["roteiro_vsl"] = cenas_estruturadas
@@ -1363,7 +1383,7 @@ with tab_apresentacao:
     with col_ap2:
         prod_publico = st.text_input("Público-Alvo:", key="ap_prod_publico")
         prod_oferta = st.text_input("Oferta / CTA:", key="ap_prod_oferta")
-        marca_ap = st.text_input("Marca d'água:", value=st.session_state.get("vsl_marca_ativa", ""), key="ap_marca_dagua")
+        marca_ap = st.text_input("Marca d'água / Assinatura do Pitch:", value=st.session_state.get("vsl_marca_ativa", ""), key="ap_marca_dagua")
 
     voz_ap_sel = st.selectbox("Locução do Pitch:", ["onyx (Forte/Masculina)", "alloy (Neutra)", "nova (Energética/Feminina)"], key="ap_voz_sel")
     voz_ap_cod = voz_ap_sel.split()[0]
@@ -1380,7 +1400,7 @@ with tab_apresentacao:
                 st.session_state["roteiro_pitch_3min"] = roteiro_pitch
                 st.session_state["ap_plataforma_ativa"] = plataforma_ap_sel
 
-                status_ap.write("🎥 Renderizando cortes e legendas (Low-RAM Mode)...")
+                status_ap.write("🎥 Renderizando cortes e legendas inferiores...")
                 video_pitch = renderizar_vsl_completa(
                     cenas=roteiro_pitch, plataforma_nome=plataforma_ap_sel, voz=voz_ap_cod,
                     pexels_key=PEXELS_API_KEY, musica_fundo_path=None, volume_musica=0.0,
@@ -1634,7 +1654,7 @@ with tab_ads:
             )
 
 # ------------------------------------------------------------------------------
-# ABA 7: GESTÃO MASTER (CORRIGIDO SYNTAX ERROR DO SUPABASE)
+# ABA 7: GESTÃO MASTER
 # ------------------------------------------------------------------------------
 with tab_master:
     st.markdown("## 👑 Painel de Gestão Master")
