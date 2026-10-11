@@ -16,7 +16,7 @@ from PIL import Image as PILImage, ImageOps
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Image as RLImage, PageBreak, Table, TableStyle, HRFlowable
+    SimpleDocTemplate, Paragraph, Spacer, Image as RLImage, PageBreak, Table, TableStyle, HRFlowable, KeepTogether
 )
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.pdfgen import canvas
@@ -953,7 +953,7 @@ def dublar_roteiro_e_renderizar_vsl(
     return vid, cenas_traduzidas
 
 # ==============================================================================
-# MOTOR DE FUSÃO DE VÍDEOS (SEM ERROS DE MEMÓRIA E COM LOOP SEGURO)
+# MOTOR DE FUSÃO DE VÍDEOS (27S + 2-3MIN COM TRILHA EM LOOP SEGURO)
 # ==============================================================================
 def fundir_videos_com_trilha(
     video1_path: str,
@@ -1013,7 +1013,7 @@ def fundir_videos_com_trilha(
     return output_path
 
 # ==============================================================================
-# MOTOR DE INTEGRAÇÃO TIKTOK MARKETING API & GERADOR DE LP
+# MOTOR TIKTOK MARKETING API COM MACROS DINÂMICAS & LANDING PAGE COM REPASSE
 # ==============================================================================
 TIKTOK_API_BASE = "https://business-api.tiktok.com/open_api/v1.3"
 
@@ -1025,14 +1025,14 @@ def disparar_campanha_tiktok_completa(
     headers_json = {"Access-Token": access_token, "Content-Type": "application/json"}
     if not os.path.exists(video_path): raise FileNotFoundError(f"Arquivo de vídeo não encontrado em: {video_path}")
 
-    # 1. Upload
+    # 1. Upload do Vídeo
     url_upload = f"{TIKTOK_API_BASE}/file/video/ad/upload/"
     with open(video_path, "rb") as vf:
         res_upload = requests.post(url_upload, headers=headers, data={"advertiser_id": advertiser_id, "upload_type": "UPLOAD_BY_FILE"}, files={"video_file": vf}).json()
     if res_upload.get("code") != 0: raise Exception(f"Erro no Upload do Vídeo: {res_upload.get('message')}")
     video_id = res_upload["data"]["video_id"]
 
-    # 2. Campanha
+    # 2. Criar Campanha
     res_camp = requests.post(
         f"{TIKTOK_API_BASE}/campaign/create/", headers=headers_json,
         json={"advertiser_id": advertiser_id, "campaign_name": campaign_name, "objective_type": "WEB_CONVERSIONS", "budget_mode": "BUDGET_MODE_DYNAMIC"}
@@ -1040,7 +1040,7 @@ def disparar_campanha_tiktok_completa(
     if res_camp.get("code") != 0: raise Exception(f"Erro ao criar Campanha: {res_camp.get('message')}")
     campaign_id = res_camp["data"]["campaign_id"]
 
-    # 3. Ad Group
+    # 3. Criar Ad Group
     data_formatada = (datetime.now(timezone.utc) + timedelta(minutes=10)).strftime("%Y-%m-%d %H:%M:%S")
     payload_adgroup = {
         "advertiser_id": advertiser_id, "campaign_id": campaign_id, "adgroup_name": f"Grupo - {campaign_name}",
@@ -1052,10 +1052,25 @@ def disparar_campanha_tiktok_completa(
     if res_adgroup.get("code") != 0: raise Exception(f"Erro ao criar AdGroup: {res_adgroup.get('message')}")
     adgroup_id = res_adgroup["data"]["adgroup_id"]
 
-    # 4. Criativo
+    # 4. Criar Anúncio com INJEÇÃO AUTOMÁTICA DE UTMS DINÂMICAS DO TIKTOK E SRC KIWIFY
+    separador = "&" if "?" in landing_page_url else "?"
+    url_com_utms = (
+        f"{landing_page_url}{separador}"
+        f"utm_source=tiktok"
+        f"&utm_medium=cpc"
+        f"&utm_campaign=__CAMPAIGN_NAME__"
+        f"&utm_term=__AID_NAME__"
+        f"&utm_content=__CID__"
+        f"&src=__CAMPAIGN_NAME__|__CID__"
+    )
+
     criativo = {
-        "ad_name": f"Criativo - {campaign_name}", "ad_format": "SINGLE_VIDEO", "video_id": video_id,
-        "ad_text": copy_text[:100], "call_to_action": "LEARN_MORE", "landing_page_url": landing_page_url
+        "ad_name": f"Criativo - {campaign_name}",
+        "ad_format": "SINGLE_VIDEO",
+        "video_id": video_id,
+        "ad_text": copy_text[:100],
+        "call_to_action": "LEARN_MORE",
+        "landing_page_url": url_com_utms
     }
     if identity_id and identity_id.strip():
         criativo["identity_type"] = "CUSTOMIZED_USER"
@@ -1120,12 +1135,14 @@ def gerar_html_landing_page(titulo: str, promessa: str, url_video_mp4: str, link
     const oferta = document.getElementById('oferta-container');
     const checkoutBtn = document.getElementById('checkoutBtn');
 
+    // Desbloqueio de áudio com clique
     overlay.addEventListener('click', () => {{
       video.muted = false;
       video.play();
       overlay.style.display = 'none';
     }});
 
+    // Persistência de estado da oferta
     function liberar() {{
       oferta.style.display = 'block';
       localStorage.setItem('oferta_liberada_{abs(hash(titulo)) % 10000}', 'true');
@@ -1138,6 +1155,24 @@ def gerar_html_landing_page(titulo: str, promessa: str, url_video_mp4: str, link
     video.addEventListener('timeupdate', () => {{
       if (video.currentTime >= {delay_segundos}) {{
         liberar();
+      }}
+    }});
+
+    // REPASSE AUTOMÁTICO DE UTMS DO TIKTOK PARA O CHECKOUT DA KIWIFY
+    window.addEventListener('DOMContentLoaded', () => {{
+      const params = window.location.search;
+      if (params && checkoutBtn) {{
+        try {{
+          const urlObj = new URL(checkoutBtn.href, window.location.origin);
+          const currentParams = new URLSearchParams(params);
+          currentParams.forEach((val, key) => {{
+            urlObj.searchParams.set(key, val);
+          }});
+          checkoutBtn.href = urlObj.toString();
+        }} catch(e) {{
+          const sep = checkoutBtn.href.includes('?') ? '&' : '?';
+          checkoutBtn.href += sep + params.replace('?', '');
+        }}
       }}
     }});
 
@@ -1704,11 +1739,11 @@ with tab_ebook:
                     st.download_button(f"⬇️ Baixar Manual em {st.session_state.get('pdf_global_lingua')} (.PDF)", data=f_gtr, file_name="manual_traduzido.pdf", mime="application/pdf", use_container_width=True)
 
 # ------------------------------------------------------------------------------
-# ABA 6: CENTRAL TIKTOK ADS & LANDING PAGE
+# ABA 6: CENTRAL TIKTOK ADS & LANDING PAGE (COM UTMS AUTOMÁTICAS)
 # ------------------------------------------------------------------------------
 with tab_ads:
     st.markdown("## 🎯 6. Central TikTok Ads & Funil de Conversão")
-    st.caption("Gere a Landing Page oficial com delay e faça o upload direto do vídeo na API do TikTok Ads.")
+    st.caption("Gere a Landing Page oficial com delay e faça o upload direto do vídeo na API com injeção automática de UTMs dinâmicas.")
 
     video_final_anuncio = (
         st.session_state.get("video_master_fundido") or
@@ -1722,6 +1757,7 @@ with tab_ads:
         with col_ad1:
             nome_camp = st.text_input("Nome da Campanha:", value=f"Campanha Conversão - {datetime.now().strftime('%d/%m')}")
             url_lp = st.text_input("URL da Landing Page de Destino:", placeholder="https://meusite.com/vsl")
+            st.info("ℹ️ **Rastreamento Dinâmico:** As macros oficiais (`__CAMPAIGN_NAME__`, `__AID_NAME__`, `__CID__` e `src=...`) são injetadas automaticamente na URL ao publicar.")
             orcamento = st.number_input("Orçamento Diário (R$):", min_value=30.0, value=60.0, step=10.0)
             copy_ad = st.text_area("Texto do Anúncio:", value="Método revelado em menos de 3 minutos! Toque em Saiba Mais.")
             adv_id = st.text_input("Advertiser ID:", value=TIKTOK_ADVERTISER_ID)
@@ -1742,7 +1778,7 @@ with tab_ads:
             elif not url_lp: st.error("Informe a URL da Landing Page.")
             elif not video_final_anuncio or not os.path.exists(video_final_anuncio): st.error("Nenhum vídeo disponível.")
             else:
-                with st.spinner("Publicando anúncio via TikTok Marketing API..."):
+                with st.spinner("Publicando anúncio via TikTok Marketing API com UTMs dinâmicas..."):
                     try:
                         res = disparar_campanha_tiktok_completa(
                             advertiser_id=adv_id, access_token=tok_ad, video_path=video_final_anuncio,
@@ -1756,6 +1792,7 @@ with tab_ads:
 
     with aba_tt_lp:
         st.markdown("### 📄 Gerador da Landing Page Oficial do Funil")
+        st.caption("A página já inclui o repasse automático de todos os parâmetros UTM e SRC da URL diretamente para o botão de compra.")
         col_lp1, col_lp2 = st.columns(2)
         with col_lp1:
             lp_tit = st.text_input("Título da Página:", value="Apresentação Exclusiva")
@@ -1787,7 +1824,7 @@ with tab_master:
         try:
             res_u = supabase_client.from_("usuarios").select("*").execute()
             usuarios_lista = res_u.data if res_u.data else []
-            res_p = supabase_client.from_("pedidos_kiwify").select("*").execute()
+            res_p = supabase_client.from("pedidos_kiwify").select("*").execute()
             pedidos_lista = res_p.data if res_p.data else []
 
             fat_total = sum(float(p.get("valor_pago", 0)) for p in pedidos_lista)
