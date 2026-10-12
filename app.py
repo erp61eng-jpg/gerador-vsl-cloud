@@ -61,6 +61,32 @@ def sanitizar_texto(valor: Any) -> str:
         return "\n".join(linhas)
     return str(valor)
 
+def sanitizar_fala_locucao(texto: str) -> str:
+    """Elimina placeholders, colchetes, notas de direção e introduções quebradas antes do TTS e legenda."""
+    if not texto:
+        return ""
+    # 1. Remove qualquer conteúdo entre colchetes: [Meu Nome], [Insira depoimento], [assim], etc.
+    t = re.sub(r'\[.*?\]', '', texto)
+    # 2. Remove parênteses que contenham instruções de cena/direção
+    t = re.sub(r'\((?:cena|take|cortar|inserir|mostrar|depoimento|música|audio|fala|voz|efeito|zoom|prints?|imagem).*?\)', '', t, flags=re.IGNORECASE)
+    # 3. Limpa frases inteiras que sejam instruções de edição direcionadas ao usuário
+    if re.search(r'\b(?:coloque|insira|adicione|mostre|gravar|inserir)\s+(?:aqui\s+)?(?:depoimentos?|fotos?|vídeos?|prints?|provas?)\b', t, flags=re.IGNORECASE):
+        t = re.sub(r'[^.!?]*\b(?:coloque|insira|adicione|mostre|gravar|inserir)\s+(?:aqui\s+)?(?:depoimentos?|fotos?|vídeos?|prints?|provas?)[^.!?]*(?:[.!?]|$)', '', t, flags=re.IGNORECASE)
+    # 4. Remove introduções de nome vazias ou quebradas tipo "Meu nome é e...", "Olá, meu nome é..."
+    t = re.sub(r'\b(?:olá,?\s*)?meu nome é(?:\s+\w+){0,4}\s*(?:e\s+|,|\.)', '', t, flags=re.IGNORECASE)
+    t = re.sub(r'\b(?:olá,?\s*)?meu nome é\s*$', '', t, flags=re.IGNORECASE)
+    t = re.sub(r'\b(?:olá,?\s*)?meu nome é\s*[,.:;?!-]', '', t, flags=re.IGNORECASE)
+    # 5. Limpa conectivos e pontuações órfãs geradas no início
+    t = re.sub(r'^\s*(?:e\s+|mas\s+|ou\s+|portanto\s+|assim\s+)', '', t, flags=re.IGNORECASE)
+    t = re.sub(r'^\s*[,.:;?!-]+\s*', '', t)
+    # 6. Limpa pontuação dupla interna
+    t = re.sub(r'\s+([,.:;?!])', r'\1', t)
+    t = re.sub(r'([,.:;?!])\s*([,.:;?!])+', r'\1', t)
+    t = re.sub(r'[,:;-]\s*([.!?])', r'\1', t)
+    # 7. Espaços duplos
+    t = re.sub(r'\s+', ' ', t).strip()
+    return t
+
 # ==============================================================================
 # 1. CONFIGURAÇÕES INICIAIS, DIRETÓRIOS, PRESETS & MOTOR DE TRADUÇÃO
 # ==============================================================================
@@ -403,8 +429,8 @@ def traduzir_cenas_vsl_ia(cenas: List[Dict[str, str]], idioma_destino: str) -> L
         cenas_traduzidas = dados.get("cenas", [])
         return [
             {
-                "fala": sanitizar_texto(c["fala"]).strip(),
-                "termo_video": sanitizar_texto(c.get("termo_video", "business growth")).strip()
+                "fala": sanitizar_fala_locucao(sanitizar_texto(c["fala"])).strip(),
+                "termo_video": re.sub(r'\[.*?\]', '', sanitizar_texto(c.get("termo_video", "business growth"))).strip() or "business growth"
             }
             for c in cenas_traduzidas if c.get("fala")
         ]
@@ -454,13 +480,16 @@ def minerar_nicho_profundo_ia(nicho: str, profundidade: str, idioma: str = "Port
 
 def gerar_roteiro_vsl_ia(nicho: str, promessa: str, publico: str, num_cenas: int = 5, idioma: str = "Português (Brasil)") -> List[Dict[str, str]]:
     prompt = f"""
-    Crie um roteiro de alta conversão para VSL curta (27 segundos):
+    Atue como Copywriter Profissional de Vídeos de Anúncio Direto (27 segundos).
+    Crie um roteiro persuasivo, visceral e direto ao ponto:
     - Nicho: {nicho} | Promessa: {promessa} | Público: {publico}
     - IDIOMA DA LOCUÇÃO: {idioma}
     
-    REGRAS MANDATÓRIAS:
-    1. A chave 'fala' DEVE ser rigorosamente no idioma: {idioma}.
-    2. A chave 'termo_video' DEVE ser OBRIGATORIAMENTE em INGLÊS com 1 a 3 palavras simples de alta relevância visual para buscar filmagens no Pexels (ex: "baking cake", "cooking kitchen", "making money", "cash money", "chef decorating"). NUNCA use outro idioma na chave 'termo_video'.
+    REGRAS MANDATÓRIAS (ANTI-AMADORISMO):
+    1. ZERO PLACEHOLDERS: NUNCA use colchetes, chaves ou termos genéricos como [Seu Nome], [Nome], [assim], [insira X].
+    2. NADA DE APRESENTAÇÃO PESSOAL FICTÍCIA: NÃO comece com "Meu nome é...". O anúncio tem 27s; comece imediatamente com um gancho forte sobre a dor ou o resultado desejado.
+    3. TEXTO TELEPROMPTER PRONTO: Toda palavra da chave 'fala' será sintetizada por voz de IA e gravada na legenda do vídeo. Escreva exclusivamente texto final para locução em {idioma}.
+    4. A chave 'termo_video' DEVE ser OBRIGATORIAMENTE em INGLÊS com 1 a 3 palavras simples para busca no Pexels (ex: "baking cake", "cooking kitchen", "making money", "cash money", "chef decorating"). NUNCA use outro idioma na chave 'termo_video'.
     
     Gere exatamente {num_cenas} cenas cronológicas com fala e termo_video.
     Retorne ESTRITAMENTE o JSON:
@@ -470,21 +499,31 @@ def gerar_roteiro_vsl_ia(nicho: str, promessa: str, publico: str, num_cenas: int
     try:
         dados = json.loads(resp)
         cenas_raw = dados.get("cenas", [])
-        return [{"fala": sanitizar_texto(c["fala"]).strip(), "termo_video": sanitizar_texto(c.get("termo_video", "cooking kitchen")).strip()} for c in cenas_raw if c.get("fala")]
+        return [
+            {
+                "fala": sanitizar_fala_locucao(sanitizar_texto(c["fala"])).strip(),
+                "termo_video": re.sub(r'\[.*?\]', '', sanitizar_texto(c.get("termo_video", "cooking kitchen"))).strip() or "cooking kitchen"
+            }
+            for c in cenas_raw if c.get("fala")
+        ]
     except Exception:
         return [{"fala": promessa, "termo_video": "cooking kitchen"}]
 
 def gerar_roteiro_apresentacao_3min_ia(nome_produto: str, nicho: str, promessa: str, publico: str, oferta_cta: str, idioma: str = "Português (Brasil)") -> List[Dict[str, str]]:
     prompt = f"""
-    Crie o roteiro completo de pitch de vendas de 3 minutos para:
+    Atue como Roteirista Sênior de VSL de Vendas de Alta Conversão (Vídeo de Apresentação de 3 minutos).
+    Crie o roteiro de locução contínua para:
     - Produto: {nome_produto} | Nicho: {nicho} | Promessa: {promessa} | CTA: {oferta_cta}
     - IDIOMA DA APRESENTAÇÃO: {idioma}
     
-    REGRAS MANDATÓRIAS:
-    1. A chave 'fala' DEVE ser no idioma: {idioma}.
-    2. A chave 'termo_video' DEVE ser OBRIGATORIAMENTE em INGLÊS com 1 a 3 palavras simples de busca no Pexels (ex: "baking cake", "delicious dessert", "happy woman cooking", "money cash", "smiling chef").
+    REGRAS MANDATÓRIAS (ANTI-AMADORISMO):
+    1. ZERO PLACEHOLDERS: NUNCA use colchetes, chaves ou parênteses como [Seu Nome], [Nome], [assim], [Insira X].
+    2. NARRATIVA INSTITUCIONAL E DIRETA: NÃO invente nomes de apresentadores nem diga "Meu nome é...". Comece direto no problema e na grande oportunidade.
+    3. PROVA SOCIAL NARRADA: NUNCA dê instruções de edição ou fale para "colocar depoimentos de pessoas nos vídeos". ESCREVA A HISTÓRIA REAL NARRADA na própria locução (exemplo: "Centenas de pessoas comuns que começaram da própria cozinha já estão faturando mais de três mil reais no primeiro mês").
+    4. TEXTO 100% PRONTO PARA VOZ: Cada palavra no campo 'fala' será narrada por voz sintética e gravada na legenda. Escreva apenas texto corrido e persuasivo no idioma {idioma}.
+    5. A chave 'termo_video' DEVE ser OBRIGATORIAMENTE em INGLÊS com 1 a 3 palavras simples de busca no Pexels (ex: "baking cake", "delicious dessert", "happy woman cooking", "money cash", "smiling chef").
     
-    Gere 13 cenas cronológicas (Gancho, História, Revelação do Produto, Prova, Garantia e Oferta).
+    Gere 13 cenas cronológicas (Gancho, Problema, Agitação da Dor, Revelação do Método, Passo a Passo, Prova Narrada de Resultados, Apresentação da Oferta Oficial, Detalhamento dos Bônus, Quebra de Objeções, Garantia Incondicional, Chamada para Ação Final).
     Retorne ESTRITAMENTE o JSON:
     {{ "cenas": [{{"fala": "...", "termo_video": "..."}}] }}
     """
@@ -492,7 +531,13 @@ def gerar_roteiro_apresentacao_3min_ia(nome_produto: str, nicho: str, promessa: 
     try:
         dados = json.loads(resp)
         cenas_raw = dados.get("cenas", [])
-        return [{"fala": sanitizar_texto(c["fala"]).strip(), "termo_video": sanitizar_texto(c.get("termo_video", "cooking delicious food")).strip()} for c in cenas_raw if c.get("fala")]
+        return [
+            {
+                "fala": sanitizar_fala_locucao(sanitizar_texto(c["fala"])).strip(),
+                "termo_video": re.sub(r'\[.*?\]', '', sanitizar_texto(c.get("termo_video", "cooking delicious food"))).strip() or "cooking delicious food"
+            }
+            for c in cenas_raw if c.get("fala")
+        ]
     except Exception:
         return [{"fala": f"Descubra agora: {nome_produto}.", "termo_video": "cooking delicious food"}]
 
@@ -501,7 +546,7 @@ def gerar_roteiro_apresentacao_3min_ia(nome_produto: str, nicho: str, promessa: 
 # ==============================================================================
 def sintetizar_audio_tts(texto: str, output_path: str, voz: str = "Adam (Narrador Persuasivo)") -> bool:
     """Sintetiza áudio via ElevenLabs (DubfyAi padrão) com fallback automático para OpenAI TTS."""
-    texto_limpo = sanitizar_texto(texto).strip()
+    texto_limpo = sanitizar_fala_locucao(sanitizar_texto(texto)).strip()
     if not texto_limpo:
         return False
 
@@ -612,8 +657,12 @@ def renderizar_vsl_completa(
         filtro_marca = f",drawtext=text='{marca_limpa}':fontcolor=white@0.75:fontsize={tam_fonte_marca}:box=1:boxcolor=black@0.45:boxborderw=8:x=45:y={pos_y_m}"
 
     for idx, item in enumerate(cenas):
-        frase = sanitizar_texto(item.get("fala", "") if isinstance(item, dict) else str(item))
+        frase_bruta = sanitizar_texto(item.get("fala", "") if isinstance(item, dict) else str(item))
+        frase = sanitizar_fala_locucao(frase_bruta)
+        if not frase or len(frase.split()) < 3:
+            frase = "Veja os resultados reais de quem já aplicou este método com total consistência e segurança."
         termo_video = sanitizar_texto(item.get("termo_video", "cooking kitchen") if isinstance(item, dict) else "cooking kitchen")
+        termo_video = re.sub(r'\[.*?\]', '', termo_video).strip() or "cooking kitchen"
 
         prefixo = f"cena_{idx}_{int(time.time())}"
         a_path = os.path.join(DIR_AUDIOS, f"{prefixo}.mp3")
@@ -837,7 +886,7 @@ def gerar_conteudo_apostila_ia(titulo: str, publico: str, promessa: str, idioma:
           "subtitulo": "Subtítulo do Módulo",
           "conteudo_p1": "Texto denso com fundamentação técnica e diagnóstico (mínimo de 3 parágrafos aprofundados)...",
           "conteudo_p2": "Instruções operacionais detalhadas, conceitos-chave e regras práticas (mínimo de 3 parágrafos aprofundados)...",
-          "checklist": "• Passo 1 prático\\n• Passo 2 prático\\n• Passo 3 prático\\n• Passo 4 prático"
+          "checklist": "• Passo 1 prático\n• Passo 2 prático\n• Passo 3 prático\n• Passo 4 prático"
         }}
       ]
     }}
@@ -873,7 +922,7 @@ def gerar_conteudo_apostila_ia(titulo: str, publico: str, promessa: str, idioma:
                 "Mantenha registros consistentes de cada ciclo de produção. Os detalhes técnicos que parecem insignificantes no início são "
                 "exatamente os fatores que definem a sustentabilidade do negócio e a retenção dos seus clientes no longo prazo."
             ),
-            "checklist": "• Definir cronograma semanal de produção\\n• Controlar custos unitários por lote\\n• Padronizar fichas técnicas operacionais\\n• Avaliar satisfação e feedback direto dos clientes"
+            "checklist": "• Definir cronograma semanal de produção\n• Controlar custos unitários por lote\n• Padronizar fichas técnicas operacionais\n• Avaliar satisfação e feedback direto dos clientes"
         }
         for m in modulos_padrao
     ]
