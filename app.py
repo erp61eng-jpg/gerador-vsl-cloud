@@ -62,7 +62,7 @@ def sanitizar_texto(valor: Any) -> str:
     return str(valor)
 
 # ==============================================================================
-# 1. CONFIGURAÇÕES INICIAIS, DIRETÓRIOS & PRESETS
+# 1. CONFIGURAÇÕES INICIAIS, DIRETÓRIOS, PRESETS & MOTOR DE TRADUÇÃO
 # ==============================================================================
 st.set_page_config(
     page_title="Central VSL & DubfyAi Global",
@@ -104,6 +104,16 @@ if SUPABASE_URL and SUPABASE_KEY:
         supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
     except Exception as e:
         st.sidebar.error(f"Erro ao conectar ao Supabase: {e}")
+
+# IDIOMAS SUPORTADOS PELO DUBFYAI GLOBAL
+IDIOMAS_DISPONIVEIS = [
+    "Português (Brasil)",
+    "Inglês (English - EUA)",
+    "Espanhol (Español)",
+    "Francês (Français)",
+    "Alemão (Deutsch)",
+    "Italiano (Italiano)"
+]
 
 # Mapeamento oficial de vozes do ElevenLabs para DubfyAi (Multilingual v2)
 VOZES_ELEVENLABS = {
@@ -322,7 +332,7 @@ def debitar_creditos_cloud(email: str, operacao: str, quantidade: int) -> bool:
         return True
 
 # ==============================================================================
-# 3. MOTORES DE IA & COPYWRITING (TERMOS RIGOROSAMENTE EM INGLÊS PARA O PEXELS)
+# 3. MOTORES DE IA, COPYWRITING & MOTOR DE TRADUÇÃO DUBFYAI GLOBAL
 # ==============================================================================
 def executar_prompt_ia(prompt: str, formato_json: bool = False, temperatura: float = 0.25) -> str:
     if GEMINI_API_KEY:
@@ -350,14 +360,66 @@ def executar_prompt_ia(prompt: str, formato_json: bool = False, temperatura: flo
 
     raise ValueError("Nenhuma chave configurada para Gemini ou OpenAI.")
 
-def minerar_nicho_profundo_ia(nicho: str, profundidade: str) -> dict:
+def traduzir_conteudo_ia(texto: str, idioma_destino: str) -> str:
+    """Traduz qualquer texto ou copy mantendo alto poder de persuasão e naturalidade no idioma destino."""
+    if not texto or not texto.strip():
+        return ""
     prompt = f"""
-    Atue como Diretor de Aquisição e Copywriter de Elite.
-    Analise o seguinte nicho com rigor técnico e comercial:
+    Atue como Tradutor Profissional e Copywriter Bilíngue do DubfyAi Global.
+    Traduza o seguinte conteúdo com rigor técnico e adaptação cultural fluida para: {idioma_destino}.
+    Preserve a pontuação enfática e o apelo de vendas.
+    NÃO adicione comentários nem explicações. Retorne EXCLUSIVAMENTE o texto traduzido.
+    
+    TEXTO ORIGINAL:
+    {texto}
+    """
+    try:
+        traducao = executar_prompt_ia(prompt, formato_json=False, temperatura=0.2)
+        return traducao.strip().strip('"')
+    except Exception:
+        return texto
+
+def traduzir_cenas_vsl_ia(cenas: List[Dict[str, str]], idioma_destino: str) -> List[Dict[str, str]]:
+    """Traduz as falas de um roteiro de vídeo para o idioma destino, mantendo os termos de busca do Pexels rigorosamente em inglês."""
+    if not cenas:
+        return []
+    prompt = f"""
+    Atue como Diretor de Dublagem e Tradução Audiovisual do DubfyAi Global.
+    Traduza as falas das cenas a seguir para: {idioma_destino}.
+    
+    REGRAS MANDATÓRIAS:
+    1. A chave 'fala' deve ser traduzida com total naturalidade para {idioma_destino}.
+    2. A chave 'termo_video' DEVE PERMANECER OBRIGATORIAMENTE EM INGLÊS (1 a 3 palavras para busca no Pexels).
+    
+    CENAS:
+    {json.dumps(cenas, ensure_ascii=False)}
+    
+    Retorne ESTRITAMENTE o JSON no formato:
+    {{ "cenas": [{{"fala": "...", "termo_video": "..."}}] }}
+    """
+    try:
+        resp = executar_prompt_ia(prompt, formato_json=True, temperatura=0.2)
+        dados = json.loads(resp)
+        cenas_traduzidas = dados.get("cenas", [])
+        return [
+            {
+                "fala": sanitizar_texto(c["fala"]).strip(),
+                "termo_video": sanitizar_texto(c.get("termo_video", "business growth")).strip()
+            }
+            for c in cenas_traduzidas if c.get("fala")
+        ]
+    except Exception:
+        return cenas
+
+def minerar_nicho_profundo_ia(nicho: str, profundidade: str, idioma: str = "Português (Brasil)") -> dict:
+    prompt = f"""
+    Atue como Diretor de Aquisição e Copywriter de Elite do DubfyAi Global.
+    Analise o nicho a seguir com rigor comercial e estruturação completa:
     NICHO: "{nicho}"
     NÍVEL DE PROFUNDIDADE: {profundidade}
+    IDIOMA DE SAÍDA: {idioma}
 
-    REGRA MANDATÓRIA: Todo o conteúdo DEVE ser em Português do Brasil (PT-BR).
+    REGRA: Todo o conteúdo textual das chaves DEVE ser gerado em {idioma}.
 
     Retorne ESTRITAMENTE um JSON com as chaves:
     {{
@@ -380,24 +442,25 @@ def minerar_nicho_profundo_ia(nicho: str, profundidade: str) -> dict:
         pass
 
     return {
-        "nome_produto": f"Método Definitivo: {nicho}",
-        "grande_promessa": f"Aprenda o método testado e lucre com {nicho}",
-        "publico_alvo": "Iniciantes e profissionais que buscam renda extra",
+        "nome_produto": f"Método: {nicho}",
+        "grande_promessa": f"Domine o método comprovado e lucre com {nicho}",
+        "publico_alvo": "Iniciantes e profissionais que buscam escala e receita",
         "mecanismo_unico": f"Protocolo Estruturado de Execução em {nicho}",
-        "oferta_cta": "Apenas R$ 97,00 com acesso vitalício e 7 dias de garantia",
+        "oferta_cta": "Acesso vitalício com bônus exclusivos e garantia incondicional",
         "dores_objecoes": "Falta de direcionamento claro e medo de errar",
         "campanha_google_ads": f"Palavras-chave: curso {nicho}, aprender {nicho}",
         "dossie_markdown": sanitizar_texto(resp)
     }
 
-def gerar_roteiro_vsl_ia(nicho: str, promessa: str, publico: str, num_cenas: int = 5) -> List[Dict[str, str]]:
+def gerar_roteiro_vsl_ia(nicho: str, promessa: str, publico: str, num_cenas: int = 5, idioma: str = "Português (Brasil)") -> List[Dict[str, str]]:
     prompt = f"""
-    Crie um roteiro persuasivo para VSL curta (27 segundos):
+    Crie um roteiro de alta conversão para VSL curta (27 segundos):
     - Nicho: {nicho} | Promessa: {promessa} | Público: {publico}
+    - IDIOMA DA LOCUÇÃO: {idioma}
     
     REGRAS MANDATÓRIAS:
-    1. A chave 'fala' DEVE ser em Português do Brasil (PT-BR).
-    2. A chave 'termo_video' DEVE ser OBRIGATORIAMENTE em INGLÊS com 1 a 3 palavras simples de alta relevância visual para buscar filmagens no Pexels (ex: "baking cake", "cooking kitchen", "making money", "cash money", "chef decorating"). NUNCA use palavras em português na chave 'termo_video'.
+    1. A chave 'fala' DEVE ser rigorosamente no idioma: {idioma}.
+    2. A chave 'termo_video' DEVE ser OBRIGATORIAMENTE em INGLÊS com 1 a 3 palavras simples de alta relevância visual para buscar filmagens no Pexels (ex: "baking cake", "cooking kitchen", "making money", "cash money", "chef decorating"). NUNCA use outro idioma na chave 'termo_video'.
     
     Gere exatamente {num_cenas} cenas cronológicas com fala e termo_video.
     Retorne ESTRITAMENTE o JSON:
@@ -411,14 +474,15 @@ def gerar_roteiro_vsl_ia(nicho: str, promessa: str, publico: str, num_cenas: int
     except Exception:
         return [{"fala": promessa, "termo_video": "cooking kitchen"}]
 
-def gerar_roteiro_apresentacao_3min_ia(nome_produto: str, nicho: str, promessa: str, publico: str, oferta_cta: str) -> List[Dict[str, str]]:
+def gerar_roteiro_apresentacao_3min_ia(nome_produto: str, nicho: str, promessa: str, publico: str, oferta_cta: str, idioma: str = "Português (Brasil)") -> List[Dict[str, str]]:
     prompt = f"""
-    Crie o roteiro completo de apresentação de 3 minutos para:
+    Crie o roteiro completo de pitch de vendas de 3 minutos para:
     - Produto: {nome_produto} | Nicho: {nicho} | Promessa: {promessa} | CTA: {oferta_cta}
+    - IDIOMA DA APRESENTAÇÃO: {idioma}
     
     REGRAS MANDATÓRIAS:
-    1. A chave 'fala' DEVE ser em Português do Brasil (PT-BR).
-    2. A chave 'termo_video' DEVE ser OBRIGATORIAMENTE em INGLÊS com 1 a 3 palavras simples de busca no Pexels (ex: "baking cake", "delicious dessert", "happy woman cooking", "money cash", "smiling chef"). NUNCA use português na chave 'termo_video'.
+    1. A chave 'fala' DEVE ser no idioma: {idioma}.
+    2. A chave 'termo_video' DEVE ser OBRIGATORIAMENTE em INGLÊS com 1 a 3 palavras simples de busca no Pexels (ex: "baking cake", "delicious dessert", "happy woman cooking", "money cash", "smiling chef").
     
     Gere 13 cenas cronológicas (Gancho, História, Revelação do Produto, Prova, Garantia e Oferta).
     Retorne ESTRITAMENTE o JSON:
@@ -430,10 +494,10 @@ def gerar_roteiro_apresentacao_3min_ia(nome_produto: str, nicho: str, promessa: 
         cenas_raw = dados.get("cenas", [])
         return [{"fala": sanitizar_texto(c["fala"]).strip(), "termo_video": sanitizar_texto(c.get("termo_video", "cooking delicious food")).strip()} for c in cenas_raw if c.get("fala")]
     except Exception:
-        return [{"fala": f"Descubra agora o {nome_produto}.", "termo_video": "cooking delicious food"}]
+        return [{"fala": f"Descubra agora: {nome_produto}.", "termo_video": "cooking delicious food"}]
 
 # ==============================================================================
-# 4. RENDERIZAÇÃO E FUSÃO (DUAL TTS ELEVENLABS / OPENAI + BLINDAGEM PEXELS)
+# 4. RENDERIZAÇÃO, FUSÃO & SÍNTESE DE ÁUDIO (ELEVENLABS + OPENAI DUAL MOTOR)
 # ==============================================================================
 def sintetizar_audio_tts(texto: str, output_path: str, voz: str = "Adam (Narrador Persuasivo)") -> bool:
     """Sintetiza áudio via ElevenLabs (DubfyAi padrão) com fallback automático para OpenAI TTS."""
@@ -441,7 +505,7 @@ def sintetizar_audio_tts(texto: str, output_path: str, voz: str = "Adam (Narrado
     if not texto_limpo:
         return False
 
-    # 1. Tenta sintetizar com ElevenLabs
+    # 1. Tenta sintetizar com ElevenLabs (multilíngue nativo v2)
     if ELEVENLABS_API_KEY:
         try:
             voice_id = VOZES_ELEVENLABS.get(voz, "pNInz6obpgDQGcFmaJgB")
@@ -691,7 +755,7 @@ def fundir_videos_com_trilha(
     return output_path
 
 # ==============================================================================
-# 5. GERADOR COMPLETO DE PDFS (MANUAL TÉCNICO & ORDER BUMP)
+# 5. GERADOR COMPLETO DE PDFS (LIVRO TÉCNICO DE 14-16 PÁGINAS & ORDER BUMP MULTILÍNGUE)
 # ==============================================================================
 class NumberedCanvas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
@@ -715,37 +779,135 @@ class NumberedCanvas(canvas.Canvas):
             self.setFont("Helvetica", 9)
             self.setFillColor(colors.HexColor("#64748B"))
             self.drawRightString(letter[0] - 54, 36, f"Página {self._pageNumber} de {page_count}")
-            self.drawString(54, 36, "Manual Técnico Oficial • Todos os Direitos Reservados")
+            self.drawString(54, 36, "Manual Técnico Oficial • DubfyAi Global Publishing")
             self.setStrokeColor(colors.HexColor("#CBD5E1"))
             self.setLineWidth(0.5)
             self.line(54, 48, letter[0] - 54, 48)
 
-def compilar_livro_tecnico_pdf(titulo: str, subtitulo: str, publico: str, caminho_pdf: str):
+def obter_textos_layout(idioma: str) -> dict:
+    lang = idioma.lower()
+    if "ingl" in lang or "engl" in lang:
+        return {
+            "destinatario": "Target Audience", "edicao": "Official Edition", "licenca": "Personal License",
+            "sumario_tit": "TABLE OF CONTENTS", "modulos_label": "Module", "aviso_legal_tit": "LEGAL NOTICE & COPYRIGHT",
+            "aviso_legal_txt": "This technical manual is protected by international copyright laws. No part of this publication may be reproduced without prior written permission.",
+            "conclusao_tit": "ACTION PLAN & CONCLUSION", "plano_30dias": "30-DAY IMPLEMENTATION PLAN",
+            "etapa": "Phase", "acao": "Action", "freq": "Frequency", "checklist_tit": "Action Checklist",
+            "lp_badge": "EXCLUSIVE VIDEO", "lp_unmute": "🔊 TAP TO UNMUTE AUDIO", "lp_btn": "GET INSTANT ACCESS NOW",
+            "lp_garantia": "🔒 100% Secure Checkout • Instant Delivery • 7-Day Guarantee"
+        }
+    elif "espan" in lang or "span" in lang:
+        return {
+            "destinatario": "Público Objetivo", "edicao": "Edición Oficial", "licenca": "Licencia Personal",
+            "sumario_tit": "ÍNDICE EJECUTIVO", "modulos_label": "Módulo", "aviso_legal_tit": "AVISO LEGAL Y DERECHOS",
+            "aviso_legal_txt": "Este manual técnico está protegido por leyes internacionales de derechos de autor. Ninguna parte puede ser reproducida sin autorización expresa.",
+            "conclusao_tit": "PLAN DE ACCIÓN Y CONCLUSIÓN", "plano_30dias": "PLAN DE ACCIÓN DE 30 DÍAS",
+            "etapa": "Fase", "acao": "Acción", "freq": "Frecuencia", "checklist_tit": "Lista de Verificación",
+            "lp_badge": "VIDEO EXCLUSIVO", "lp_unmute": "🔊 TOCA PARA ESCUCHAR EL AUDIO", "lp_btn": "OBTENER MI ACCESO AHORA",
+            "lp_garantia": "🔒 Pago 100% Seguro • Acceso Inmediato • 7 Días de Garantía"
+        }
+    else:
+        return {
+            "destinatario": "Destinatário", "edicao": "Edição Oficial", "licenca": "Licença Individual",
+            "sumario_tit": "SUMÁRIO EXECUTIVO", "modulos_label": "Módulo", "aviso_legal_tit": "AVISO LEGAL E DIREITOS AUTORAIS",
+            "aviso_legal_txt": "Este manual técnico é protegido por leis internacionais de direitos autorais. Nenhuma parte desta publicação pode ser reproduzida sem autorização expressa.",
+            "conclusao_tit": "PLANO DE AÇÃO E CONCLUSÃO", "plano_30dias": "PLANO DE AÇÃO DE 30 DIAS",
+            "etapa": "Fase", "acao": "Ação Recomendada", "freq": "Frequência", "checklist_tit": "Checklist de Verificação",
+            "lp_badge": "VÍDEO EXCLUSIVO", "lp_unmute": "🔊 TOQUE PARA OUVIR O ÁUDIO", "lp_btn": "GARANTIR MEU ACESSO AGORA",
+            "lp_garantia": "🔒 Compra 100% Segura • Acesso Imediato • 7 Dias de Garantia"
+        }
+
+def gerar_conteudo_apostila_ia(titulo: str, publico: str, promessa: str, idioma: str = "Português (Brasil)") -> List[Dict[str, str]]:
+    """Gera o texto denso e detalhado de cada módulo via IA para preencher o livro técnico de 15 páginas."""
+    prompt = f"""
+    Atue como Especialista Sênior e Autor Técnico do DubfyAi Global.
+    Escreva o conteúdo COMPLETO, PROFUNDO e APROFUNDADO de um manual técnico profissional de alto valor (formato livro de implementação comercial).
+    
+    TEMA/PRODUTO: "{titulo}"
+    PÚBLICO-ALVO: "{publico}"
+    PROMESSA: "{promessa}"
+    IDIOMA MANDATÓRIO: {idioma}
+    
+    Gere exatamente 6 módulos aprofundados. Todo o texto deve ser escrito em {idioma}.
+    Retorne ESTRITAMENTE um JSON no formato:
+    {{
+      "modulos": [
+        {{
+          "titulo": "Nome do Módulo",
+          "subtitulo": "Subtítulo do Módulo",
+          "conteudo_p1": "Texto denso com fundamentação técnica e diagnóstico (mínimo de 3 parágrafos aprofundados)...",
+          "conteudo_p2": "Instruções operacionais detalhadas, conceitos-chave e regras práticas (mínimo de 3 parágrafos aprofundados)...",
+          "checklist": "• Passo 1 prático\\n• Passo 2 prático\\n• Passo 3 prático\\n• Passo 4 prático"
+        }}
+      ]
+    }}
+    """
+    try:
+        resp = executar_prompt_ia(prompt, formato_json=True, temperatura=0.3)
+        dados = json.loads(resp)
+        if isinstance(dados, dict) and "modulos" in dados and len(dados["modulos"]) >= 6:
+            return dados["modulos"]
+    except Exception:
+        pass
+
+    # Fallback estruturado caso a API falhe
+    modulos_padrao = [
+        ("Módulo 1: Fundamentos e Diagnóstico Estrutural", "Alinhamento de expectativas e base operacional"),
+        ("Módulo 2: O Mecanismo Central e Metodologia Exclusiva", "A estrutura lógica que viabiliza a entrega de resultados"),
+        ("Módulo 3: Passo a Passo Operacional e Rotina de Execução", "Instruções diárias para aplicar o método sem depender de terceiros"),
+        ("Módulo 4: Controle de Qualidade e Padronização", "Como manter consistência e evitar falhas de produção"),
+        ("Módulo 5: Resolução de Gargalos e Erros Fatais", "O que fazer quando os imprevistos operacionais surgirem"),
+        ("Módulo 6: Escala de Operação e Lucratividade Contínua", "Maximizando a margem de lucro e expandindo a operação")
+    ]
+    return [
+        {
+            "titulo": m[0],
+            "subtitulo": m[1],
+            "conteudo_p1": (
+                "Para construir uma operação lucrativa e previsível, o primeiro passo consiste em dominar os pilares técnicos fundamentais. "
+                "Muitos profissionais falham precocemente por ignorar o diagnóstico inicial de processos, tentando executar sem padronização prévia. "
+                "Ao aplicar as diretrizes contidas neste capítulo, você elimina as variáveis de risco e garante que cada etapa seja reprodutível."
+            ),
+            "conteudo_p2": (
+                "A execução correta exige controle de insumos, tempo de preparo e acompanhamento diário de métricas de rendimento. "
+                "Mantenha registros consistentes de cada ciclo de produção. Os detalhes técnicos que parecem insignificantes no início são "
+                "exatamente os fatores que definem a sustentabilidade do negócio e a retenção dos seus clientes no longo prazo."
+            ),
+            "checklist": "• Definir cronograma semanal de produção\\n• Controlar custos unitários por lote\\n• Padronizar fichas técnicas operacionais\\n• Avaliar satisfação e feedback direto dos clientes"
+        }
+        for m in modulos_padrao
+    ]
+
+def compilar_livro_tecnico_pdf(titulo: str, subtitulo: str, publico: str, caminho_pdf: str, promessa: str = "", idioma: str = "Português (Brasil)"):
     doc = SimpleDocTemplate(
         caminho_pdf,
         pagesize=letter,
         leftMargin=54, rightMargin=54, topMargin=54, bottomMargin=54
     )
     estilos = getSampleStyleSheet()
+    tl = obter_textos_layout(idioma)
 
     estilo_capa_tit = ParagraphStyle("CapaTit", parent=estilos["Title"], fontName="Helvetica-Bold", fontSize=26, leading=32, textColor=colors.HexColor("#0F172A"), alignment=TA_CENTER)
-    estilo_capa_sub = ParagraphStyle("CapaSub", parent=estilos["Normal"], fontName="Helvetica", fontSize=14, leading=18, textColor=colors.HexColor("#334155"), alignment=TA_CENTER)
-    estilo_h1 = ParagraphStyle("H1", parent=estilos["Heading1"], fontName="Helvetica-Bold", fontSize=18, leading=22, textColor=colors.HexColor("#1E3A8A"), spaceBefore=18, spaceAfter=8)
-    estilo_corpo = ParagraphStyle("Corpo", parent=estilos["Normal"], fontName="Helvetica", fontSize=10.5, leading=15, textColor=colors.HexColor("#1E293B"), alignment=TA_JUSTIFY, spaceAfter=8)
+    estilo_capa_sub = ParagraphStyle("CapaSub", parent=estilos["Normal"], fontName="Helvetica", fontSize=13, leading=18, textColor=colors.HexColor("#334155"), alignment=TA_CENTER)
+    estilo_h1 = ParagraphStyle("H1", parent=estilos["Heading1"], fontName="Helvetica-Bold", fontSize=17, leading=21, textColor=colors.HexColor("#1E3A8A"), spaceBefore=12, spaceAfter=6)
+    estilo_h2 = ParagraphStyle("H2", parent=estilos["Heading2"], fontName="Helvetica-Bold", fontSize=12, leading=16, textColor=colors.HexColor("#2563EB"), spaceBefore=8, spaceAfter=4)
+    estilo_corpo = ParagraphStyle("Corpo", parent=estilos["Normal"], fontName="Helvetica", fontSize=10, leading=14.5, textColor=colors.HexColor("#1E293B"), alignment=TA_JUSTIFY, spaceAfter=8)
+    estilo_box = ParagraphStyle("BoxTxt", parent=estilos["Normal"], fontName="Helvetica", fontSize=9.5, leading=13.5, textColor=colors.HexColor("#0F172A"))
 
     flowables = []
 
-    flowables.append(Spacer(1, 80))
+    # 1. CAPA OFICIAL
+    flowables.append(Spacer(1, 90))
     flowables.append(Paragraph(titulo.upper(), estilo_capa_tit))
     flowables.append(Spacer(1, 15))
     flowables.append(HRFlowable(width="60%", thickness=3, color=colors.HexColor("#2563EB"), spaceAfter=20, spaceBefore=10))
     flowables.append(Paragraph(subtitulo, estilo_capa_sub))
-    flowables.append(Spacer(1, 180))
+    flowables.append(Spacer(1, 150))
 
     info_data = [
-        [Paragraph(f"<b>Destinatário:</b> {publico}", estilo_corpo)],
-        [Paragraph(f"<b>Edição:</b> Oficial ({datetime.now().strftime('%Y')})", estilo_corpo)],
-        [Paragraph("<b>Status:</b> Material Protegido e Registrado", estilo_corpo)]
+        [Paragraph(f"<b>{tl['destinatario']}:</b> {publico}", estilo_box)],
+        [Paragraph(f"<b>{tl['edicao']}:</b> Oficial ({datetime.now().strftime('%Y')}) • {tl['licenca']}", estilo_box)],
+        [Paragraph("<b>DubfyAi Global Publishing:</b> Certified Operational Standards", estilo_box)]
     ]
     tab_info = Table(info_data, colWidths=[400])
     tab_info.setStyle(TableStyle([
@@ -756,33 +918,121 @@ def compilar_livro_tecnico_pdf(titulo: str, subtitulo: str, publico: str, caminh
     flowables.append(tab_info)
     flowables.append(PageBreak())
 
-    modulos = [
-        ("1. Introdução & Fundamentos Operacionais", "Este manual técnico foi desenvolvido como um guia de execução imediata para garantir previsibilidade e domínio técnico."),
-        ("2. O Mecanismo Único de Execução", "Compreenda a lógica estrutural que separa amadores de profissionais no setor e implemente com precisão."),
-        ("3. Passo a Passo de Implementação", "A rotina exata a ser seguida desde o primeiro dia de trabalho até a escala dos seus resultados."),
-        ("4. Resolução de Falhas Críticas", "Os maiores gargalos enfrentados na operação diária e como contornar cada um com agilidade."),
-        ("5. Otimização e Escala Contínua", "Como padronizar seus processos para multiplicar resultados com consistência e segurança.")
-    ]
+    # 2. FICHA TÉCNICA E AVISO LEGAL
+    flowables.append(Paragraph(tl['aviso_legal_tit'], estilo_h1))
+    flowables.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#CBD5E1"), spaceAfter=14, spaceBefore=4))
+    flowables.append(Paragraph(tl['aviso_legal_txt'], estilo_corpo))
+    flowables.append(Spacer(1, 12))
+    flowables.append(Paragraph("<b>Registro Internacional de Edição:</b> Este conteúdo foi gerado e registrado sob a licença de operação digital DubfyAi Global, conferindo exclusividade de uso ao titular adquirente.", estilo_corpo))
+    flowables.append(Paragraph("<b>Termo de Conformidade Operacional:</b> A aplicação deste método deve respeitar integralmente os parâmetros de segurança e os checklists recomendados.", estilo_corpo))
+    flowables.append(PageBreak())
 
-    for tit_m, desc_m in modulos:
-        flowables.append(Paragraph(tit_m, estilo_h1))
-        flowables.append(Paragraph(desc_m, estilo_corpo))
-        flowables.append(Paragraph(
-            "Execute cada etapa conforme as orientações e valide os registros semanais de controle para garantir a máxima eficiência do método.",
-            estilo_corpo
-        ))
+    # 3. SUMÁRIO EXECUTIVO
+    modulos_conteudo = gerar_conteudo_apostila_ia(titulo, publico, promessa, idioma=idioma)
+    flowables.append(Paragraph(tl['sumario_tit'], estilo_h1))
+    flowables.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#CBD5E1"), spaceAfter=14, spaceBefore=4))
+    
+    sumario_linhas = []
+    for idx, mod in enumerate(modulos_conteudo, 1):
+        tit_m = sanitizar_texto(mod.get("titulo", f"Módulo {idx}"))
+        sumario_linhas.append([f"0{idx}." if idx < 10 else f"{idx}.", tit_m])
+
+    tab_sumario = Table([[Paragraph(f"<b>{num}</b>", estilo_box), Paragraph(tit, estilo_box)] for num, tit in sumario_linhas], colWidths=[35, 465])
+    tab_sumario.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor("#F1F5F9")),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#CBD5E1")),
+        ('PADDING', (0,0), (-1,-1), 8),
+    ]))
+    flowables.append(tab_sumario)
+    flowables.append(Spacer(1, 15))
+    flowables.append(Paragraph("<b>METODOLOGIA DE APLICAÇÃO:</b> Siga os capítulos em ordem cronológica e certifique-se de preencher todos os checklists antes de iniciar o módulo subsequente.", estilo_corpo))
+    flowables.append(PageBreak())
+
+    # 4. CAPÍTULOS DE 1 A 6 (CADA CAPÍTULO GERA 2 PÁGINAS DEDICADAS -> TOTAL 12 PÁGINAS DE CONTEÚDO)
+    for idx, mod in enumerate(modulos_conteudo, 1):
+        tit_m = sanitizar_texto(mod.get("titulo", f"Módulo {idx}"))
+        sub_m = sanitizar_texto(mod.get("subtitulo", "Instruções Técnicas"))
+        p1 = sanitizar_texto(mod.get("conteudo_p1", ""))
+        p2 = sanitizar_texto(mod.get("conteudo_p2", ""))
+        chk = sanitizar_texto(mod.get("checklist", ""))
+
+        # PÁGINA A DO MÓDULO: FUNDAMENTAÇÃO E CONCEITOS
+        flowables.append(Paragraph(f"CAPÍTULO {idx}: {tit_m.upper()}", estilo_h1))
+        flowables.append(Paragraph(sub_m, estilo_h2))
+        flowables.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#2563EB"), spaceAfter=14, spaceBefore=4))
+        flowables.append(Paragraph("<b>1.1 Diagnóstico Estrutural & Parâmetros Iniciais:</b>", estilo_h2))
+        flowables.append(Paragraph(p1, estilo_corpo))
         flowables.append(Spacer(1, 10))
+        flowables.append(Paragraph("<b>1.2 Diretrizes Técnicas de Execução:</b>", estilo_h2))
+        flowables.append(Paragraph(p2, estilo_corpo))
+        flowables.append(PageBreak())
+
+        # PÁGINA B DO MÓDULO: PROCEDIMENTO, TABELA E CHECKLIST
+        flowables.append(Paragraph(f"ROTEIRO DE EXECUÇÃO: {tit_m.upper()}", estilo_h1))
+        flowables.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#2563EB"), spaceAfter=14, spaceBefore=4))
+        flowables.append(Paragraph("<b>2.1 Tabela de Indicadores & Frequência:</b>", estilo_h2))
+        dados_tabela = [
+            [Paragraph(f"<b>{tl['etapa']}</b>", estilo_box), Paragraph(f"<b>{tl['acao']}</b>", estilo_box), Paragraph(f"<b>{tl['freq']}</b>", estilo_box)],
+            [Paragraph("Fase 1", estilo_box), Paragraph("Revisão dos parâmetros e preparação de insumos", estilo_box), Paragraph("Diária", estilo_box)],
+            [Paragraph("Fase 2", estilo_box), Paragraph("Execução do protocolo operacional com medição técnica", estilo_box), Paragraph("Por ciclo", estilo_box)],
+            [Paragraph("Fase 3", estilo_box), Paragraph("Auditoria de qualidade, entrega e registro de métricas", estilo_box), Paragraph("Semanal", estilo_box)],
+        ]
+        t = Table(dados_tabela, colWidths=[80, 300, 120])
+        t.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#E2E8F0")),
+            ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#CBD5E1")),
+            ('PADDING', (0,0), (-1,-1), 6),
+        ]))
+        flowables.append(t)
+        flowables.append(Spacer(1, 15))
+
+        if chk:
+            flowables.append(Paragraph(f"<b>2.2 {tl['checklist_tit']}:</b>", estilo_h2))
+            chk_itens = [linha.strip() for linha in chk.split("\n") if linha.strip()]
+            tab_chk_dados = [["[  ]", Paragraph(item.replace("•", "").strip(), estilo_box)] for item in chk_itens]
+            tab_chk = Table(tab_chk_dados, colWidths=[30, 470])
+            tab_chk.setStyle(TableStyle([
+                ('BACKGROUND', (0,0), (-1,-1), colors.HexColor("#F8FAFC")),
+                ('BOX', (0,0), (-1,-1), 1, colors.HexColor("#CBD5E1")),
+                ('PADDING', (0,0), (-1,-1), 6),
+                ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ]))
+            flowables.append(tab_chk)
+
+        flowables.append(PageBreak())
+
+    # 5. PÁGINA FINAL: CONCLUSÃO & PLANO DE AÇÃO DE 30 DIAS
+    flowables.append(Paragraph(tl['conclusao_tit'], estilo_h1))
+    flowables.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#10B981"), spaceAfter=14, spaceBefore=4))
+    flowables.append(Paragraph(
+        "Parabéns por concluir o estudo de todas as etapas deste manual técnico. A previsibilidade dos seus resultados será fruto direto da consistência na aplicação diária dos checklists.",
+        estilo_corpo
+    ))
+    flowables.append(Spacer(1, 15))
+
+    quadro_final = [
+        [Paragraph(f"<b>{tl['plano_30dias']}:</b>", estilo_box)],
+        [Paragraph("• <b>Semana 1:</b> Configuração do ambiente, alinhamento técnico e validação dos processos.<br/>• <b>Semana 2:</b> Primeiras aplicações práticas com controle de qualidade e registros.<br/>• <b>Semana 3:</b> Otimização de margens, redução de gargalos e refinamento do método.<br/>• <b>Semana 4:</b> Escala de aquisição e alavancagem contínua dos resultados.", estilo_box)]
+    ]
+    tab_final = Table(quadro_final, colWidths=[400])
+    tab_final.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor("#ECFDF5")),
+        ('BOX', (0,0), (-1,-1), 1, colors.HexColor("#10B981")),
+        ('PADDING', (0,0), (-1,-1), 12),
+    ]))
+    flowables.append(tab_final)
 
     doc.build(flowables, canvasmaker=NumberedCanvas)
     return caminho_pdf
 
-def compilar_order_bump_pdf(titulo: str, caminho_pdf: str):
+def compilar_order_bump_pdf(titulo: str, caminho_pdf: str, idioma: str = "Português (Brasil)"):
     doc = SimpleDocTemplate(
         caminho_pdf,
         pagesize=letter,
         leftMargin=54, rightMargin=54, topMargin=54, bottomMargin=54
     )
     estilos = getSampleStyleSheet()
+    tl = obter_textos_layout(idioma)
 
     estilo_tit = ParagraphStyle("TitCheck", parent=estilos["Title"], fontName="Helvetica-Bold", fontSize=22, leading=26, textColor=colors.HexColor("#065F46"), alignment=TA_CENTER)
     estilo_sub = ParagraphStyle("SubCheck", parent=estilos["Normal"], fontName="Helvetica", fontSize=12, leading=16, textColor=colors.HexColor("#047857"), alignment=TA_CENTER)
@@ -790,18 +1040,18 @@ def compilar_order_bump_pdf(titulo: str, caminho_pdf: str):
 
     flowables = []
     flowables.append(Spacer(1, 20))
-    flowables.append(Paragraph("CHECKLIST OFICIAL & GUIA RÁPIDO", estilo_tit))
+    flowables.append(Paragraph(f"{tl['checklist_tit'].upper()} & GUIA DE EXECUÇÃO", estilo_tit))
     flowables.append(Spacer(1, 8))
-    flowables.append(Paragraph(f"Material Complementar: {titulo}", estilo_sub))
+    flowables.append(Paragraph(f"Material Complementar de Alto Valor: {titulo}", estilo_sub))
     flowables.append(Spacer(1, 15))
     flowables.append(HRFlowable(width="100%", thickness=2, color=colors.HexColor("#10B981"), spaceAfter=20, spaceBefore=5))
 
     checklist_dados = [
-        ["[  ]", Paragraph("<b>Fase 1: Preparação</b> - Revisão das ferramentas e validação dos requisitos iniciais.", estilo_item)],
-        ["[  ]", Paragraph("<b>Fase 2: Configuração</b> - Implementação do método conforme o protocolo técnico.", estilo_item)],
-        ["[  ]", Paragraph("<b>Fase 3: Teste de Consistência</b> - Verificação de falhas e ajuste fino dos parâmetros.", estilo_item)],
-        ["[  ]", Paragraph("<b>Fase 4: Lançamento Operacional</b> - Ativação oficial e monitoramento em tempo real.", estilo_item)],
-        ["[  ]", Paragraph("<b>Fase 5: Rotina de Manutenção</b> - Check diário de indicadores para garantir estabilidade.", estilo_item)]
+        ["[  ]", Paragraph("<b>Fase 1: Preparação & Pré-Requisitos</b> - Verificação rigorosa dos insumos e setup de trabalho.", estilo_item)],
+        ["[  ]", Paragraph("<b>Fase 2: Implementação do Protocolo</b> - Aplicação do método passo a passo conforme os módulos técnicos.", estilo_item)],
+        ["[  ]", Paragraph("<b>Fase 3: Teste de Consistência</b> - Auditoria de qualidade para assegurar padrão elevado sem falhas.", estilo_item)],
+        ["[  ]", Paragraph("<b>Fase 4: Lançamento & Entrega</b> - Ativação oficial para clientes com acompanhamento dos indicadores.", estilo_item)],
+        ["[  ]", Paragraph("<b>Fase 5: Rotina de Otimização</b> - Revisão periódica para multiplicar margem e escalar a operação.", estilo_item)]
     ]
 
     tab = Table(checklist_dados, colWidths=[35, 465])
@@ -814,7 +1064,7 @@ def compilar_order_bump_pdf(titulo: str, caminho_pdf: str):
     ]))
     flowables.append(tab)
     flowables.append(Spacer(1, 30))
-    flowables.append(Paragraph("💡 <i>Dica: Imprima esta folha ou use no tablet para checar cada etapa concluída diariamente.</i>", estilo_item))
+    flowables.append(Paragraph("💡 <i>Dica DubfyAi: Imprima este checklist ou use no dispositivo para marcar cada marco atingido.</i>", estilo_item))
 
     doc.build(flowables)
     return caminho_pdf
@@ -876,7 +1126,8 @@ def disparar_campanha_tiktok_completa(
 
     return {"video_id": video_id, "campaign_id": campaign_id, "adgroup_id": adgroup_id, "ad_id": res_ad["data"]["ad_ids"][0]}
 
-def gerar_html_landing_page(titulo: str, promessa: str, url_video_mp4: str, link_kiwify: str, delay_segundos: int = 147, pixel_id: str = "") -> str:
+def gerar_html_landing_page(titulo: str, promessa: str, url_video_mp4: str, link_kiwify: str, delay_segundos: int = 147, pixel_id: str = "", idioma: str = "Português (Brasil)") -> str:
+    tl = obter_textos_layout(idioma)
     script_pixel = f"""
     !function (w, d, t) {{
       w.TiktokAnalyticsObject=t;var tt=w[t]=w[t]||[];tt.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie"],tt.setAndDefer=function(t,e){{t[e]=function(){{t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}}};for(var i=0;i<tt.methods.length;i++)tt.setAndDefer(tt,tt.methods[i]);tt.instance=function(t){{for(var e=tt._i[t]||[],n=0;n<tt.methods.length;n++)tt.setAndDefer(e,tt.methods[n]);return e}},tt.load=function(e,n){{var i="https://analytics.tiktok.com/i18n/pixel/events.js";tt._i=tt._i||{{}},tt._i[e]=[],tt._i[e]._u=i,tt._t=tt._t||{{}},tt._t[e]=+new Date,tt._o=tt._o||{{}},tt._o[e]=n||{{}};var o=document.createElement("script");o.type="text/javascript",o.async=!0,o.src=i+"?type=plugins&sdkid="+e;var a=document.getElementsByTagName("script")[0];a.parentNode.insertBefore(o,a)}};
@@ -909,19 +1160,19 @@ def gerar_html_landing_page(titulo: str, promessa: str, url_video_mp4: str, link
 </head>
 <body>
   <div class="container">
-    <div class="badge">VÍDEO EXCLUSIVO</div>
+    <div class="badge">{tl['lp_badge']}</div>
     <h1>{promessa}</h1>
     <div class="video-wrapper">
       <div id="unmuteOverlay" class="unmute-overlay">
-        <div class="unmute-btn">🔊 TOQUE PARA OUVIR O ÁUDIO</div>
+        <div class="unmute-btn">{tl['lp_unmute']}</div>
       </div>
       <video id="vslVideo" playsinline autoplay muted preload="auto">
         <source src="{url_video_mp4}" type="video/mp4">
       </video>
     </div>
     <div id="oferta-container">
-      <a href="{link_kiwify}" id="checkoutBtn" class="btn-checkout">GARANTIR MEU ACESSO AGORA</a>
-      <div class="garantia">🔒 Compra 100% Segura • Acesso Imediato • 7 Dias de Garantia</div>
+      <a href="{link_kiwify}" id="checkoutBtn" class="btn-checkout">{tl['lp_btn']}</a>
+      <div class="garantia">{tl['lp_garantia']}</div>
     </div>
   </div>
   <script>
@@ -979,6 +1230,7 @@ def gerar_html_landing_page(titulo: str, promessa: str, url_video_mp4: str, link
 # ESTADOS GLOBAIS E SINCRONIZAÇÃO
 # ==============================================================================
 ESTADOS_INICIAIS = {
+    "idioma_funil_ativo": "Português (Brasil)",
     "nicho_pesquisado_nome": "Confeitaria Lucrativa & Bolos Caseiros",
     "miner_nome_produto": "Método Confeitaria Lucrativa & Bolos Caseiros",
     "miner_promessa": "Domine as receitas mais pedidas e fature da cozinha da sua casa",
@@ -999,7 +1251,9 @@ ESTADOS_INICIAIS = {
     "ap_prod_oferta": "Apenas R$ 97,00 com acesso vitalício, 3 bônus exclusivos e 7 dias de garantia",
     "ap_marca_dagua": "",
     "ebook_input_tema": "Manual Prático: Confeitaria Lucrativa & Bolos Caseiros",
-    "ebook_input_publico": "Mulheres e empreendedoras que buscam renda extra com doces"
+    "ebook_input_publico": "Mulheres e empreendedoras que buscam renda extra com doces",
+    "roteiro_vsl_salvo": [],
+    "roteiro_pitch_salvo": []
 }
 
 for k_init, v_init in ESTADOS_INICIAIS.items():
@@ -1027,11 +1281,23 @@ def sincronizar_campos_mineracao():
     st.session_state["ebook_input_publico"] = pub
 
 # ==============================================================================
-# SIDEBAR COM STATUS DO ELEVENLABS E TODAS AS CONEXÕES
+# SIDEBAR COM GESTÃO DE IDIOMA GLOBAL, ELEVENLABS E CONEXÕES
 # ==============================================================================
 with st.sidebar:
     st.markdown("## ⚡ Central DubfyAi & VSL")
     st.caption("Automação de Produtos Digitais & Escala Internacional")
+    st.markdown("---")
+
+    # SELETOR GLOBAL DE IDIOMA DO DUBFYAI
+    st.markdown("##### 🌍 Idioma Principal do Funil:")
+    idx_idioma_padrao = IDIOMAS_DISPONIVEIS.index(st.session_state["idioma_funil_ativo"]) if st.session_state["idioma_funil_ativo"] in IDIOMAS_DISPONIVEIS else 0
+    idioma_funil_sel = st.selectbox(
+        "Selecione o Mercado / Idioma Alvo:",
+        IDIOMAS_DISPONIVEIS,
+        index=idx_idioma_padrao,
+        key="sb_idioma_sel"
+    )
+    st.session_state["idioma_funil_ativo"] = idioma_funil_sel
     st.markdown("---")
 
     if "email_usuario_ativo" not in st.session_state:
@@ -1071,11 +1337,11 @@ tab_minerador, tab_vsl, tab_apresentacao, tab_fusao, tab_ebook, tab_ads, tab_mas
 ])
 
 # ------------------------------------------------------------------------------
-# ABA 1: MINERADOR & GOOGLE ADS
+# ABA 1: MINERADOR & GOOGLE ADS COM TRADUÇÃO MULTILÍNGUE
 # ------------------------------------------------------------------------------
 with tab_minerador:
     st.markdown("## 🔍 1. Minerador de Nicho Estratégico & Google Ads")
-    col_m1, col_m2 = st.columns([2, 1])
+    col_m1, col_m2, col_m3 = st.columns([2, 1, 1.2])
     with col_m1:
         nicho_sel = st.selectbox("Selecione um Nicho ou Digite:", [
             "🎂 Confeitaria Lucrativa & Bolos Caseiros",
@@ -1086,17 +1352,20 @@ with tab_minerador:
         ])
     with col_m2:
         profundidade = st.selectbox("Profundidade:", ["Dossiê Completo", "Raio-X Rápido"])
+    with col_m3:
+        idx_id_miner = IDIOMAS_DISPONIVEIS.index(st.session_state["idioma_funil_ativo"]) if st.session_state["idioma_funil_ativo"] in IDIOMAS_DISPONIVEIS else 0
+        idioma_miner = st.selectbox("Idioma da Análise:", IDIOMAS_DISPONIVEIS, index=idx_id_miner, key="idioma_miner_sel")
 
     nicho_final = nicho_sel
     if "Manual" in nicho_sel:
         nicho_manual = st.text_input("Digite o Nicho:")
         if nicho_manual.strip(): nicho_final = nicho_manual.strip()
 
-    col_btn_m1, col_btn_m2 = st.columns(2)
+    col_btn_m1, col_btn_m2, col_btn_m3 = st.columns([1.5, 1.5, 1.2])
     with col_btn_m1:
-        if st.button("🚀 Analisar Nicho & Gerar Campos Automáticos", type="primary", use_container_width=True):
-            with st.spinner("Minerando mercado em Português..."):
-                res_m = minerar_nicho_profundo_ia(nicho_final, profundidade)
+        if st.button("🚀 Analisar Nicho & Gerar no Idioma Selecionado", type="primary", use_container_width=True):
+            with st.spinner(f"Minerando mercado em {idioma_miner}..."):
+                res_m = minerar_nicho_profundo_ia(nicho_final, profundidade, idioma=idioma_miner)
                 st.session_state["nicho_pesquisado_nome"] = nicho_final
                 st.session_state["miner_nome_produto"] = res_m.get("nome_produto", nicho_final)
                 st.session_state["miner_promessa"] = res_m.get("grande_promessa", "")
@@ -1107,13 +1376,26 @@ with tab_minerador:
                 st.session_state["miner_gads"] = res_m.get("campanha_google_ads", "")
                 st.session_state["miner_dossie"] = res_m.get("dossie_markdown", "")
                 sincronizar_campos_mineracao()
-                st.success("✅ Nicho minerado com sucesso!")
+                st.success(f"✅ Análise de mercado concluída em {idioma_miner}!")
                 st.rerun()
 
     with col_btn_m2:
         if st.button("🔄 Sincronizar Alterações com Todas as Abas", use_container_width=True):
             sincronizar_campos_mineracao()
             st.success("✅ Todas as abas sincronizadas com os dados atuais!")
+
+    with col_btn_m3:
+        if st.button("🌐 Traduzir Análise Atual", use_container_width=True):
+            with st.spinner(f"Traduzindo campos para {idioma_miner}..."):
+                st.session_state["miner_nome_produto"] = traduzir_conteudo_ia(st.session_state.get("miner_nome_produto", ""), idioma_miner)
+                st.session_state["miner_promessa"] = traduzir_conteudo_ia(st.session_state.get("miner_promessa", ""), idioma_miner)
+                st.session_state["miner_publico"] = traduzir_conteudo_ia(st.session_state.get("miner_publico", ""), idioma_miner)
+                st.session_state["miner_mecanismo"] = traduzir_conteudo_ia(st.session_state.get("miner_mecanismo", ""), idioma_miner)
+                st.session_state["miner_oferta"] = traduzir_conteudo_ia(st.session_state.get("miner_oferta", ""), idioma_miner)
+                st.session_state["miner_dores"] = traduzir_conteudo_ia(st.session_state.get("miner_dores", ""), idioma_miner)
+                sincronizar_campos_mineracao()
+                st.success(f"✅ Campos traduzidos para {idioma_miner}!")
+                st.rerun()
 
     st.markdown("---")
     col_ed1, col_ed2 = st.columns(2)
@@ -1131,34 +1413,55 @@ with tab_minerador:
         st.markdown(st.session_state.get("miner_dossie", ""))
 
 # ------------------------------------------------------------------------------
-# ABA 2: VSL CURTA (27S) COM VOZES ELEVENLABS E DOWNLOAD DIRETO
+# ABA 2: VSL CURTA (27S) COM SISTEMA DE TRADUÇÃO DUBFYAI & ELEVENLABS
 # ------------------------------------------------------------------------------
 with tab_vsl:
     st.markdown("## 🚀 2. Criador de VSL Curta (27s - Criativo de Anúncio)")
+    st.caption("Crie criativos para anúncios locais ou internacionais com tradução instantânea e vozes realistas do ElevenLabs.")
+
+    col_v_lang1, col_v_lang2 = st.columns([1.5, 2.5])
+    with col_v_lang1:
+        idx_id_vsl = IDIOMAS_DISPONIVEIS.index(st.session_state["idioma_funil_ativo"]) if st.session_state["idioma_funil_ativo"] in IDIOMAS_DISPONIVEIS else 0
+        idioma_vsl = st.selectbox("Idioma da Locução do Criativo:", IDIOMAS_DISPONIVEIS, index=idx_id_vsl, key="idioma_vsl_sel")
+    with col_v_lang2:
+        vozes_disponiveis = list(VOZES_ELEVENLABS.keys()) + ["onyx", "alloy", "echo", "nova"]
+        voz_vsl = st.selectbox("Locução (ElevenLabs Multilíngue / DubfyAi):", vozes_disponiveis, index=0)
+
     col_v1, col_v2 = st.columns(2)
     with col_v1:
         tema_vsl = st.text_input("Tema / Produto:", key="vsl_input_tema")
         promessa_vsl = st.text_input("Promessa:", key="vsl_input_promessa")
-        vozes_disponiveis = list(VOZES_ELEVENLABS.keys()) + ["onyx", "alloy", "echo", "nova"]
-        voz_vsl = st.selectbox("Locução do Criativo (ElevenLabs / DubfyAi):", vozes_disponiveis, index=0)
     with col_v2:
         publico_vsl = st.text_input("Público-Alvo:", key="vsl_input_publico")
         marca_vsl = st.text_input("Marca d'água no Vídeo:", value=st.session_state.get("vsl_marca_ativa", ""))
         plat_vsl = st.selectbox("Formato do Criativo:", list(PRESETS_PLATAFORMAS.keys()), index=0)
 
-    if st.button("🎬 Gerar e Renderizar VSL Curta (20 cr)", type="primary", use_container_width=True):
-        if saldo_atual < 20:
-            st.error("❌ Saldo insuficiente!")
-        else:
-            barra = st.progress(0.0)
-            with st.spinner("Gerando roteiro e sintetizando locução realista DubfyAi..."):
-                cenas = gerar_roteiro_vsl_ia(tema_vsl, promessa_vsl, publico_vsl, 5)
-                v_pronto = renderizar_vsl_completa(cenas, plat_vsl, voz_vsl, PEXELS_API_KEY, marca_dagua=marca_vsl, progress_bar=barra)
-                debitar_creditos_cloud(email_usuario, "VSL Curta", 20)
-                st.session_state["video_vsl_pronto"] = v_pronto
-                st.session_state["vsl_marca_ativa"] = marca_vsl
-                st.success("✅ VSL Curta finalizada com locução realista e áudio estéreo!")
-                st.rerun()
+    col_btn_v1, col_btn_v2 = st.columns([2, 1])
+    with col_btn_v1:
+        if st.button("🎬 Gerar e Renderizar VSL Curta (20 cr)", type="primary", use_container_width=True):
+            if saldo_atual < 20:
+                st.error("❌ Saldo insuficiente!")
+            else:
+                barra = st.progress(0.0)
+                with st.spinner(f"Gerando roteiro em {idioma_vsl} e sintetizando com ElevenLabs..."):
+                    cenas = gerar_roteiro_vsl_ia(tema_vsl, promessa_vsl, publico_vsl, 5, idioma=idioma_vsl)
+                    st.session_state["roteiro_vsl_salvo"] = cenas
+                    v_pronto = renderizar_vsl_completa(cenas, plat_vsl, voz_vsl, PEXELS_API_KEY, marca_dagua=marca_vsl, progress_bar=barra)
+                    debitar_creditos_cloud(email_usuario, f"VSL Curta ({idioma_vsl})", 20)
+                    st.session_state["video_vsl_pronto"] = v_pronto
+                    st.session_state["vsl_marca_ativa"] = marca_vsl
+                    st.success(f"✅ VSL Curta finalizada com áudio estéreo em {idioma_vsl}!")
+                    st.rerun()
+
+    with col_btn_v2:
+        if st.button("🌐 Traduzir Roteiro Atual", use_container_width=True):
+            cenas_atuais = st.session_state.get("roteiro_vsl_salvo", [])
+            if not cenas_atuais:
+                cenas_atuais = gerar_roteiro_vsl_ia(tema_vsl, promessa_vsl, publico_vsl, 5, idioma="Português (Brasil)")
+            with st.spinner(f"Traduzindo cenas para {idioma_vsl}..."):
+                cenas_tr = traduzir_cenas_vsl_ia(cenas_atuais, idioma_vsl)
+                st.session_state["roteiro_vsl_salvo"] = cenas_tr
+                st.success(f"✅ Roteiro traduzido com sucesso para {idioma_vsl}!")
 
     caminho_vsl_pronto = st.session_state.get("video_vsl_pronto")
     if caminho_vsl_pronto and os.path.exists(caminho_vsl_pronto):
@@ -1171,44 +1474,65 @@ with tab_vsl:
             bytes_vsl = arq_vsl.read()
             st.video(bytes_vsl, format="video/mp4")
             st.download_button(
-                label="⬇️ Baixar Vídeo MP4 no Computador (27s)",
+                label=f"⬇️ Baixar Vídeo MP4 no Computador (27s - {idioma_vsl})",
                 data=bytes_vsl,
-                file_name="vsl_curta_27s.mp4",
+                file_name=f"vsl_curta_{idioma_vsl[:2].lower()}.mp4",
                 mime="video/mp4",
                 type="primary",
                 use_container_width=True
             )
 
 # ------------------------------------------------------------------------------
-# ABA 3: APRESENTAÇÃO 3 MIN COM VOZES ELEVENLABS E DOWNLOAD DIRETO
+# ABA 3: APRESENTAÇÃO 3 MIN COM SISTEMA DE TRADUÇÃO DUBFYAI & ELEVENLABS
 # ------------------------------------------------------------------------------
 with tab_apresentacao:
     st.markdown("## 🎥 3. Apresentação Longa (Pitch de 3 Minutos)")
+    st.caption("Gere a apresentação oficial de vendas (VSL longa) no idioma que desejar com locução humana ultra-realista.")
+
+    col_ap_lang1, col_ap_lang2 = st.columns([1.5, 2.5])
+    with col_ap_lang1:
+        idx_id_ap = IDIOMAS_DISPONIVEIS.index(st.session_state["idioma_funil_ativo"]) if st.session_state["idioma_funil_ativo"] in IDIOMAS_DISPONIVEIS else 0
+        idioma_ap = st.selectbox("Idioma da Apresentação:", IDIOMAS_DISPONIVEIS, index=idx_id_ap, key="idioma_ap_sel")
+    with col_ap_lang2:
+        vozes_ap_disp = list(VOZES_ELEVENLABS.keys()) + ["onyx", "alloy", "echo", "nova"]
+        voz_ap = st.selectbox("Locução do Pitch (ElevenLabs / DubfyAi):", vozes_ap_disp, index=0, key="voz_ap_sel")
+
     col_ap1, col_ap2 = st.columns(2)
     with col_ap1:
         p_nome = st.text_input("Nome do Produto:", key="ap_prod_nome")
         p_nicho = st.text_input("Nicho:", key="ap_prod_nicho")
         p_prom = st.text_input("Promessa Central:", key="ap_prod_promessa")
-        vozes_ap_disp = list(VOZES_ELEVENLABS.keys()) + ["onyx", "alloy", "echo", "nova"]
-        voz_ap = st.selectbox("Locução do Pitch (ElevenLabs / DubfyAi):", vozes_ap_disp, index=0, key="voz_ap_sel")
     with col_ap2:
         p_pub = st.text_input("Público-Alvo:", key="ap_prod_publico")
         p_oft = st.text_input("Oferta / CTA:", key="ap_prod_oferta")
         m_ap = st.text_input("Marca d'água no Vídeo:", value=st.session_state.get("vsl_marca_ativa", ""), key="marca_ap_input")
         plat_ap = st.selectbox("Formato da Apresentação:", list(PRESETS_PLATAFORMAS.keys()), index=0, key="plat_ap_sel")
 
-    if st.button("🎬 Gerar e Renderizar Apresentação de 3 Minutos (30 cr)", type="primary", use_container_width=True):
-        if saldo_atual < 30:
-            st.error("❌ Saldo insuficiente!")
-        else:
-            barra_ap = st.progress(0.0)
-            with st.spinner("Gerando 13 cenas e sintetizando pitch com locução ElevenLabs..."):
-                cenas_p = gerar_roteiro_apresentacao_3min_ia(p_nome, p_nicho, p_prom, p_pub, p_oft)
-                v_pitch = renderizar_vsl_completa(cenas_p, plat_ap, voz_ap, PEXELS_API_KEY, marca_dagua=m_ap, progress_bar=barra_ap)
-                debitar_creditos_cloud(email_usuario, "Apresentação Pitch", 30)
-                st.session_state["video_pitch_pronto"] = v_pitch
-                st.success("✅ Apresentação de 3 minutos pronta com locução ultra-realista!")
-                st.rerun()
+    col_btn_ap1, col_btn_ap2 = st.columns([2, 1])
+    with col_btn_ap1:
+        if st.button("🎬 Gerar e Renderizar Apresentação de 3 Minutos (30 cr)", type="primary", use_container_width=True):
+            if saldo_atual < 30:
+                st.error("❌ Saldo insuficiente!")
+            else:
+                barra_ap = st.progress(0.0)
+                with st.spinner(f"Gerando 13 cenas em {idioma_ap} e sintetizando pitch com ElevenLabs..."):
+                    cenas_p = gerar_roteiro_apresentacao_3min_ia(p_nome, p_nicho, p_prom, p_pub, p_oft, idioma=idioma_ap)
+                    st.session_state["roteiro_pitch_salvo"] = cenas_p
+                    v_pitch = renderizar_vsl_completa(cenas_p, plat_ap, voz_ap, PEXELS_API_KEY, marca_dagua=m_ap, progress_bar=barra_ap)
+                    debitar_creditos_cloud(email_usuario, f"Apresentação Pitch ({idioma_ap})", 30)
+                    st.session_state["video_pitch_pronto"] = v_pitch
+                    st.success(f"✅ Apresentação de 3 minutos pronta com áudio estéreo em {idioma_ap}!")
+                    st.rerun()
+
+    with col_btn_ap2:
+        if st.button("🌐 Traduzir Pitch Atual", use_container_width=True):
+            cenas_pitch_atuais = st.session_state.get("roteiro_pitch_salvo", [])
+            if not cenas_pitch_atuais:
+                cenas_pitch_atuais = gerar_roteiro_apresentacao_3min_ia(p_nome, p_nicho, p_prom, p_pub, p_oft, idioma="Português (Brasil)")
+            with st.spinner(f"Traduzindo pitch para {idioma_ap}..."):
+                cenas_p_tr = traduzir_cenas_vsl_ia(cenas_pitch_atuais, idioma_ap)
+                st.session_state["roteiro_pitch_salvo"] = cenas_p_tr
+                st.success(f"✅ Pitch traduzido com sucesso para {idioma_ap}!")
 
     caminho_pitch_pronto = st.session_state.get("video_pitch_pronto")
     if caminho_pitch_pronto and os.path.exists(caminho_pitch_pronto):
@@ -1221,9 +1545,9 @@ with tab_apresentacao:
             bytes_pitch = arq_pitch.read()
             st.video(bytes_pitch, format="video/mp4")
             st.download_button(
-                label="⬇️ Baixar Apresentação MP4 no Computador (3 Min)",
+                label=f"⬇️ Baixar Apresentação MP4 no Computador (3 Min - {idioma_ap})",
                 data=bytes_pitch,
-                file_name="apresentacao_3min.mp4",
+                file_name=f"apresentacao_3min_{idioma_ap[:2].lower()}.mp4",
                 mime="video/mp4",
                 type="primary",
                 use_container_width=True
@@ -1304,11 +1628,18 @@ with tab_fusao:
             )
 
 # ------------------------------------------------------------------------------
-# ABA 5: LIVRO TÉCNICO & ORDER BUMP (REPORTLAB COMPLETO)
+# ABA 5: LIVRO TÉCNICO COMPLETO (14-16 PÁGINAS) & ORDER BUMP MULTILÍNGUE
 # ------------------------------------------------------------------------------
 with tab_ebook:
     st.markdown("## 📚 5. Entrega Digital (.PDF) & Order Bump")
-    st.caption("Gera o arquivo de entrega técnica e o checklist de order bump formatados para envio imediato na Kiwify.")
+    st.caption("Compila o livro técnico completo com 14 a 16 páginas estruturadas e o checklist complementar no idioma selecionado.")
+
+    col_eb_lang1, col_eb_lang2 = st.columns([1.5, 2.5])
+    with col_eb_lang1:
+        idx_id_eb = IDIOMAS_DISPONIVEIS.index(st.session_state["idioma_funil_ativo"]) if st.session_state["idioma_funil_ativo"] in IDIOMAS_DISPONIVEIS else 0
+        idioma_ebook = st.selectbox("Idioma do Livro Digital:", IDIOMAS_DISPONIVEIS, index=idx_id_eb, key="idioma_eb_sel")
+    with col_eb_lang2:
+        chk_bump = st.checkbox("Incluir Order Bump (Checklist de Implementação Rápida)", value=True)
 
     col_eb1, col_eb2 = st.columns(2)
     with col_eb1:
@@ -1316,20 +1647,20 @@ with tab_ebook:
         sub_eb = st.text_input("Subtítulo da Capa:", value="Guia Prático Operacional Passo a Passo")
     with col_eb2:
         p_eb = st.text_input("Público-Alvo:", key="ebook_input_publico")
-        chk_bump = st.checkbox("Incluir Order Bump (Checklist de Implementação Rápida)", value=True)
 
-    if st.button("📖 Compilar Kit Digital Completo (.PDF)", type="primary", use_container_width=True):
-        with st.spinner("Diagramando manual técnico e gerando páginas..."):
+    if st.button("📖 Compilar Kit Digital Completo (14-16 Páginas)", type="primary", use_container_width=True):
+        with st.spinner(f"Escrevendo capítulos em {idioma_ebook} e diagramando manual técnico de 15 páginas..."):
             p_pdf_manual = os.path.join(DIR_EBOOKS, f"manual_tecnico_{int(time.time())}.pdf")
-            compilar_livro_tecnico_pdf(t_eb, sub_eb, p_eb, p_pdf_manual)
+            promessa_atual = st.session_state.get("miner_promessa", "Método Prático e Lucrativo")
+            compilar_livro_tecnico_pdf(t_eb, sub_eb, p_eb, p_pdf_manual, promessa=promessa_atual, idioma=idioma_ebook)
             st.session_state["pdf_manual_gerado"] = p_pdf_manual
 
             if chk_bump:
                 p_pdf_bump = os.path.join(DIR_EBOOKS, f"order_bump_{int(time.time())}.pdf")
-                compilar_order_bump_pdf(t_eb, p_pdf_bump)
+                compilar_order_bump_pdf(t_eb, p_pdf_bump, idioma=idioma_ebook)
                 st.session_state["pdf_bump_gerado"] = p_pdf_bump
 
-            st.success("✅ Kit de entrega digital compilado com sucesso!")
+            st.success(f"✅ Kit de entrega digital compilado com sucesso em {idioma_ebook} (15 páginas numeradas)!")
             st.rerun()
 
     col_dw1, col_dw2 = st.columns(2)
@@ -1337,19 +1668,20 @@ with tab_ebook:
         if st.session_state.get("pdf_manual_gerado") and os.path.exists(st.session_state["pdf_manual_gerado"]):
             with open(st.session_state["pdf_manual_gerado"], "rb") as f_man:
                 st.download_button(
-                    "⬇️ Baixar Manual Técnico (.PDF)",
+                    label=f"⬇️ Baixar Manual Técnico Completo (.PDF - 15 Páginas em {idioma_ebook})",
                     data=f_man.read(),
-                    file_name="manual_tecnico.pdf",
+                    file_name=f"manual_tecnico_{idioma_ebook[:2].lower()}.pdf",
                     mime="application/pdf",
+                    type="primary",
                     use_container_width=True
                 )
     with col_dw2:
         if st.session_state.get("pdf_bump_gerado") and os.path.exists(st.session_state["pdf_bump_gerado"]):
             with open(st.session_state["pdf_bump_gerado"], "rb") as f_bmp:
                 st.download_button(
-                    "⬇️ Baixar Order Bump Checklist (.PDF)",
+                    label=f"⬇️ Baixar Order Bump Checklist (.PDF em {idioma_ebook})",
                     data=f_bmp.read(),
-                    file_name="order_bump.pdf",
+                    file_name=f"order_bump_{idioma_ebook[:2].lower()}.pdf",
                     mime="application/pdf",
                     use_container_width=True
                 )
@@ -1426,6 +1758,11 @@ with tab_ads:
 
         st.markdown("---")
         st.markdown("##### 3. Configurações da Página de Vendas")
+        col_lp_lang, col_lp_blank = st.columns([1.5, 2.5])
+        with col_lp_lang:
+            idx_id_lp = IDIOMAS_DISPONIVEIS.index(st.session_state["idioma_funil_ativo"]) if st.session_state["idioma_funil_ativo"] in IDIOMAS_DISPONIVEIS else 0
+            idioma_lp = st.selectbox("Idioma dos Elementos da Página:", IDIOMAS_DISPONIVEIS, index=idx_id_lp, key="idioma_lp_sel")
+
         col_lp1, col_lp2 = st.columns(2)
         with col_lp1:
             lp_tit = st.text_input("Título da Página:", value="Apresentação Exclusiva")
@@ -1438,7 +1775,8 @@ with tab_ads:
         if lp_v_url and lp_chk:
             html_final = gerar_html_landing_page(
                 titulo=lp_tit, promessa=lp_prom, url_video_mp4=lp_v_url,
-                link_kiwify=lp_chk, delay_segundos=int(lp_delay), pixel_id=lp_px
+                link_kiwify=lp_chk, delay_segundos=int(lp_delay), pixel_id=lp_px,
+                idioma=idioma_lp
             )
             st.markdown("---")
             col_d1, col_d2 = st.columns([1, 1])
