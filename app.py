@@ -92,6 +92,7 @@ def obter_credencial(chave: str, padrao: str = "") -> str:
 SUPABASE_URL = obter_credencial("SUPABASE_URL")
 SUPABASE_KEY = obter_credencial("SUPABASE_KEY")
 OPENAI_API_KEY = obter_credencial("OPENAI_API_KEY")
+ELEVENLABS_API_KEY = obter_credencial("ELEVENLABS_API_KEY")
 GEMINI_API_KEY = obter_credencial("GEMINI_API_KEY")
 PEXELS_API_KEY = obter_credencial("PEXELS_API_KEY")
 TIKTOK_ADVERTISER_ID = obter_credencial("TIKTOK_ADVERTISER_ID", "7693205737438314502")
@@ -103,6 +104,18 @@ if SUPABASE_URL and SUPABASE_KEY:
         supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
     except Exception as e:
         st.sidebar.error(f"Erro ao conectar ao Supabase: {e}")
+
+# Mapeamento oficial de vozes do ElevenLabs para DubfyAi (Multilingual v2)
+VOZES_ELEVENLABS = {
+    "Adam (Narrador Persuasivo)": "pNInz6obpgDQGcFmaJgB",
+    "Rachel (Profissional Feminina)": "21m00Tcm4TlvDq8ikWAM",
+    "Antoni (Dinâmico / Jovem)": "ErXwobaYiN019PkySvjV",
+    "Bella (Empática / Emocional)": "EXAVITQu4vr4xnSDxMaL",
+    "Josh (Grave / Impactante)": "TxGEqnHWrfWFTfGW9XjX",
+    "Domi (Confiante / Forte)": "AZnzlk1XvdvUeBnXmlld",
+    "Elli (Clara / Didática)": "MF3mGyEYCl7XYWbV9V6O",
+    "Sam (Autoritário / Direto)": "yoZ06aMxZJJ28mfd3POQ"
+}
 
 PRESETS_PLATAFORMAS = {
     "TikTok (Ads / Orgânico 9:16)": {
@@ -309,7 +322,7 @@ def debitar_creditos_cloud(email: str, operacao: str, quantidade: int) -> bool:
         return True
 
 # ==============================================================================
-# 3. MOTORES DE IA & COPYWRITING
+# 3. MOTORES DE IA & COPYWRITING (TERMOS RIGOROSAMENTE EM INGLÊS PARA O PEXELS)
 # ==============================================================================
 def executar_prompt_ia(prompt: str, formato_json: bool = False, temperatura: float = 0.25) -> str:
     if GEMINI_API_KEY:
@@ -381,69 +394,136 @@ def gerar_roteiro_vsl_ia(nicho: str, promessa: str, publico: str, num_cenas: int
     prompt = f"""
     Crie um roteiro persuasivo para VSL curta (27 segundos):
     - Nicho: {nicho} | Promessa: {promessa} | Público: {publico}
-    REGRA: O texto da chave 'fala' DEVE ser em Português do Brasil (PT-BR).
-    Gere exatamente {num_cenas} cenas cronológicas com fala e termo_video em inglês para o Pexels.
+    
+    REGRAS MANDATÓRIAS:
+    1. A chave 'fala' DEVE ser em Português do Brasil (PT-BR).
+    2. A chave 'termo_video' DEVE ser OBRIGATORIAMENTE em INGLÊS com 1 a 3 palavras simples de alta relevância visual para buscar filmagens no Pexels (ex: "baking cake", "cooking kitchen", "making money", "cash money", "chef decorating"). NUNCA use palavras em português na chave 'termo_video'.
+    
+    Gere exatamente {num_cenas} cenas cronológicas com fala e termo_video.
     Retorne ESTRITAMENTE o JSON:
     {{ "cenas": [{{"fala": "...", "termo_video": "..."}}] }}
     """
     resp = executar_prompt_ia(prompt, formato_json=True, temperatura=0.25)
-    termo_generico = re.sub(r'[^a-zA-Z0-9\s]', '', nicho).strip()
     try:
         dados = json.loads(resp)
         cenas_raw = dados.get("cenas", [])
-        return [{"fala": sanitizar_texto(c["fala"]).strip(), "termo_video": sanitizar_texto(c.get("termo_video", termo_generico)).strip()} for c in cenas_raw if c.get("fala")]
+        return [{"fala": sanitizar_texto(c["fala"]).strip(), "termo_video": sanitizar_texto(c.get("termo_video", "cooking kitchen")).strip()} for c in cenas_raw if c.get("fala")]
     except Exception:
-        return [{"fala": promessa, "termo_video": termo_generico}]
+        return [{"fala": promessa, "termo_video": "cooking kitchen"}]
 
 def gerar_roteiro_apresentacao_3min_ia(nome_produto: str, nicho: str, promessa: str, publico: str, oferta_cta: str) -> List[Dict[str, str]]:
     prompt = f"""
     Crie o roteiro completo de apresentação de 3 minutos para:
     - Produto: {nome_produto} | Nicho: {nicho} | Promessa: {promessa} | CTA: {oferta_cta}
-    REGRA: Todo o texto DEVE ser em Português do Brasil (PT-BR).
+    
+    REGRAS MANDATÓRIAS:
+    1. A chave 'fala' DEVE ser em Português do Brasil (PT-BR).
+    2. A chave 'termo_video' DEVE ser OBRIGATORIAMENTE em INGLÊS com 1 a 3 palavras simples de busca no Pexels (ex: "baking cake", "delicious dessert", "happy woman cooking", "money cash", "smiling chef"). NUNCA use português na chave 'termo_video'.
+    
     Gere 13 cenas cronológicas (Gancho, História, Revelação do Produto, Prova, Garantia e Oferta).
     Retorne ESTRITAMENTE o JSON:
     {{ "cenas": [{{"fala": "...", "termo_video": "..."}}] }}
     """
     resp = executar_prompt_ia(prompt, formato_json=True, temperatura=0.25)
-    termo_generico = re.sub(r'[^a-zA-Z0-9\s]', '', nicho).strip()
     try:
         dados = json.loads(resp)
         cenas_raw = dados.get("cenas", [])
-        return [{"fala": sanitizar_texto(c["fala"]).strip(), "termo_video": sanitizar_texto(c.get("termo_video", termo_generico)).strip()} for c in cenas_raw if c.get("fala")]
+        return [{"fala": sanitizar_texto(c["fala"]).strip(), "termo_video": sanitizar_texto(c.get("termo_video", "cooking delicious food")).strip()} for c in cenas_raw if c.get("fala")]
     except Exception:
-        return [{"fala": f"Descubra agora o {nome_produto}.", "termo_video": termo_generico}]
+        return [{"fala": f"Descubra agora o {nome_produto}.", "termo_video": "cooking delicious food"}]
 
 # ==============================================================================
-# 4. RENDERIZAÇÃO E FUSÃO (ÁUDIO 44.1kHz ESTÉREO CORRIGIDO)
+# 4. RENDERIZAÇÃO E FUSÃO (DUAL TTS ELEVENLABS / OPENAI + BLINDAGEM PEXELS)
 # ==============================================================================
-def sintetizar_audio_tts(texto: str, output_path: str, voz: str = "onyx") -> bool:
-    if not OPENAI_API_KEY: return False
-    try:
-        client = OpenAI(api_key=OPENAI_API_KEY)
-        resp = client.audio.speech.create(model="tts-1", voice=voz, input=sanitizar_texto(texto))
-        resp.stream_to_file(output_path)
-        return True
-    except Exception:
+def sintetizar_audio_tts(texto: str, output_path: str, voz: str = "Adam (Narrador Persuasivo)") -> bool:
+    """Sintetiza áudio via ElevenLabs (DubfyAi padrão) com fallback automático para OpenAI TTS."""
+    texto_limpo = sanitizar_texto(texto).strip()
+    if not texto_limpo:
         return False
 
+    # 1. Tenta sintetizar com ElevenLabs
+    if ELEVENLABS_API_KEY:
+        try:
+            voice_id = VOZES_ELEVENLABS.get(voz, "pNInz6obpgDQGcFmaJgB")
+            url_eleven = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+            headers_eleven = {
+                "xi-api-key": ELEVENLABS_API_KEY,
+                "Content-Type": "application/json",
+                "Accept": "audio/mpeg"
+            }
+            payload_eleven = {
+                "text": texto_limpo,
+                "model_id": "eleven_multilingual_v2",
+                "voice_settings": {
+                    "stability": 0.45,
+                    "similarity_boost": 0.80,
+                    "style": 0.15,
+                    "use_speaker_boost": True
+                }
+            }
+            res_eleven = requests.post(url_eleven, headers=headers_eleven, json=payload_eleven, timeout=30)
+            if res_eleven.status_code == 200 and len(res_eleven.content) > 1000:
+                with open(output_path, "wb") as f_out:
+                    f_out.write(res_eleven.content)
+                return True
+        except Exception:
+            pass
+
+    # 2. Fallback resiliente para OpenAI TTS
+    if OPENAI_API_KEY:
+        try:
+            voz_openai = "onyx"
+            if voz in ["alloy", "echo", "fable", "onyx", "nova", "shimmer"]:
+                voz_openai = voz
+            elif "Feminina" in voz or "Bella" in voz or "Rachel" in voz or "Domi" in voz:
+                voz_openai = "nova"
+            client = OpenAI(api_key=OPENAI_API_KEY)
+            resp = client.audio.speech.create(model="tts-1", voice=voz_openai, input=texto_limpo)
+            resp.stream_to_file(output_path)
+            return True
+        except Exception:
+            pass
+
+    return False
+
 def buscar_video_pexels(query: str, pexels_key: str, dest_path: str, vertical: bool = False) -> bool:
-    if not pexels_key: return False
+    """Busca vídeo no Pexels com lista de fallbacks automáticos em inglês para eliminar telas azuis."""
+    if not pexels_key:
+        return False
     orientacao = "portrait" if vertical else "landscape"
     headers = {"Authorization": pexels_key}
-    termo_limpo = re.sub(r'[^a-zA-Z0-9\s]', '', str(query)).strip() or "business"
-    try:
-        url = f"https://api.pexels.com/videos/search?query={requests.utils.quote(termo_limpo)}&per_page=3&orientation={orientacao}"
-        res = requests.get(url, headers=headers, timeout=12)
-        if res.status_code == 200:
-            videos = res.json().get("videos", [])
-            if videos:
-                vfiles = videos[0].get("video_files", [])
-                if vfiles:
-                    v_bytes = requests.get(vfiles[0]["link"], timeout=25).content
-                    with open(dest_path, "wb") as f: f.write(v_bytes)
-                    return True
-    except Exception:
-        pass
+
+    termo_original = re.sub(r'[^a-zA-Z0-9\s]', '', str(query)).strip()
+    tentativas = []
+    if termo_original:
+        tentativas.append(termo_original)
+    tentativas.extend([
+        "cooking kitchen",
+        "baking cake dessert",
+        "making money cash",
+        "business growth success",
+        "happy lifestyle",
+        "chef cooking"
+    ])
+
+    for termo in tentativas:
+        if not termo:
+            continue
+        try:
+            url = f"https://api.pexels.com/videos/search?query={requests.utils.quote(termo)}&per_page=5&orientation={orientacao}"
+            res = requests.get(url, headers=headers, timeout=12)
+            if res.status_code == 200:
+                videos = res.json().get("videos", [])
+                if videos:
+                    vfiles = videos[0].get("video_files", [])
+                    if vfiles:
+                        v_bytes = requests.get(vfiles[0]["link"], timeout=25).content
+                        if len(v_bytes) > 50000:
+                            with open(dest_path, "wb") as f:
+                                f.write(v_bytes)
+                            return True
+        except Exception:
+            continue
     return False
 
 def renderizar_vsl_completa(
@@ -469,7 +549,7 @@ def renderizar_vsl_completa(
 
     for idx, item in enumerate(cenas):
         frase = sanitizar_texto(item.get("fala", "") if isinstance(item, dict) else str(item))
-        termo_video = sanitizar_texto(item.get("termo_video", "business") if isinstance(item, dict) else "business")
+        termo_video = sanitizar_texto(item.get("termo_video", "cooking kitchen") if isinstance(item, dict) else "cooking kitchen")
 
         prefixo = f"cena_{idx}_{int(time.time())}"
         a_path = os.path.join(DIR_AUDIOS, f"{prefixo}.mp3")
@@ -503,11 +583,11 @@ def renderizar_vsl_completa(
         else:
             vf = (
                 f"setsar=1,fps=30,drawtext=textfile='{legenda_path_escapado}':fontcolor=white:fontsize={tam_fonte+4}:"
-                f"box=1:boxcolor=blue@0.65:boxborderw=18:line_spacing=12:x=(w-text_w)/2:y={pos_y_legenda}"
+                f"box=1:boxcolor=black@0.75:boxborderw=18:line_spacing=12:x=(w-text_w)/2:y={pos_y_legenda}"
                 f"{filtro_marca}"
             )
             cmd = [
-                "ffmpeg", "-y", "-threads", "2", "-f", "lavfi", "-i", f"color=c=0x0F172A:s={res_w}x{res_h}:d={duracao:.2f}", "-i", a_path,
+                "ffmpeg", "-y", "-threads", "2", "-f", "lavfi", "-i", f"color=c=0x111827:s={res_w}x{res_h}:d={duracao:.2f}", "-i", a_path,
                 "-map", "0:v:0", "-map", "1:a:0", "-t", f"{duracao:.2f}", "-vf", vf,
                 "-c:v", "libx264", "-preset", "faster", "-crf", "26",
                 "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2",
@@ -947,7 +1027,7 @@ def sincronizar_campos_mineracao():
     st.session_state["ebook_input_publico"] = pub
 
 # ==============================================================================
-# SIDEBAR
+# SIDEBAR COM STATUS DO ELEVENLABS E TODAS AS CONEXÕES
 # ==============================================================================
 with st.sidebar:
     st.markdown("## ⚡ Central DubfyAi & VSL")
@@ -970,10 +1050,11 @@ with st.sidebar:
     with col_s2: st.metric("Compras", dados_user["total_compras"])
 
     st.markdown("---")
-    st.caption("Status das Conexões:")
-    st.write("• Supabase:", "🟢 Ativo" if SUPABASE_URL and SUPABASE_KEY else "🔴 Pendente")
-    st.write("• OpenAI:", "🟢 Ativo" if OPENAI_API_KEY else "🔴 Ausente")
-    st.write("• Pexels:", "🟢 Ativo" if PEXELS_API_KEY else "🔴 Ausente")
+    st.caption("Status das Conexões Oficiais:")
+    st.write("• ElevenLabs (DubfyAi):", "🟢 Ativo" if ELEVENLABS_API_KEY else "🔴 Ausente (Fallback OpenAI)")
+    st.write("• Supabase Storage:", "🟢 Ativo" if SUPABASE_URL and SUPABASE_KEY else "🔴 Pendente")
+    st.write("• OpenAI Inteligência:", "🟢 Ativo" if OPENAI_API_KEY else "🔴 Ausente")
+    st.write("• Pexels Filmagens:", "🟢 Ativo" if PEXELS_API_KEY else "🔴 Ausente")
     st.write("• TikTok Ads:", "🟢 Ativo" if TIKTOK_ACCESS_TOKEN else "🟡 Aguardando Token")
 
 # ==============================================================================
@@ -1050,7 +1131,7 @@ with tab_minerador:
         st.markdown(st.session_state.get("miner_dossie", ""))
 
 # ------------------------------------------------------------------------------
-# ABA 2: VSL CURTA (27S) COM DOWNLOAD DIRETO E ÁUDIO CORRIGIDO
+# ABA 2: VSL CURTA (27S) COM VOZES ELEVENLABS E DOWNLOAD DIRETO
 # ------------------------------------------------------------------------------
 with tab_vsl:
     st.markdown("## 🚀 2. Criador de VSL Curta (27s - Criativo de Anúncio)")
@@ -1058,7 +1139,8 @@ with tab_vsl:
     with col_v1:
         tema_vsl = st.text_input("Tema / Produto:", key="vsl_input_tema")
         promessa_vsl = st.text_input("Promessa:", key="vsl_input_promessa")
-        voz_vsl = st.selectbox("Locução do Criativo:", ["onyx", "alloy", "echo", "fable", "nova", "shimmer"])
+        vozes_disponiveis = list(VOZES_ELEVENLABS.keys()) + ["onyx", "alloy", "echo", "nova"]
+        voz_vsl = st.selectbox("Locução do Criativo (ElevenLabs / DubfyAi):", vozes_disponiveis, index=0)
     with col_v2:
         publico_vsl = st.text_input("Público-Alvo:", key="vsl_input_publico")
         marca_vsl = st.text_input("Marca d'água no Vídeo:", value=st.session_state.get("vsl_marca_ativa", ""))
@@ -1069,13 +1151,13 @@ with tab_vsl:
             st.error("❌ Saldo insuficiente!")
         else:
             barra = st.progress(0.0)
-            with st.spinner("Gerando roteiro e renderizando cenas com áudio estéreo..."):
+            with st.spinner("Gerando roteiro e sintetizando locução realista DubfyAi..."):
                 cenas = gerar_roteiro_vsl_ia(tema_vsl, promessa_vsl, publico_vsl, 5)
                 v_pronto = renderizar_vsl_completa(cenas, plat_vsl, voz_vsl, PEXELS_API_KEY, marca_dagua=marca_vsl, progress_bar=barra)
                 debitar_creditos_cloud(email_usuario, "VSL Curta", 20)
                 st.session_state["video_vsl_pronto"] = v_pronto
                 st.session_state["vsl_marca_ativa"] = marca_vsl
-                st.success("✅ VSL Curta finalizada com áudio perfeito!")
+                st.success("✅ VSL Curta finalizada com locução realista e áudio estéreo!")
                 st.rerun()
 
     caminho_vsl_pronto = st.session_state.get("video_vsl_pronto")
@@ -1098,7 +1180,7 @@ with tab_vsl:
             )
 
 # ------------------------------------------------------------------------------
-# ABA 3: APRESENTAÇÃO 3 MIN COM DOWNLOAD DIRETO E ÁUDIO CORRIGIDO
+# ABA 3: APRESENTAÇÃO 3 MIN COM VOZES ELEVENLABS E DOWNLOAD DIRETO
 # ------------------------------------------------------------------------------
 with tab_apresentacao:
     st.markdown("## 🎥 3. Apresentação Longa (Pitch de 3 Minutos)")
@@ -1107,7 +1189,8 @@ with tab_apresentacao:
         p_nome = st.text_input("Nome do Produto:", key="ap_prod_nome")
         p_nicho = st.text_input("Nicho:", key="ap_prod_nicho")
         p_prom = st.text_input("Promessa Central:", key="ap_prod_promessa")
-        voz_ap = st.selectbox("Locução do Pitch:", ["onyx", "alloy", "echo", "fable", "nova", "shimmer"], key="voz_ap_sel")
+        vozes_ap_disp = list(VOZES_ELEVENLABS.keys()) + ["onyx", "alloy", "echo", "nova"]
+        voz_ap = st.selectbox("Locução do Pitch (ElevenLabs / DubfyAi):", vozes_ap_disp, index=0, key="voz_ap_sel")
     with col_ap2:
         p_pub = st.text_input("Público-Alvo:", key="ap_prod_publico")
         p_oft = st.text_input("Oferta / CTA:", key="ap_prod_oferta")
@@ -1119,12 +1202,12 @@ with tab_apresentacao:
             st.error("❌ Saldo insuficiente!")
         else:
             barra_ap = st.progress(0.0)
-            with st.spinner("Gerando 13 cenas e sintetizando pitch de vendas..."):
+            with st.spinner("Gerando 13 cenas e sintetizando pitch com locução ElevenLabs..."):
                 cenas_p = gerar_roteiro_apresentacao_3min_ia(p_nome, p_nicho, p_prom, p_pub, p_oft)
                 v_pitch = renderizar_vsl_completa(cenas_p, plat_ap, voz_ap, PEXELS_API_KEY, marca_dagua=m_ap, progress_bar=barra_ap)
                 debitar_creditos_cloud(email_usuario, "Apresentação Pitch", 30)
                 st.session_state["video_pitch_pronto"] = v_pitch
-                st.success("✅ Apresentação de 3 minutos pronta com áudio estéreo!")
+                st.success("✅ Apresentação de 3 minutos pronta com locução ultra-realista!")
                 st.rerun()
 
     caminho_pitch_pronto = st.session_state.get("video_pitch_pronto")
