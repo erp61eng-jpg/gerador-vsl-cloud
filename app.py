@@ -21,7 +21,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY
 from reportlab.pdfgen import canvas
 
-# Compatibilidade com SDK do Google Gemini (Novo e Legado)
+# Compatibilidade com SDKs do Google Gemini
 try:
     from google import genai
     HAS_GENAI_NEW = True
@@ -195,7 +195,7 @@ def garantir_video_abaixo_50mb(caminho_mp4: str, max_mb: float = 42.0, status_pl
         return caminho_mp4
 
     if status_placeholder:
-        status_placeholder.info(f"⚡ Vídeo detectado com {tam_mb:.1f} MB. Comprimindo automaticamente para ~30 MB...")
+        status_placeholder.info(f"⚡ Vídeo com {tam_mb:.1f} MB. Comprimindo para ~30 MB...")
 
     dir_origem = os.path.dirname(caminho_mp4)
     saida_comprimida = os.path.join(dir_origem, f"vsl_otimizada_{int(time.time())}.mp4")
@@ -248,55 +248,35 @@ class LeitorComProgresso:
         self.arquivo.close()
 
 def hospedar_video_supabase(caminho_local: str, barra_progresso=None, texto_status=None) -> Optional[str]:
-    """Comprime se necessário, auto-detecta VIDEOS/videos e faz upload completo."""
+    """Comprime o vídeo se necessário, testa os buckets VIDEOS e videos e realiza upload com x-upsert."""
     if not SUPABASE_URL or not SUPABASE_KEY or not os.path.exists(caminho_local):
         st.error("Credenciais do Supabase ausentes ou arquivo de vídeo não encontrado.")
         return None
 
     caminho_pronto = garantir_video_abaixo_50mb(caminho_local, max_mb=42.0, status_placeholder=texto_status)
-
     candidatos = ["VIDEOS", "videos"]
-    bucket_escolhido = "VIDEOS"
-
-    headers_check = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
-    for cand in candidatos:
-        try:
-            r = requests.get(f"{SUPABASE_URL.rstrip('/')}/storage/v1/bucket/{cand}", headers=headers_check, timeout=3)
-            if r.status_code == 200:
-                bucket_escolhido = cand
-                break
-        except Exception:
-            pass
-
     nome_arquivo = f"vsl_master_{int(time.time())}.mp4"
-    url_upload = f"{SUPABASE_URL.rstrip('/')}/storage/v1/object/{bucket_escolhido}/{nome_arquivo}"
-    headers_upload = {
+
+    headers_base = {
         "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}",
+        "x-upsert": "true",
         "Content-Type": "video/mp4"
     }
 
-    leitor = LeitorComProgresso(caminho_pronto, barra_progresso, texto_status)
-    try:
-        resp = requests.post(url_upload, headers=headers_upload, data=leitor, timeout=300)
-        if resp.status_code in [200, 201]:
-            url_publica = f"{SUPABASE_URL.rstrip('/')}/storage/v1/object/public/{bucket_escolhido}/{nome_arquivo}"
-            return url_publica
-        else:
-            outro_bucket = "videos" if bucket_escolhido == "VIDEOS" else "VIDEOS"
-            url_upload2 = f"{SUPABASE_URL.rstrip('/')}/storage/v1/object/{outro_bucket}/{nome_arquivo}"
-            leitor2 = LeitorComProgresso(caminho_pronto, barra_progresso, texto_status)
-            resp2 = requests.post(url_upload2, headers=headers_upload, data=leitor2, timeout=300)
-            leitor2.close()
-            if resp2.status_code in [200, 201]:
-                return f"{SUPABASE_URL.rstrip('/')}/storage/v1/object/public/{outro_bucket}/{nome_arquivo}"
-            st.error(f"Erro Supabase ({resp.status_code}): {resp.text}")
-            return None
-    except Exception as e:
-        st.error(f"Erro de conexão durante o envio: {e}")
-        return None
-    finally:
-        leitor.close()
+    for bucket in candidatos:
+        url_upload = f"{SUPABASE_URL.rstrip('/')}/storage/v1/object/{bucket}/{nome_arquivo}"
+        leitor = LeitorComProgresso(caminho_pronto, barra_progresso, texto_status)
+        try:
+            resp = requests.post(url_upload, headers=headers_base, data=leitor, timeout=300)
+            leitor.close()
+            if resp.status_code in [200, 201]:
+                return f"{SUPABASE_URL.rstrip('/')}/storage/v1/object/public/{bucket}/{nome_arquivo}"
+        except Exception:
+            leitor.close()
+
+    st.error("Falha no upload automático do Supabase. Verifique se o bucket VIDEOS ou videos está público.")
+    return None
 
 def obter_dados_usuario(email: str) -> dict:
     if not supabase_client or not email:
@@ -355,7 +335,7 @@ def executar_prompt_ia(prompt: str, formato_json: bool = False, temperatura: flo
         res = client.chat.completions.create(**kwargs)
         return res.choices[0].message.content
 
-    raise ValueError("Nenhuma chave válida configurada para Gemini ou OpenAI.")
+    raise ValueError("Nenhuma chave configurada para Gemini ou OpenAI.")
 
 def minerar_nicho_profundo_ia(nicho: str, profundidade: str) -> dict:
     prompt = f"""
@@ -506,7 +486,6 @@ def renderizar_vsl_completa(
         with open(legenda_txt, "w", encoding="utf-8") as f_l: f_l.write(texto_formatado)
         legenda_path_escapado = legenda_txt.replace(os.sep, "/").replace(":", "\\:")
 
-        # Garante áudio forçado em AAC 44.1kHz estéreo em cada clipe
         if tem_video and os.path.exists(v_raw_path):
             vf = (
                 f"scale={res_w}:{res_h}:force_original_aspect_ratio=increase,crop={res_w}:{res_h},setsar=1,fps=30,"
@@ -538,7 +517,6 @@ def renderizar_vsl_completa(
         cenas_clipes.append(cena_out)
         if progress_bar: progress_bar.progress((idx + 0.8) / total)
 
-    # Concatenação reencodando o áudio para evitar perda de faixa
     concat_txt_path = os.path.join(DIR_VSL, f"concat_{int(time.time())}.txt")
     with open(concat_txt_path, "w", encoding="utf-8") as f:
         for c in cenas_clipes: f.write(f"file '{c.replace(os.sep, '/')}'\n")
@@ -677,7 +655,6 @@ def compilar_livro_tecnico_pdf(titulo: str, subtitulo: str, publico: str, caminh
 
     flowables = []
 
-    # Capa
     flowables.append(Spacer(1, 80))
     flowables.append(Paragraph(titulo.upper(), estilo_capa_tit))
     flowables.append(Spacer(1, 15))
@@ -699,7 +676,6 @@ def compilar_livro_tecnico_pdf(titulo: str, subtitulo: str, publico: str, caminh
     flowables.append(tab_info)
     flowables.append(PageBreak())
 
-    # Módulos Práticos
     modulos = [
         ("1. Introdução & Fundamentos Operacionais", "Este manual técnico foi desenvolvido como um guia de execução imediata para garantir previsibilidade e domínio técnico."),
         ("2. O Mecanismo Único de Execução", "Compreenda a lógica estrutural que separa amadores de profissionais no setor e implemente com precisão."),
@@ -757,7 +733,6 @@ def compilar_order_bump_pdf(titulo: str, caminho_pdf: str):
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
     ]))
     flowables.append(tab)
-
     flowables.append(Spacer(1, 30))
     flowables.append(Paragraph("💡 <i>Dica: Imprima esta folha ou use no tablet para checar cada etapa concluída diariamente.</i>", estilo_item))
 
@@ -1057,7 +1032,7 @@ with tab_minerador:
     with col_btn_m2:
         if st.button("🔄 Sincronizar Alterações com Todas as Abas", use_container_width=True):
             sincronizar_campos_mineracao()
-            st.success("✅ Todas as abas foram atualizadas com os dados atuais!")
+            st.success("✅ Todas as abas sincronizadas com os dados atuais!")
 
     st.markdown("---")
     col_ed1, col_ed2 = st.columns(2)
@@ -1109,12 +1084,13 @@ with tab_vsl:
         st.markdown("#### 🎬 Vídeo Pronto para Uso:")
         tam_mb = os.path.getsize(caminho_vsl_pronto) / (1024 * 1024)
         st.caption(f"📁 **Salvo no computador em:** `{caminho_vsl_pronto}` ({tam_mb:.1f} MB)")
-        st.video(caminho_vsl_pronto)
-
+        
         with open(caminho_vsl_pronto, "rb") as arq_vsl:
+            bytes_vsl = arq_vsl.read()
+            st.video(bytes_vsl, format="video/mp4")
             st.download_button(
                 label="⬇️ Baixar Vídeo MP4 no Computador (27s)",
-                data=arq_vsl.read(),
+                data=bytes_vsl,
                 file_name="vsl_curta_27s.mp4",
                 mime="video/mp4",
                 type="primary",
@@ -1157,12 +1133,13 @@ with tab_apresentacao:
         st.markdown("#### 🎬 Apresentação Pronta para Uso:")
         tam_mb_pitch = os.path.getsize(caminho_pitch_pronto) / (1024 * 1024)
         st.caption(f"📁 **Salvo no computador em:** `{caminho_pitch_pronto}` ({tam_mb_pitch:.1f} MB)")
-        st.video(caminho_pitch_pronto)
-
+        
         with open(caminho_pitch_pronto, "rb") as arq_pitch:
+            bytes_pitch = arq_pitch.read()
+            st.video(bytes_pitch, format="video/mp4")
             st.download_button(
                 label="⬇️ Baixar Apresentação MP4 no Computador (3 Min)",
-                data=arq_pitch.read(),
+                data=bytes_pitch,
                 file_name="apresentacao_3min.mp4",
                 mime="video/mp4",
                 type="primary",
@@ -1230,12 +1207,13 @@ with tab_fusao:
         st.markdown("#### 🎬 Vídeo Master Fundido:")
         tam_mb_f = os.path.getsize(caminho_fusao_pronto) / (1024 * 1024)
         st.caption(f"📁 **Salvo no computador em:** `{caminho_fusao_pronto}` ({tam_mb_f:.1f} MB)")
-        st.video(caminho_fusao_pronto)
-
+        
         with open(caminho_fusao_pronto, "rb") as arq_fusao:
+            bytes_fusao = arq_fusao.read()
+            st.video(bytes_fusao, format="video/mp4")
             st.download_button(
                 label="⬇️ Baixar Vídeo Master Fundido (.mp4)",
-                data=arq_fusao.read(),
+                data=bytes_fusao,
                 file_name="vsl_master_fundido.mp4",
                 mime="video/mp4",
                 type="primary",
@@ -1393,7 +1371,7 @@ with tab_ads:
             with col_d2:
                 st.link_button("🌐 2. Abrir Netlify Drop (Publicar Site)", "https://app.netlify.com/drop", use_container_width=True)
         else:
-            st.info("💡 Cole o link de checkout da Kiwify e garanta a URL do vídeo para liberar o download do index.html.")
+            st.info("💡 Cole o link de checkout da Kiwify e a URL do vídeo para liberar o download do index.html.")
 
     # SUB-ABA 2: SUBIR NO TIKTOK ADS (COM UPLOAD MANUAL DIRETO)
     with aba_tt_manual:
@@ -1427,11 +1405,12 @@ with tab_ads:
                     st.warning("⚠️ O vídeo da Aba 2 ainda não foi gerado.")
 
             if video_para_ad and os.path.exists(video_para_ad):
-                st.video(video_para_ad)
                 with open(video_para_ad, "rb") as vf_ad:
+                    b_ad = vf_ad.read()
+                    st.video(b_ad, format="video/mp4")
                     st.download_button(
                         "⬇️ Baixar Criativo do Anúncio (.mp4)",
-                        data=vf_ad.read(),
+                        data=b_ad,
                         file_name="anuncio_tiktok.mp4",
                         mime="video/mp4",
                         type="primary",
@@ -1466,7 +1445,7 @@ with tab_ads:
         with col_cta_tt1:
             st.link_button("🚀 Abrir TikTok Ads Manager", "https://ads.tiktok.com", type="primary", use_container_width=True)
         with col_cta_tt2:
-            st.info("💡 **Como publicar:** No gerenciador que abrir, clique em **Criar Campanha** > suba o vídeo acima > cole a URL rastreada > publique.")
+            st.info("💡 **Publicação:** Abra o gerenciador, clique em **Criar** > Escolha **Tráfego** > Suba o vídeo de 27s > Cole a URL rastreada e publique.")
 
     # SUB-ABA 3: DISPARO VIA API (OPCIONAL/AVANÇADO)
     with aba_tt_api:
