@@ -9,6 +9,7 @@ from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Optional, Any
 
 import streamlit as st
+import streamlit.components.v1 as components
 from openai import OpenAI
 from supabase import create_client, Client
 
@@ -65,30 +66,23 @@ def sanitizar_fala_locucao(texto: str) -> str:
     """Elimina placeholders, colchetes, notas de direção e introduções quebradas antes do TTS e legenda."""
     if not texto:
         return ""
-    # 1. Remove qualquer conteúdo entre colchetes: [Meu Nome], [Insira depoimento], [assim], etc.
     t = re.sub(r'\[.*?\]', '', texto)
-    # 2. Remove parênteses que contenham instruções de cena/direção
     t = re.sub(r'\((?:cena|take|cortar|inserir|mostrar|depoimento|música|audio|fala|voz|efeito|zoom|prints?|imagem).*?\)', '', t, flags=re.IGNORECASE)
-    # 3. Limpa frases inteiras que sejam instruções de edição direcionadas ao usuário
     if re.search(r'\b(?:coloque|insira|adicione|mostre|gravar|inserir)\s+(?:aqui\s+)?(?:depoimentos?|fotos?|vídeos?|prints?|provas?)\b', t, flags=re.IGNORECASE):
         t = re.sub(r'[^.!?]*\b(?:coloque|insira|adicione|mostre|gravar|inserir)\s+(?:aqui\s+)?(?:depoimentos?|fotos?|vídeos?|prints?|provas?)[^.!?]*(?:[.!?]|$)', '', t, flags=re.IGNORECASE)
-    # 4. Remove introduções de nome vazias ou quebradas tipo "Meu nome é e...", "Olá, meu nome é..."
     t = re.sub(r'\b(?:olá,?\s*)?meu nome é(?:\s+\w+){0,4}\s*(?:e\s+|,|\.)', '', t, flags=re.IGNORECASE)
     t = re.sub(r'\b(?:olá,?\s*)?meu nome é\s*$', '', t, flags=re.IGNORECASE)
     t = re.sub(r'\b(?:olá,?\s*)?meu nome é\s*[,.:;?!-]', '', t, flags=re.IGNORECASE)
-    # 5. Limpa conectivos e pontuações órfãs geradas no início
     t = re.sub(r'^\s*(?:e\s+|mas\s+|ou\s+|portanto\s+|assim\s+)', '', t, flags=re.IGNORECASE)
     t = re.sub(r'^\s*[,.:;?!-]+\s*', '', t)
-    # 6. Limpa pontuação dupla interna
     t = re.sub(r'\s+([,.:;?!])', r'\1', t)
     t = re.sub(r'([,.:;?!])\s*([,.:;?!])+', r'\1', t)
     t = re.sub(r'[,:;-]\s*([.!?])', r'\1', t)
-    # 7. Espaços duplos
     t = re.sub(r'\s+', ' ', t).strip()
     return t
 
 # ==============================================================================
-# 1. CONFIGURAÇÕES INICIAIS, DIRETÓRIOS, PRESETS & MOTOR DE TRADUÇÃO
+# 1. CONFIGURAÇÕES INICIAIS, DIRETÓRIOS & PRESETS
 # ==============================================================================
 st.set_page_config(
     page_title="Central VSL & DubfyAi Global",
@@ -131,7 +125,6 @@ if SUPABASE_URL and SUPABASE_KEY:
     except Exception as e:
         st.sidebar.error(f"Erro ao conectar ao Supabase: {e}")
 
-# IDIOMAS SUPORTADOS PELO DUBFYAI GLOBAL
 IDIOMAS_DISPONIVEIS = [
     "Português (Brasil)",
     "Inglês (English - EUA)",
@@ -141,7 +134,6 @@ IDIOMAS_DISPONIVEIS = [
     "Italiano (Italiano)"
 ]
 
-# Mapeamento oficial de vozes do ElevenLabs para DubfyAi (Multilingual v2)
 VOZES_ELEVENLABS = {
     "Adam (Narrador Persuasivo)": "pNInz6obpgDQGcFmaJgB",
     "Rachel (Profissional Feminina)": "21m00Tcm4TlvDq8ikWAM",
@@ -235,7 +227,7 @@ def obter_duracao_audio(audio_path: str) -> float:
         return 180.0
 
 def garantir_video_abaixo_50mb(caminho_mp4: str, max_mb: float = 42.0, status_placeholder=None) -> str:
-    """Comprime o vídeo automaticamente no FFmpeg caso ultrapasse o limite do Supabase."""
+    """Comprime o vídeo automaticamente no FFmpeg caso ultrapasse o limite de 50MB do Supabase."""
     if not os.path.exists(caminho_mp4):
         return caminho_mp4
 
@@ -244,7 +236,7 @@ def garantir_video_abaixo_50mb(caminho_mp4: str, max_mb: float = 42.0, status_pl
         return caminho_mp4
 
     if status_placeholder:
-        status_placeholder.info(f"⚡ Vídeo com {tam_mb:.1f} MB. Comprimindo para ~30 MB...")
+        status_placeholder.info(f"⚡ Vídeo com {tam_mb:.1f} MB. Comprimindo automaticamente para ~30 MB...")
 
     dir_origem = os.path.dirname(caminho_mp4)
     saida_comprimida = os.path.join(dir_origem, f"vsl_otimizada_{int(time.time())}.mp4")
@@ -264,11 +256,13 @@ def garantir_video_abaixo_50mb(caminho_mp4: str, max_mb: float = 42.0, status_pl
         "-movflags", "+faststart",
         saida_comprimida
     ]
-    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
-    return saida_comprimida
+    try:
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=True)
+        return saida_comprimida
+    except Exception:
+        return caminho_mp4
 
 class LeitorComProgresso:
-    """Lê o arquivo em blocos e atualiza a barra do Streamlit com contador de MB."""
     def __init__(self, caminho_arquivo: str, barra_progresso=None, texto_status=None):
         self.caminho = caminho_arquivo
         self.tamanho_total = os.path.getsize(caminho_arquivo)
@@ -297,13 +291,15 @@ class LeitorComProgresso:
         self.arquivo.close()
 
 def hospedar_video_supabase(caminho_local: str, barra_progresso=None, texto_status=None) -> Optional[str]:
-    """Comprime o vídeo se necessário, testa os buckets VIDEOS e videos e realiza upload com x-upsert."""
+    """Comprime o vídeo se necessário, limpa o nome do arquivo e envia para o bucket do Supabase."""
     if not SUPABASE_URL or not SUPABASE_KEY or not os.path.exists(caminho_local):
         st.error("Credenciais do Supabase ausentes ou arquivo de vídeo não encontrado.")
         return None
 
     caminho_pronto = garantir_video_abaixo_50mb(caminho_local, max_mb=42.0, status_placeholder=texto_status)
-    candidatos = ["VIDEOS", "videos"]
+    
+    # Prioriza 'videos' minúsculo (convenção padrão do Supabase)
+    candidatos = ["videos", "VIDEOS"]
     nome_arquivo = f"vsl_master_{int(time.time())}.mp4"
 
     headers_base = {
@@ -313,6 +309,7 @@ def hospedar_video_supabase(caminho_local: str, barra_progresso=None, texto_stat
         "Content-Type": "video/mp4"
     }
 
+    ultimo_erro = ""
     for bucket in candidatos:
         url_upload = f"{SUPABASE_URL.rstrip('/')}/storage/v1/object/{bucket}/{nome_arquivo}"
         leitor = LeitorComProgresso(caminho_pronto, barra_progresso, texto_status)
@@ -321,10 +318,13 @@ def hospedar_video_supabase(caminho_local: str, barra_progresso=None, texto_stat
             leitor.close()
             if resp.status_code in [200, 201]:
                 return f"{SUPABASE_URL.rstrip('/')}/storage/v1/object/public/{bucket}/{nome_arquivo}"
-        except Exception:
+            else:
+                ultimo_erro = f"Bucket '{bucket}': HTTP {resp.status_code} - {resp.text}"
+        except Exception as e_up:
             leitor.close()
+            ultimo_erro = str(e_up)
 
-    st.error("Falha no upload automático do Supabase. Verifique se o bucket VIDEOS ou videos está público.")
+    st.error(f"Falha no upload do Supabase: {ultimo_erro}. Verifique se o bucket 'videos' foi criado e marcado como público.")
     return None
 
 def obter_dados_usuario(email: str) -> dict:
@@ -358,7 +358,7 @@ def debitar_creditos_cloud(email: str, operacao: str, quantidade: int) -> bool:
         return True
 
 # ==============================================================================
-# 3. MOTORES DE IA, COPYWRITING & MOTOR DE TRADUÇÃO DUBFYAI GLOBAL
+# 3. MOTORES DE IA, COPYWRITING & TRADUÇÃO DUBFYAI GLOBAL
 # ==============================================================================
 def executar_prompt_ia(prompt: str, formato_json: bool = False, temperatura: float = 0.25) -> str:
     if GEMINI_API_KEY:
@@ -387,7 +387,6 @@ def executar_prompt_ia(prompt: str, formato_json: bool = False, temperatura: flo
     raise ValueError("Nenhuma chave configurada para Gemini ou OpenAI.")
 
 def traduzir_conteudo_ia(texto: str, idioma_destino: str) -> str:
-    """Traduz qualquer texto ou copy mantendo alto poder de persuasão e naturalidade no idioma destino."""
     if not texto or not texto.strip():
         return ""
     prompt = f"""
@@ -406,7 +405,6 @@ def traduzir_conteudo_ia(texto: str, idioma_destino: str) -> str:
         return texto
 
 def traduzir_cenas_vsl_ia(cenas: List[Dict[str, str]], idioma_destino: str) -> List[Dict[str, str]]:
-    """Traduz as falas de um roteiro de vídeo para o idioma destino, mantendo os termos de busca do Pexels rigorosamente em inglês."""
     if not cenas:
         return []
     prompt = f"""
@@ -486,10 +484,10 @@ def gerar_roteiro_vsl_ia(nicho: str, promessa: str, publico: str, num_cenas: int
     - IDIOMA DA LOCUÇÃO: {idioma}
     
     REGRAS MANDATÓRIAS (ANTI-AMADORISMO):
-    1. ZERO PLACEHOLDERS: NUNCA use colchetes, chaves ou termos genéricos como [Seu Nome], [Nome], [assim], [insira X].
-    2. NADA DE APRESENTAÇÃO PESSOAL FICTÍCIA: NÃO comece com "Meu nome é...". O anúncio tem 27s; comece imediatamente com um gancho forte sobre a dor ou o resultado desejado.
-    3. TEXTO TELEPROMPTER PRONTO: Toda palavra da chave 'fala' será sintetizada por voz de IA e gravada na legenda do vídeo. Escreva exclusivamente texto final para locução em {idioma}.
-    4. A chave 'termo_video' DEVE ser OBRIGATORIAMENTE em INGLÊS com 1 a 3 palavras simples para busca no Pexels (ex: "baking cake", "cooking kitchen", "making money", "cash money", "chef decorating"). NUNCA use outro idioma na chave 'termo_video'.
+    1. ZERO PLACEHOLDERS: NUNCA use colchetes ou termos como [Seu Nome], [Nome], [assim].
+    2. NADA DE APRESENTAÇÃO PESSOAL FICTÍCIA: NÃO comece com "Meu nome é...". O anúncio tem 27s; comece direto no gancho.
+    3. TEXTO TELEPROMPTER PRONTO: Toda palavra da chave 'fala' será sintetizada por voz de IA.
+    4. A chave 'termo_video' DEVE ser OBRIGATORIAMENTE em INGLÊS com 1 a 3 palavras simples para busca no Pexels.
     
     Gere exatamente {num_cenas} cenas cronológicas com fala e termo_video.
     Retorne ESTRITAMENTE o JSON:
@@ -517,13 +515,12 @@ def gerar_roteiro_apresentacao_3min_ia(nome_produto: str, nicho: str, promessa: 
     - IDIOMA DA APRESENTAÇÃO: {idioma}
     
     REGRAS MANDATÓRIAS (ANTI-AMADORISMO):
-    1. ZERO PLACEHOLDERS: NUNCA use colchetes, chaves ou parênteses como [Seu Nome], [Nome], [assim], [Insira X].
-    2. NARRATIVA INSTITUCIONAL E DIRETA: NÃO invente nomes de apresentadores nem diga "Meu nome é...". Comece direto no problema e na grande oportunidade.
-    3. PROVA SOCIAL NARRADA: NUNCA dê instruções de edição ou fale para "colocar depoimentos de pessoas nos vídeos". ESCREVA A HISTÓRIA REAL NARRADA na própria locução (exemplo: "Centenas de pessoas comuns que começaram da própria cozinha já estão faturando mais de três mil reais no primeiro mês").
-    4. TEXTO 100% PRONTO PARA VOZ: Cada palavra no campo 'fala' será narrada por voz sintética e gravada na legenda. Escreva apenas texto corrido e persuasivo no idioma {idioma}.
-    5. A chave 'termo_video' DEVE ser OBRIGATORIAMENTE em INGLÊS com 1 a 3 palavras simples de busca no Pexels (ex: "baking cake", "delicious dessert", "happy woman cooking", "money cash", "smiling chef").
+    1. ZERO PLACEHOLDERS: NUNCA use colchetes, chaves ou parênteses.
+    2. NARRATIVA INSTITUCIONAL E DIRETA: NÃO invente nomes de apresentadores nem diga "Meu nome é...".
+    3. PROVA SOCIAL NARRADA: NUNCA dê instruções de edição. ESCREVA A HISTÓRIA REAL NARRADA na própria locução.
+    4. A chave 'termo_video' DEVE ser OBRIGATORIAMENTE em INGLÊS com 1 a 3 palavras simples de busca no Pexels.
     
-    Gere 13 cenas cronológicas (Gancho, Problema, Agitação da Dor, Revelação do Método, Passo a Passo, Prova Narrada de Resultados, Apresentação da Oferta Oficial, Detalhamento dos Bônus, Quebra de Objeções, Garantia Incondicional, Chamada para Ação Final).
+    Gere 13 cenas cronológicas.
     Retorne ESTRITAMENTE o JSON:
     {{ "cenas": [{{"fala": "...", "termo_video": "..."}}] }}
     """
@@ -542,15 +539,13 @@ def gerar_roteiro_apresentacao_3min_ia(nome_produto: str, nicho: str, promessa: 
         return [{"fala": f"Descubra agora: {nome_produto}.", "termo_video": "cooking delicious food"}]
 
 # ==============================================================================
-# 4. RENDERIZAÇÃO, FUSÃO & SÍNTESE DE ÁUDIO (ELEVENLABS + OPENAI DUAL MOTOR)
+# 4. RENDERIZAÇÃO, FUSÃO & SÍNTESE DE ÁUDIO
 # ==============================================================================
 def sintetizar_audio_tts(texto: str, output_path: str, voz: str = "Adam (Narrador Persuasivo)") -> bool:
-    """Sintetiza áudio via ElevenLabs (DubfyAi padrão) com fallback automático para OpenAI TTS."""
     texto_limpo = sanitizar_fala_locucao(sanitizar_texto(texto)).strip()
     if not texto_limpo:
         return False
 
-    # 1. Tenta sintetizar com ElevenLabs (multilíngue nativo v2)
     if ELEVENLABS_API_KEY:
         try:
             voice_id = VOZES_ELEVENLABS.get(voz, "pNInz6obpgDQGcFmaJgB")
@@ -578,7 +573,6 @@ def sintetizar_audio_tts(texto: str, output_path: str, voz: str = "Adam (Narrado
         except Exception:
             pass
 
-    # 2. Fallback resiliente para OpenAI TTS
     if OPENAI_API_KEY:
         try:
             voz_openai = "onyx"
@@ -596,7 +590,6 @@ def sintetizar_audio_tts(texto: str, output_path: str, voz: str = "Adam (Narrado
     return False
 
 def buscar_video_pexels(query: str, pexels_key: str, dest_path: str, vertical: bool = False) -> bool:
-    """Busca vídeo no Pexels com lista de fallbacks automáticos em inglês para eliminar telas azuis."""
     if not pexels_key:
         return False
     orientacao = "portrait" if vertical else "landscape"
@@ -751,7 +744,6 @@ def fundir_videos_com_trilha(
     video1_path: str, video2_path: str, output_path: str,
     musica_path: Optional[str] = None, volume_musica: float = 0.08, plataforma: str = "TikTok (Ads / Orgânico 9:16)"
 ) -> str:
-    """Funde os dois vídeos garantindo áudio padronizado em 44.1kHz e compressão CRF 27."""
     config = PRESETS_PLATAFORMAS.get(plataforma, PRESETS_PLATAFORMAS["TikTok (Ads / Orgânico 9:16)"])
     w, h = config["resolucao"]
 
@@ -804,7 +796,7 @@ def fundir_videos_com_trilha(
     return output_path
 
 # ==============================================================================
-# 5. GERADOR COMPLETO DE PDFS (LIVRO TÉCNICO DE 14-16 PÁGINAS & ORDER BUMP MULTILÍNGUE)
+# 5. GERADOR COMPLETO DE PDFS
 # ==============================================================================
 class NumberedCanvas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
@@ -867,10 +859,9 @@ def obter_textos_layout(idioma: str) -> dict:
         }
 
 def gerar_conteudo_apostila_ia(titulo: str, publico: str, promessa: str, idioma: str = "Português (Brasil)") -> List[Dict[str, str]]:
-    """Gera o texto denso e detalhado de cada módulo via IA para preencher o livro técnico de 15 páginas."""
     prompt = f"""
     Atue como Especialista Sênior e Autor Técnico do DubfyAi Global.
-    Escreva o conteúdo COMPLETO, PROFUNDO e APROFUNDADO de um manual técnico profissional de alto valor (formato livro de implementação comercial).
+    Escreva o conteúdo COMPLETO de um manual técnico profissional de alto valor.
     
     TEMA/PRODUTO: "{titulo}"
     PÚBLICO-ALVO: "{publico}"
@@ -884,8 +875,8 @@ def gerar_conteudo_apostila_ia(titulo: str, publico: str, promessa: str, idioma:
         {{
           "titulo": "Nome do Módulo",
           "subtitulo": "Subtítulo do Módulo",
-          "conteudo_p1": "Texto denso com fundamentação técnica e diagnóstico (mínimo de 3 parágrafos aprofundados)...",
-          "conteudo_p2": "Instruções operacionais detalhadas, conceitos-chave e regras práticas (mínimo de 3 parágrafos aprofundados)...",
+          "conteudo_p1": "Texto denso com fundamentação técnica e diagnóstico...",
+          "conteudo_p2": "Instruções operacionais detalhadas...",
           "checklist": "• Passo 1 prático\n• Passo 2 prático\n• Passo 3 prático\n• Passo 4 prático"
         }}
       ]
@@ -899,7 +890,6 @@ def gerar_conteudo_apostila_ia(titulo: str, publico: str, promessa: str, idioma:
     except Exception:
         pass
 
-    # Fallback estruturado caso a API falhe
     modulos_padrao = [
         ("Módulo 1: Fundamentos e Diagnóstico Estrutural", "Alinhamento de expectativas e base operacional"),
         ("Módulo 2: O Mecanismo Central e Metodologia Exclusiva", "A estrutura lógica que viabiliza a entrega de resultados"),
@@ -912,27 +902,15 @@ def gerar_conteudo_apostila_ia(titulo: str, publico: str, promessa: str, idioma:
         {
             "titulo": m[0],
             "subtitulo": m[1],
-            "conteudo_p1": (
-                "Para construir uma operação lucrativa e previsível, o primeiro passo consiste em dominar os pilares técnicos fundamentais. "
-                "Muitos profissionais falham precocemente por ignorar o diagnóstico inicial de processos, tentando executar sem padronização prévia. "
-                "Ao aplicar as diretrizes contidas neste capítulo, você elimina as variáveis de risco e garante que cada etapa seja reprodutível."
-            ),
-            "conteudo_p2": (
-                "A execução correta exige controle de insumos, tempo de preparo e acompanhamento diário de métricas de rendimento. "
-                "Mantenha registros consistentes de cada ciclo de produção. Os detalhes técnicos que parecem insignificantes no início são "
-                "exatamente os fatores que definem a sustentabilidade do negócio e a retenção dos seus clientes no longo prazo."
-            ),
+            "conteudo_p1": "Para construir uma operação previsível, o primeiro passo consiste em dominar os pilares técnicos fundamentais com foco em processos reproduzíveis.",
+            "conteudo_p2": "A execução correta exige controle de insumos, tempo e acompanhamento diário de métricas de rendimento.",
             "checklist": "• Definir cronograma semanal de produção\n• Controlar custos unitários por lote\n• Padronizar fichas técnicas operacionais\n• Avaliar satisfação e feedback direto dos clientes"
         }
         for m in modulos_padrao
     ]
 
 def compilar_livro_tecnico_pdf(titulo: str, subtitulo: str, publico: str, caminho_pdf: str, promessa: str = "", idioma: str = "Português (Brasil)"):
-    doc = SimpleDocTemplate(
-        caminho_pdf,
-        pagesize=letter,
-        leftMargin=54, rightMargin=54, topMargin=54, bottomMargin=54
-    )
+    doc = SimpleDocTemplate(caminho_pdf, pagesize=letter, leftMargin=54, rightMargin=54, topMargin=54, bottomMargin=54)
     estilos = getSampleStyleSheet()
     tl = obter_textos_layout(idioma)
 
@@ -945,7 +923,6 @@ def compilar_livro_tecnico_pdf(titulo: str, subtitulo: str, publico: str, caminh
 
     flowables = []
 
-    # 1. CAPA OFICIAL
     flowables.append(Spacer(1, 90))
     flowables.append(Paragraph(titulo.upper(), estilo_capa_tit))
     flowables.append(Spacer(1, 15))
@@ -967,16 +944,11 @@ def compilar_livro_tecnico_pdf(titulo: str, subtitulo: str, publico: str, caminh
     flowables.append(tab_info)
     flowables.append(PageBreak())
 
-    # 2. FICHA TÉCNICA E AVISO LEGAL
     flowables.append(Paragraph(tl['aviso_legal_tit'], estilo_h1))
     flowables.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#CBD5E1"), spaceAfter=14, spaceBefore=4))
     flowables.append(Paragraph(tl['aviso_legal_txt'], estilo_corpo))
-    flowables.append(Spacer(1, 12))
-    flowables.append(Paragraph("<b>Registro Internacional de Edição:</b> Este conteúdo foi gerado e registrado sob a licença de operação digital DubfyAi Global, conferindo exclusividade de uso ao titular adquirente.", estilo_corpo))
-    flowables.append(Paragraph("<b>Termo de Conformidade Operacional:</b> A aplicação deste método deve respeitar integralmente os parâmetros de segurança e os checklists recomendados.", estilo_corpo))
     flowables.append(PageBreak())
 
-    # 3. SUMÁRIO EXECUTIVO
     modulos_conteudo = gerar_conteudo_apostila_ia(titulo, publico, promessa, idioma=idioma)
     flowables.append(Paragraph(tl['sumario_tit'], estilo_h1))
     flowables.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#CBD5E1"), spaceAfter=14, spaceBefore=4))
@@ -993,11 +965,8 @@ def compilar_livro_tecnico_pdf(titulo: str, subtitulo: str, publico: str, caminh
         ('PADDING', (0,0), (-1,-1), 8),
     ]))
     flowables.append(tab_sumario)
-    flowables.append(Spacer(1, 15))
-    flowables.append(Paragraph("<b>METODOLOGIA DE APLICAÇÃO:</b> Siga os capítulos em ordem cronológica e certifique-se de preencher todos os checklists antes de iniciar o módulo subsequente.", estilo_corpo))
     flowables.append(PageBreak())
 
-    # 4. CAPÍTULOS DE 1 A 6 (CADA CAPÍTULO GERA 2 PÁGINAS DEDICADAS -> TOTAL 12 PÁGINAS DE CONTEÚDO)
     for idx, mod in enumerate(modulos_conteudo, 1):
         tit_m = sanitizar_texto(mod.get("titulo", f"Módulo {idx}"))
         sub_m = sanitizar_texto(mod.get("subtitulo", "Instruções Técnicas"))
@@ -1005,7 +974,6 @@ def compilar_livro_tecnico_pdf(titulo: str, subtitulo: str, publico: str, caminh
         p2 = sanitizar_texto(mod.get("conteudo_p2", ""))
         chk = sanitizar_texto(mod.get("checklist", ""))
 
-        # PÁGINA A DO MÓDULO: FUNDAMENTAÇÃO E CONCEITOS
         flowables.append(Paragraph(f"CAPÍTULO {idx}: {tit_m.upper()}", estilo_h1))
         flowables.append(Paragraph(sub_m, estilo_h2))
         flowables.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#2563EB"), spaceAfter=14, spaceBefore=4))
@@ -1016,15 +984,14 @@ def compilar_livro_tecnico_pdf(titulo: str, subtitulo: str, publico: str, caminh
         flowables.append(Paragraph(p2, estilo_corpo))
         flowables.append(PageBreak())
 
-        # PÁGINA B DO MÓDULO: PROCEDIMENTO, TABELA E CHECKLIST
         flowables.append(Paragraph(f"ROTEIRO DE EXECUÇÃO: {tit_m.upper()}", estilo_h1))
         flowables.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#2563EB"), spaceAfter=14, spaceBefore=4))
         flowables.append(Paragraph("<b>2.1 Tabela de Indicadores & Frequência:</b>", estilo_h2))
         dados_tabela = [
             [Paragraph(f"<b>{tl['etapa']}</b>", estilo_box), Paragraph(f"<b>{tl['acao']}</b>", estilo_box), Paragraph(f"<b>{tl['freq']}</b>", estilo_box)],
-            [Paragraph("Fase 1", estilo_box), Paragraph("Revisão dos parâmetros e preparação de insumos", estilo_box), Paragraph("Diária", estilo_box)],
-            [Paragraph("Fase 2", estilo_box), Paragraph("Execução do protocolo operacional com medição técnica", estilo_box), Paragraph("Por ciclo", estilo_box)],
-            [Paragraph("Fase 3", estilo_box), Paragraph("Auditoria de qualidade, entrega e registro de métricas", estilo_box), Paragraph("Semanal", estilo_box)],
+            [Paragraph("Fase 1", estilo_box), Paragraph("Revisão dos parâmetros e preparação", estilo_box), Paragraph("Diária", estilo_box)],
+            [Paragraph("Fase 2", estilo_box), Paragraph("Execução do protocolo operacional", estilo_box), Paragraph("Por ciclo", estilo_box)],
+            [Paragraph("Fase 3", estilo_box), Paragraph("Auditoria de qualidade e entrega", estilo_box), Paragraph("Semanal", estilo_box)],
         ]
         t = Table(dados_tabela, colWidths=[80, 300, 120])
         t.setStyle(TableStyle([
@@ -1050,18 +1017,14 @@ def compilar_livro_tecnico_pdf(titulo: str, subtitulo: str, publico: str, caminh
 
         flowables.append(PageBreak())
 
-    # 5. PÁGINA FINAL: CONCLUSÃO & PLANO DE AÇÃO DE 30 DIAS
     flowables.append(Paragraph(tl['conclusao_tit'], estilo_h1))
     flowables.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#10B981"), spaceAfter=14, spaceBefore=4))
-    flowables.append(Paragraph(
-        "Parabéns por concluir o estudo de todas as etapas deste manual técnico. A previsibilidade dos seus resultados será fruto direto da consistência na aplicação diária dos checklists.",
-        estilo_corpo
-    ))
+    flowables.append(Paragraph("Parabéns por concluir o estudo de todas as etapas deste manual técnico.", estilo_corpo))
     flowables.append(Spacer(1, 15))
 
     quadro_final = [
         [Paragraph(f"<b>{tl['plano_30dias']}:</b>", estilo_box)],
-        [Paragraph("• <b>Semana 1:</b> Configuração do ambiente, alinhamento técnico e validação dos processos.<br/>• <b>Semana 2:</b> Primeiras aplicações práticas com controle de qualidade e registros.<br/>• <b>Semana 3:</b> Otimização de margens, redução de gargalos e refinamento do método.<br/>• <b>Semana 4:</b> Escala de aquisição e alavancagem contínua dos resultados.", estilo_box)]
+        [Paragraph("• <b>Semana 1:</b> Configuração e alinhamento inicial.<br/>• <b>Semana 2:</b> Primeiras aplicações práticas.<br/>• <b>Semana 3:</b> Otimização de margens.<br/>• <b>Semana 4:</b> Escala contínua.", estilo_box)]
     ]
     tab_final = Table(quadro_final, colWidths=[400])
     tab_final.setStyle(TableStyle([
@@ -1075,11 +1038,7 @@ def compilar_livro_tecnico_pdf(titulo: str, subtitulo: str, publico: str, caminh
     return caminho_pdf
 
 def compilar_order_bump_pdf(titulo: str, caminho_pdf: str, idioma: str = "Português (Brasil)"):
-    doc = SimpleDocTemplate(
-        caminho_pdf,
-        pagesize=letter,
-        leftMargin=54, rightMargin=54, topMargin=54, bottomMargin=54
-    )
+    doc = SimpleDocTemplate(caminho_pdf, pagesize=letter, leftMargin=54, rightMargin=54, topMargin=54, bottomMargin=54)
     estilos = getSampleStyleSheet()
     tl = obter_textos_layout(idioma)
 
@@ -1091,16 +1050,16 @@ def compilar_order_bump_pdf(titulo: str, caminho_pdf: str, idioma: str = "Portug
     flowables.append(Spacer(1, 20))
     flowables.append(Paragraph(f"{tl['checklist_tit'].upper()} & GUIA DE EXECUÇÃO", estilo_tit))
     flowables.append(Spacer(1, 8))
-    flowables.append(Paragraph(f"Material Complementar de Alto Valor: {titulo}", estilo_sub))
+    flowables.append(Paragraph(f"Material Complementar: {titulo}", estilo_sub))
     flowables.append(Spacer(1, 15))
     flowables.append(HRFlowable(width="100%", thickness=2, color=colors.HexColor("#10B981"), spaceAfter=20, spaceBefore=5))
 
     checklist_dados = [
-        ["[  ]", Paragraph("<b>Fase 1: Preparação & Pré-Requisitos</b> - Verificação rigorosa dos insumos e setup de trabalho.", estilo_item)],
-        ["[  ]", Paragraph("<b>Fase 2: Implementação do Protocolo</b> - Aplicação do método passo a passo conforme os módulos técnicos.", estilo_item)],
-        ["[  ]", Paragraph("<b>Fase 3: Teste de Consistência</b> - Auditoria de qualidade para assegurar padrão elevado sem falhas.", estilo_item)],
-        ["[  ]", Paragraph("<b>Fase 4: Lançamento & Entrega</b> - Ativação oficial para clientes com acompanhamento dos indicadores.", estilo_item)],
-        ["[  ]", Paragraph("<b>Fase 5: Rotina de Otimização</b> - Revisão periódica para multiplicar margem e escalar a operação.", estilo_item)]
+        ["[  ]", Paragraph("<b>Fase 1: Preparação & Pré-Requisitos</b> - Verificação de insumos.", estilo_item)],
+        ["[  ]", Paragraph("<b>Fase 2: Implementação do Protocolo</b> - Aplicação passo a passo.", estilo_item)],
+        ["[  ]", Paragraph("<b>Fase 3: Teste de Consistência</b> - Auditoria de qualidade.", estilo_item)],
+        ["[  ]", Paragraph("<b>Fase 4: Lançamento & Entrega</b> - Entrega final.", estilo_item)],
+        ["[  ]", Paragraph("<b>Fase 5: Rotina de Otimização</b> - Revisão contínua.", estilo_item)]
     ]
 
     tab = Table(checklist_dados, colWidths=[35, 465])
@@ -1112,14 +1071,11 @@ def compilar_order_bump_pdf(titulo: str, caminho_pdf: str, idioma: str = "Portug
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
     ]))
     flowables.append(tab)
-    flowables.append(Spacer(1, 30))
-    flowables.append(Paragraph("💡 <i>Dica DubfyAi: Imprima este checklist ou use no dispositivo para marcar cada marco atingido.</i>", estilo_item))
-
     doc.build(flowables)
     return caminho_pdf
 
 # ==============================================================================
-# 6. GERADOR DO HTML E INTEGRAÇÃO TIKTOK
+# 6. GERADOR DO HTML BLINDADO (COM TARGET _BLANK E SUPORTE A YOUTUBE)
 # ==============================================================================
 TIKTOK_API_BASE = "https://business-api.tiktok.com/open_api/v1.3"
 
@@ -1175,8 +1131,23 @@ def disparar_campanha_tiktok_completa(
 
     return {"video_id": video_id, "campaign_id": campaign_id, "adgroup_id": adgroup_id, "ad_id": res_ad["data"]["ad_ids"][0]}
 
-def gerar_html_landing_page(titulo: str, promessa: str, url_video_mp4: str, link_kiwify: str, delay_segundos: int = 147, pixel_id: str = "", idioma: str = "Português (Brasil)") -> str:
+def extrair_embed_youtube(url: str) -> Optional[str]:
+    """Converte links do YouTube para URL de embed segura."""
+    if not url:
+        return None
+    padrao = r'(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})'
+    match = re.search(padrao, url)
+    if match:
+        return f"https://www.youtube.com/embed/{match.group(1)}?autoplay=1&mute=1&playsinline=1"
+    return None
+
+def gerar_html_landing_page(
+    titulo: str, promessa: str, url_video_mp4: str, link_kiwify: str,
+    delay_segundos: int = 0, pixel_id: str = "", idioma: str = "Português (Brasil)"
+) -> str:
     tl = obter_textos_layout(idioma)
+    yt_embed = extrair_embed_youtube(url_video_mp4)
+
     script_pixel = f"""
     !function (w, d, t) {{
       w.TiktokAnalyticsObject=t;var tt=w[t]=w[t]||[];tt.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie"],tt.setAndDefer=function(t,e){{t[e]=function(){{t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}}};for(var i=0;i<tt.methods.length;i++)tt.setAndDefer(tt,tt.methods[i]);tt.instance=function(t){{for(var e=tt._i[t]||[],n=0;n<tt.methods.length;n++)tt.setAndDefer(e,tt.methods[n]);return e}},tt.load=function(e,n){{var i="https://analytics.tiktok.com/i18n/pixel/events.js";tt._i=tt._i||{{}},tt._i[e]=[],tt._i[e]._u=i,tt._t=tt._t||{{}},tt._t[e]=+new Date,tt._o=tt._o||{{}},tt._o[e]=n||{{}};var o=document.createElement("script");o.type="text/javascript",o.async=!0,o.src=i+"?type=plugins&sdkid="+e;var a=document.getElementsByTagName("script")[0];a.parentNode.insertBefore(o,a)}};
@@ -1184,6 +1155,27 @@ def gerar_html_landing_page(titulo: str, promessa: str, url_video_mp4: str, link
       tt.page();
     }}(window, document, 'ttq');
     """ if pixel_id else ""
+
+    # Se for YouTube, renderiza iframe; senão, player nativo com controles
+    if yt_embed:
+        player_html = f"""
+        <div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:12px;">
+          <iframe src="{yt_embed}" title="Vídeo de Vendas" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+        </div>
+        """
+    else:
+        player_html = f"""
+        <div class="video-wrapper">
+          <div id="unmuteOverlay" class="unmute-overlay">
+            <div class="unmute-btn">{tl['lp_unmute']}</div>
+          </div>
+          <video id="vslVideo" playsinline autoplay muted preload="auto" controlslist="nodownload">
+            <source src="{url_video_mp4}" type="video/mp4">
+          </video>
+        </div>
+        """
+
+    display_inicial_oferta = "block" if delay_segundos <= 0 else "none"
 
     return f"""<!DOCTYPE html>
 <html lang="pt-BR">
@@ -1194,33 +1186,28 @@ def gerar_html_landing_page(titulo: str, promessa: str, url_video_mp4: str, link
   <script>{script_pixel}</script>
   <style>
     * {{ box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }}
-    body {{ background-color: #0b0f19; color: #ffffff; text-align: center; padding: 20px 16px; }}
-    .container {{ max-width: 580px; margin: 0 auto; }}
-    .badge {{ display: inline-block; background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid #ef4444; padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: bold; margin-bottom: 12px; }}
-    h1 {{ font-size: 21px; line-height: 1.35; margin-bottom: 16px; font-weight: 800; }}
-    .video-wrapper {{ position: relative; width: 100%; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 1px solid #1f2937; }}
+    body {{ background-color: #0b0f19; color: #ffffff; text-align: center; padding: 24px 16px; }}
+    .container {{ max-width: 650px; margin: 0 auto; }}
+    .badge {{ display: inline-block; background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid #ef4444; padding: 6px 14px; border-radius: 999px; font-size: 13px; font-weight: bold; margin-bottom: 14px; }}
+    h1 {{ font-size: 22px; line-height: 1.4; margin-bottom: 18px; font-weight: 800; color: #f8fafc; }}
+    .video-wrapper {{ position: relative; width: 100%; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 10px 30px rgba(0,0,0,0.6); border: 1px solid #1f2937; }}
     video {{ width: 100%; display: block; }}
-    .unmute-overlay {{ position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.45); cursor: pointer; z-index: 10; }}
-    .unmute-btn {{ background: #ef4444; color: #fff; padding: 12px 24px; border-radius: 50px; font-weight: bold; font-size: 14px; box-shadow: 0 4px 15px rgba(239, 68, 68, 0.6); }}
-    #oferta-container {{ display: none; margin-top: 24px; }}
-    .btn-checkout {{ display: block; width: 100%; background: #22c55e; color: #000; font-size: 19px; font-weight: 900; text-decoration: none; padding: 18px; border-radius: 8px; text-transform: uppercase; box-shadow: 0 6px 20px rgba(34, 197, 94, 0.4); }}
-    .garantia {{ font-size: 12px; color: #9ca3af; margin-top: 10px; }}
+    .unmute-overlay {{ position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); cursor: pointer; z-index: 10; }}
+    .unmute-btn {{ background: #ef4444; color: #fff; padding: 14px 28px; border-radius: 50px; font-weight: bold; font-size: 15px; box-shadow: 0 4px 15px rgba(239, 68, 68, 0.6); }}
+    #oferta-container {{ display: {display_inicial_oferta}; margin-top: 28px; animation: fadeIn 0.4s ease-in; }}
+    @keyframes fadeIn {{ from {{ opacity: 0; transform: translateY(10px); }} to {{ opacity: 1; transform: translateY(0); }} }}
+    .btn-checkout {{ display: block; width: 100%; background: #22c55e; color: #052e16; font-size: 20px; font-weight: 900; text-decoration: none; padding: 20px; border-radius: 10px; text-transform: uppercase; box-shadow: 0 6px 20px rgba(34, 197, 94, 0.45); transition: transform 0.15s, background-color 0.15s; }}
+    .btn-checkout:hover {{ background-color: #16a34a; color: #ffffff; transform: scale(1.02); }}
+    .garantia {{ font-size: 13px; color: #94a3b8; margin-top: 12px; }}
   </style>
 </head>
 <body>
   <div class="container">
     <div class="badge">{tl['lp_badge']}</div>
     <h1>{promessa}</h1>
-    <div class="video-wrapper">
-      <div id="unmuteOverlay" class="unmute-overlay">
-        <div class="unmute-btn">{tl['lp_unmute']}</div>
-      </div>
-      <video id="vslVideo" playsinline autoplay muted preload="auto">
-        <source src="{url_video_mp4}" type="video/mp4">
-      </video>
-    </div>
+    {player_html}
     <div id="oferta-container">
-      <a href="{link_kiwify}" id="checkoutBtn" class="btn-checkout">{tl['lp_btn']}</a>
+      <a href="{link_kiwify}" id="checkoutBtn" class="btn-checkout" target="_blank" rel="noopener noreferrer">{tl['lp_btn']}</a>
       <div class="garantia">{tl['lp_garantia']}</div>
     </div>
   </div>
@@ -1229,27 +1216,34 @@ def gerar_html_landing_page(titulo: str, promessa: str, url_video_mp4: str, link
     const overlay = document.getElementById('unmuteOverlay');
     const oferta = document.getElementById('oferta-container');
     const checkoutBtn = document.getElementById('checkoutBtn');
+    const delaySegundos = {delay_segundos};
 
-    overlay.addEventListener('click', () => {{
-      video.muted = false;
-      video.play();
-      overlay.style.display = 'none';
-    }});
-
-    function liberar() {{
-      oferta.style.display = 'block';
-      localStorage.setItem('oferta_liberada_{abs(hash(titulo)) % 10000}', 'true');
+    if (overlay && video) {{
+      overlay.addEventListener('click', () => {{
+        video.muted = false;
+        video.play();
+        overlay.style.display = 'none';
+      }});
     }}
 
-    if (localStorage.getItem('oferta_liberada_{abs(hash(titulo)) % 10000}') === 'true') {{
-      oferta.style.display = 'block';
-    }}
-
-    video.addEventListener('timeupdate', () => {{
-      if (video.currentTime >= {delay_segundos}) {{
-        liberar();
+    function liberarBotao() {{
+      if (oferta) {{
+        oferta.style.display = 'block';
+        try {{ localStorage.setItem('oferta_liberada_{abs(hash(titulo)) % 10000}', 'true'); }} catch(e) {{}}
       }}
-    }});
+    }}
+
+    if (delaySegundos <= 0 || localStorage.getItem('oferta_liberada_{abs(hash(titulo)) % 10000}') === 'true') {{
+      liberarBotao();
+    }} else if (video) {{
+      video.addEventListener('timeupdate', () => {{
+        if (video.currentTime >= delaySegundos) {{
+          liberarBotao();
+        }}
+      }});
+    }} else {{
+      setTimeout(liberarBotao, delaySegundos * 1000);
+    }}
 
     window.addEventListener('DOMContentLoaded', () => {{
       const params = window.location.search;
@@ -1257,9 +1251,7 @@ def gerar_html_landing_page(titulo: str, promessa: str, url_video_mp4: str, link
         try {{
           const urlObj = new URL(checkoutBtn.href, window.location.origin);
           const currentParams = new URLSearchParams(params);
-          currentParams.forEach((val, key) => {{
-            urlObj.searchParams.set(key, val);
-          }});
+          currentParams.forEach((val, key) => {{ urlObj.searchParams.set(key, val); }});
           checkoutBtn.href = urlObj.toString();
         }} catch(e) {{
           const sep = checkoutBtn.href.includes('?') ? '&' : '?';
@@ -1268,9 +1260,11 @@ def gerar_html_landing_page(titulo: str, promessa: str, url_video_mp4: str, link
       }}
     }});
 
-    checkoutBtn.addEventListener('click', () => {{
-      if (typeof ttq !== 'undefined') ttq.track('InitiateCheckout');
-    }});
+    if (checkoutBtn) {{
+      checkoutBtn.addEventListener('click', () => {{
+        if (typeof ttq !== 'undefined') ttq.track('InitiateCheckout');
+      }});
+    }}
   </script>
 </body>
 </html>"""
@@ -1280,29 +1274,31 @@ def gerar_html_landing_page(titulo: str, promessa: str, url_video_mp4: str, link
 # ==============================================================================
 ESTADOS_INICIAIS = {
     "idioma_funil_ativo": "Português (Brasil)",
-    "nicho_pesquisado_nome": "Confeitaria Lucrativa & Bolos Caseiros",
-    "miner_nome_produto": "Método Confeitaria Lucrativa & Bolos Caseiros",
-    "miner_promessa": "Domine as receitas mais pedidas e fature da cozinha da sua casa",
-    "miner_publico": "Mulheres e empreendedoras que buscam renda extra com doces",
-    "miner_mecanismo": "Protocolo de Produção Padronizada Sem Glúten",
-    "miner_oferta": "Apenas R$ 97,00 com acesso vitalício, 3 bônus exclusivos e 7 dias de garantia",
-    "miner_dores": "Falta de receitas testadas, desperdício de ingredientes e medo de não conseguir vender",
-    "miner_gads": "Palavras-chave: curso de bolos caseiros, como fazer bolos para vender\nNegativas: gratis, download",
-    "miner_dossie": "### Dossiê de Mercado\nO mercado de confeitaria artesanal cresce consistentemente no Brasil.",
-    "vsl_input_tema": "Método Confeitaria Lucrativa & Bolos Caseiros",
-    "vsl_input_promessa": "Domine as receitas mais pedidas e fature da cozinha da sua casa",
-    "vsl_input_publico": "Mulheres e empreendedoras que buscam renda extra com doces",
+    "nicho_pesquisado_nome": "Gastronomia & Pães Sem Glúten",
+    "miner_nome_produto": "Manual Prático para Produção de Pães Sem Glúten",
+    "miner_promessa": "Aprenda a fazer pães sem glúten perfeitos, macios e lucrativos da sua cozinha",
+    "miner_publico": "Pessoas com intolerância a glúten e confeiteiras que buscam faturar",
+    "miner_mecanismo": "Protocolo de Fermentação e Misturas de Farinhas Nobres",
+    "miner_oferta": "Acesso imediato ao manual prático com bônus exclusivos e 7 dias de garantia",
+    "miner_dores": "Pães duros, que esfarelam, desperdício de farinhas caras e receitas sem sabor",
+    "miner_gads": "Palavras-chave: curso paes sem gluten, como fazer pao sem gluten para vender",
+    "miner_dossie": "### Dossiê de Mercado\nO mercado de alimentação saudável e sem glúten cresce mais de 20% ao ano.",
+    "vsl_input_tema": "Manual Prático para Produção de Pães Sem Glúten",
+    "vsl_input_promessa": "Aprenda a fazer pães sem glúten perfeitos e fature da sua cozinha",
+    "vsl_input_publico": "Pessoas com intolerância a glúten e empreendedoras",
     "vsl_marca_ativa": "",
-    "ap_prod_nome": "Método Confeitaria Lucrativa & Bolos Caseiros",
-    "ap_prod_nicho": "Confeitaria Lucrativa & Bolos Caseiros",
-    "ap_prod_promessa": "Domine as receitas mais pedidas e fature da cozinha da sua casa",
-    "ap_prod_publico": "Mulheres e empreendedoras que buscam renda extra com doces",
-    "ap_prod_oferta": "Apenas R$ 97,00 com acesso vitalício, 3 bônus exclusivos e 7 dias de garantia",
+    "ap_prod_nome": "Manual Prático para Produção de Pães Sem Glúten",
+    "ap_prod_nicho": "Gastronomia & Pães Sem Glúten",
+    "ap_prod_promessa": "Aprenda a fazer pães sem glúten perfeitos e fature da sua cozinha",
+    "ap_prod_publico": "Pessoas com intolerância a glúten e empreendedoras",
+    "ap_prod_oferta": "Acesso vitalício com bônus exclusivos e 7 dias de garantia",
     "ap_marca_dagua": "",
-    "ebook_input_tema": "Manual Prático: Confeitaria Lucrativa & Bolos Caseiros",
-    "ebook_input_publico": "Mulheres e empreendedoras que buscam renda extra com doces",
+    "ebook_input_tema": "Manual Prático para Produção de Pães Sem Glúten",
+    "ebook_input_publico": "Pessoas com intolerância a glúten e empreendedoras",
     "roteiro_vsl_salvo": [],
-    "roteiro_pitch_salvo": []
+    "roteiro_pitch_salvo": [],
+    "lp_video_url_ativa": "https://vzelyaubnynefsfumhtz.supabase.co/storage/v1/object/public/videos/vsl_master_fundido(1).mp4",
+    "lp_kiwify_url_ativa": "https://pay.kiwify.com.br/ysOcAav"
 }
 
 for k_init, v_init in ESTADOS_INICIAIS.items():
@@ -1326,26 +1322,20 @@ def sincronizar_campos_mineracao():
     st.session_state["ap_prod_publico"] = pub
     st.session_state["ap_prod_oferta"] = oft
 
-    st.session_state["ebook_input_tema"] = f"Manual Prático: {prod}"
+    st.session_state["ebook_input_tema"] = prod
     st.session_state["ebook_input_publico"] = pub
 
 # ==============================================================================
-# SIDEBAR COM GESTÃO DE IDIOMA GLOBAL, ELEVENLABS E CONEXÕES
+# SIDEBAR
 # ==============================================================================
 with st.sidebar:
     st.markdown("## ⚡ Central DubfyAi & VSL")
-    st.caption("Automação de Produtos Digitais & Escala Internacional")
+    st.caption("Automação de Produtos Digitais & Páginas de Vendas")
     st.markdown("---")
 
-    # SELETOR GLOBAL DE IDIOMA DO DUBFYAI
-    st.markdown("##### 🌍 Idioma Principal do Funil:")
+    st.markdown("##### 🌍 Mercado / Idioma do Funil:")
     idx_idioma_padrao = IDIOMAS_DISPONIVEIS.index(st.session_state["idioma_funil_ativo"]) if st.session_state["idioma_funil_ativo"] in IDIOMAS_DISPONIVEIS else 0
-    idioma_funil_sel = st.selectbox(
-        "Selecione o Mercado / Idioma Alvo:",
-        IDIOMAS_DISPONIVEIS,
-        index=idx_idioma_padrao,
-        key="sb_idioma_sel"
-    )
+    idioma_funil_sel = st.selectbox("Idioma Ativo:", IDIOMAS_DISPONIVEIS, index=idx_idioma_padrao, key="sb_idioma_sel")
     st.session_state["idioma_funil_ativo"] = idioma_funil_sel
     st.markdown("---")
 
@@ -1365,12 +1355,11 @@ with st.sidebar:
     with col_s2: st.metric("Compras", dados_user["total_compras"])
 
     st.markdown("---")
-    st.caption("Status das Conexões Oficiais:")
-    st.write("• ElevenLabs (DubfyAi):", "🟢 Ativo" if ELEVENLABS_API_KEY else "🔴 Ausente (Fallback OpenAI)")
-    st.write("• Supabase Storage:", "🟢 Ativo" if SUPABASE_URL and SUPABASE_KEY else "🔴 Pendente")
+    st.caption("Status das Conexões:")
+    st.write("• Supabase Storage:", "🟢 Conectado" if SUPABASE_URL and SUPABASE_KEY else "🔴 Ausente")
+    st.write("• ElevenLabs TTS:", "🟢 Ativo" if ELEVENLABS_API_KEY else "🟡 Fallback OpenAI")
     st.write("• OpenAI Inteligência:", "🟢 Ativo" if OPENAI_API_KEY else "🔴 Ausente")
-    st.write("• Pexels Filmagens:", "🟢 Ativo" if PEXELS_API_KEY else "🔴 Ausente")
-    st.write("• TikTok Ads:", "🟢 Ativo" if TIKTOK_ACCESS_TOKEN else "🟡 Aguardando Token")
+    st.write("• Pexels Vídeos:", "🟢 Ativo" if PEXELS_API_KEY else "🔴 Ausente")
 
 # ==============================================================================
 # ABAS DO SISTEMA
@@ -1381,21 +1370,21 @@ tab_minerador, tab_vsl, tab_apresentacao, tab_fusao, tab_ebook, tab_ads, tab_mas
     "🎥 3. Apresentação (3 Min)",
     "🎞️ 4. Junção Contínua & Trilha",
     "📚 5. Livro Técnico & Order Bump",
-    "🎯 6. Central TikTok Ads & Funil",
+    "🎯 6. Central Landing Page & Kiwify",
     "👑 7. Gestão Master"
 ])
 
 # ------------------------------------------------------------------------------
-# ABA 1: MINERADOR & GOOGLE ADS COM TRADUÇÃO MULTILÍNGUE
+# ABA 1: MINERADOR & GOOGLE ADS
 # ------------------------------------------------------------------------------
 with tab_minerador:
     st.markdown("## 🔍 1. Minerador de Nicho Estratégico & Google Ads")
     col_m1, col_m2, col_m3 = st.columns([2, 1, 1.2])
     with col_m1:
         nicho_sel = st.selectbox("Selecione um Nicho ou Digite:", [
+            "🍞 Gastronomia & Pães Sem Glúten",
             "🎂 Confeitaria Lucrativa & Bolos Caseiros",
             "🐕 Adestramento Canino & Comportamento Pet",
-            "🍞 Gastronomia & Pães Sem Glúten",
             "💰 Renda Extra & Milhas Aéreas",
             "✍️ Digitar Nicho Manual..."
         ])
@@ -1410,9 +1399,9 @@ with tab_minerador:
         nicho_manual = st.text_input("Digite o Nicho:")
         if nicho_manual.strip(): nicho_final = nicho_manual.strip()
 
-    col_btn_m1, col_btn_m2, col_btn_m3 = st.columns([1.5, 1.5, 1.2])
+    col_btn_m1, col_btn_m2 = st.columns([1.5, 1.5])
     with col_btn_m1:
-        if st.button("🚀 Analisar Nicho & Gerar no Idioma Selecionado", type="primary", use_container_width=True):
+        if st.button("🚀 Analisar Nicho & Gerar Estrutura", type="primary", use_container_width=True):
             with st.spinner(f"Minerando mercado em {idioma_miner}..."):
                 res_m = minerar_nicho_profundo_ia(nicho_final, profundidade, idioma=idioma_miner)
                 st.session_state["nicho_pesquisado_nome"] = nicho_final
@@ -1425,26 +1414,13 @@ with tab_minerador:
                 st.session_state["miner_gads"] = res_m.get("campanha_google_ads", "")
                 st.session_state["miner_dossie"] = res_m.get("dossie_markdown", "")
                 sincronizar_campos_mineracao()
-                st.success(f"✅ Análise de mercado concluída em {idioma_miner}!")
+                st.success(f"✅ Análise concluída em {idioma_miner}!")
                 st.rerun()
 
     with col_btn_m2:
         if st.button("🔄 Sincronizar Alterações com Todas as Abas", use_container_width=True):
             sincronizar_campos_mineracao()
-            st.success("✅ Todas as abas sincronizadas com os dados atuais!")
-
-    with col_btn_m3:
-        if st.button("🌐 Traduzir Análise Atual", use_container_width=True):
-            with st.spinner(f"Traduzindo campos para {idioma_miner}..."):
-                st.session_state["miner_nome_produto"] = traduzir_conteudo_ia(st.session_state.get("miner_nome_produto", ""), idioma_miner)
-                st.session_state["miner_promessa"] = traduzir_conteudo_ia(st.session_state.get("miner_promessa", ""), idioma_miner)
-                st.session_state["miner_publico"] = traduzir_conteudo_ia(st.session_state.get("miner_publico", ""), idioma_miner)
-                st.session_state["miner_mecanismo"] = traduzir_conteudo_ia(st.session_state.get("miner_mecanismo", ""), idioma_miner)
-                st.session_state["miner_oferta"] = traduzir_conteudo_ia(st.session_state.get("miner_oferta", ""), idioma_miner)
-                st.session_state["miner_dores"] = traduzir_conteudo_ia(st.session_state.get("miner_dores", ""), idioma_miner)
-                sincronizar_campos_mineracao()
-                st.success(f"✅ Campos traduzidos para {idioma_miner}!")
-                st.rerun()
+            st.success("✅ Todas as abas sincronizadas!")
 
     st.markdown("---")
     col_ed1, col_ed2 = st.columns(2)
@@ -1455,26 +1431,20 @@ with tab_minerador:
     with col_ed2:
         st.text_input("🎯 Público-Alvo:", key="miner_publico", on_change=sincronizar_campos_mineracao)
         st.text_input("💰 Condição da Oferta:", key="miner_oferta", on_change=sincronizar_campos_mineracao)
-        st.text_area("💥 Dores & Objeções Principais:", key="miner_dores", height=68)
-
-    with st.expander("📊 Campanha Google Ads & Dossiê Completo", expanded=False):
-        st.text_area("Estrutura Google Ads (Palavras-chave e Anúncios):", key="miner_gads", height=150)
-        st.markdown(st.session_state.get("miner_dossie", ""))
+        st.text_area("💥 Dores & Objeções:", key="miner_dores", height=68)
 
 # ------------------------------------------------------------------------------
-# ABA 2: VSL CURTA (27S) COM SISTEMA DE TRADUÇÃO DUBFYAI & ELEVENLABS
+# ABA 2: VSL CURTA (27S)
 # ------------------------------------------------------------------------------
 with tab_vsl:
     st.markdown("## 🚀 2. Criador de VSL Curta (27s - Criativo de Anúncio)")
-    st.caption("Crie criativos para anúncios locais ou internacionais com tradução instantânea e vozes realistas do ElevenLabs.")
-
     col_v_lang1, col_v_lang2 = st.columns([1.5, 2.5])
     with col_v_lang1:
         idx_id_vsl = IDIOMAS_DISPONIVEIS.index(st.session_state["idioma_funil_ativo"]) if st.session_state["idioma_funil_ativo"] in IDIOMAS_DISPONIVEIS else 0
-        idioma_vsl = st.selectbox("Idioma da Locução do Criativo:", IDIOMAS_DISPONIVEIS, index=idx_id_vsl, key="idioma_vsl_sel")
+        idioma_vsl = st.selectbox("Idioma da Locução:", IDIOMAS_DISPONIVEIS, index=idx_id_vsl, key="idioma_vsl_sel")
     with col_v_lang2:
         vozes_disponiveis = list(VOZES_ELEVENLABS.keys()) + ["onyx", "alloy", "echo", "nova"]
-        voz_vsl = st.selectbox("Locução (ElevenLabs Multilíngue / DubfyAi):", vozes_disponiveis, index=0)
+        voz_vsl = st.selectbox("Voz do Anúncio:", vozes_disponiveis, index=0)
 
     col_v1, col_v2 = st.columns(2)
     with col_v1:
@@ -1485,66 +1455,40 @@ with tab_vsl:
         marca_vsl = st.text_input("Marca d'água no Vídeo:", value=st.session_state.get("vsl_marca_ativa", ""))
         plat_vsl = st.selectbox("Formato do Criativo:", list(PRESETS_PLATAFORMAS.keys()), index=0)
 
-    col_btn_v1, col_btn_v2 = st.columns([2, 1])
-    with col_btn_v1:
-        if st.button("🎬 Gerar e Renderizar VSL Curta (20 cr)", type="primary", use_container_width=True):
-            if saldo_atual < 20:
-                st.error("❌ Saldo insuficiente!")
-            else:
-                barra = st.progress(0.0)
-                with st.spinner(f"Gerando roteiro em {idioma_vsl} e sintetizando com ElevenLabs..."):
-                    cenas = gerar_roteiro_vsl_ia(tema_vsl, promessa_vsl, publico_vsl, 5, idioma=idioma_vsl)
-                    st.session_state["roteiro_vsl_salvo"] = cenas
-                    v_pronto = renderizar_vsl_completa(cenas, plat_vsl, voz_vsl, PEXELS_API_KEY, marca_dagua=marca_vsl, progress_bar=barra)
-                    debitar_creditos_cloud(email_usuario, f"VSL Curta ({idioma_vsl})", 20)
-                    st.session_state["video_vsl_pronto"] = v_pronto
-                    st.session_state["vsl_marca_ativa"] = marca_vsl
-                    st.success(f"✅ VSL Curta finalizada com áudio estéreo em {idioma_vsl}!")
-                    st.rerun()
-
-    with col_btn_v2:
-        if st.button("🌐 Traduzir Roteiro Atual", use_container_width=True):
-            cenas_atuais = st.session_state.get("roteiro_vsl_salvo", [])
-            if not cenas_atuais:
-                cenas_atuais = gerar_roteiro_vsl_ia(tema_vsl, promessa_vsl, publico_vsl, 5, idioma="Português (Brasil)")
-            with st.spinner(f"Traduzindo cenas para {idioma_vsl}..."):
-                cenas_tr = traduzir_cenas_vsl_ia(cenas_atuais, idioma_vsl)
-                st.session_state["roteiro_vsl_salvo"] = cenas_tr
-                st.success(f"✅ Roteiro traduzido com sucesso para {idioma_vsl}!")
+    if st.button("🎬 Gerar e Renderizar VSL Curta (20 cr)", type="primary", use_container_width=True):
+        if saldo_atual < 20:
+            st.error("❌ Saldo insuficiente!")
+        else:
+            barra = st.progress(0.0)
+            with st.spinner(f"Gerando roteiro e renderizando vídeo em {idioma_vsl}..."):
+                cenas = gerar_roteiro_vsl_ia(tema_vsl, promessa_vsl, publico_vsl, 5, idioma=idioma_vsl)
+                st.session_state["roteiro_vsl_salvo"] = cenas
+                v_pronto = renderizar_vsl_completa(cenas, plat_vsl, voz_vsl, PEXELS_API_KEY, marca_dagua=marca_vsl, progress_bar=barra)
+                debitar_creditos_cloud(email_usuario, f"VSL Curta ({idioma_vsl})", 20)
+                st.session_state["video_vsl_pronto"] = v_pronto
+                st.success("✅ VSL Curta finalizada!")
+                st.rerun()
 
     caminho_vsl_pronto = st.session_state.get("video_vsl_pronto")
     if caminho_vsl_pronto and os.path.exists(caminho_vsl_pronto):
         st.markdown("---")
-        st.markdown("#### 🎬 Vídeo Pronto para Uso:")
-        tam_mb = os.path.getsize(caminho_vsl_pronto) / (1024 * 1024)
-        st.caption(f"📁 **Salvo no computador em:** `{caminho_vsl_pronto}` ({tam_mb:.1f} MB)")
-        
         with open(caminho_vsl_pronto, "rb") as arq_vsl:
             bytes_vsl = arq_vsl.read()
             st.video(bytes_vsl, format="video/mp4")
-            st.download_button(
-                label=f"⬇️ Baixar Vídeo MP4 no Computador (27s - {idioma_vsl})",
-                data=bytes_vsl,
-                file_name=f"vsl_curta_{idioma_vsl[:2].lower()}.mp4",
-                mime="video/mp4",
-                type="primary",
-                use_container_width=True
-            )
+            st.download_button("⬇️ Baixar Vídeo MP4 (27s)", data=bytes_vsl, file_name="vsl_curta.mp4", mime="video/mp4", use_container_width=True)
 
 # ------------------------------------------------------------------------------
-# ABA 3: APRESENTAÇÃO 3 MIN COM SISTEMA DE TRADUÇÃO DUBFYAI & ELEVENLABS
+# ABA 3: APRESENTAÇÃO 3 MIN
 # ------------------------------------------------------------------------------
 with tab_apresentacao:
     st.markdown("## 🎥 3. Apresentação Longa (Pitch de 3 Minutos)")
-    st.caption("Gere a apresentação oficial de vendas (VSL longa) no idioma que desejar com locução humana ultra-realista.")
-
     col_ap_lang1, col_ap_lang2 = st.columns([1.5, 2.5])
     with col_ap_lang1:
         idx_id_ap = IDIOMAS_DISPONIVEIS.index(st.session_state["idioma_funil_ativo"]) if st.session_state["idioma_funil_ativo"] in IDIOMAS_DISPONIVEIS else 0
         idioma_ap = st.selectbox("Idioma da Apresentação:", IDIOMAS_DISPONIVEIS, index=idx_id_ap, key="idioma_ap_sel")
     with col_ap_lang2:
         vozes_ap_disp = list(VOZES_ELEVENLABS.keys()) + ["onyx", "alloy", "echo", "nova"]
-        voz_ap = st.selectbox("Locução do Pitch (ElevenLabs / DubfyAi):", vozes_ap_disp, index=0, key="voz_ap_sel")
+        voz_ap = st.selectbox("Voz da Apresentação:", vozes_ap_disp, index=0, key="voz_ap_sel")
 
     col_ap1, col_ap2 = st.columns(2)
     with col_ap1:
@@ -1554,60 +1498,37 @@ with tab_apresentacao:
     with col_ap2:
         p_pub = st.text_input("Público-Alvo:", key="ap_prod_publico")
         p_oft = st.text_input("Oferta / CTA:", key="ap_prod_oferta")
-        m_ap = st.text_input("Marca d'água no Vídeo:", value=st.session_state.get("vsl_marca_ativa", ""), key="marca_ap_input")
-        plat_ap = st.selectbox("Formato da Apresentação:", list(PRESETS_PLATAFORMAS.keys()), index=0, key="plat_ap_sel")
+        m_ap = st.text_input("Marca d'água:", value=st.session_state.get("vsl_marca_ativa", ""), key="marca_ap_input")
+        plat_ap = st.selectbox("Formato:", list(PRESETS_PLATAFORMAS.keys()), index=0, key="plat_ap_sel")
 
-    col_btn_ap1, col_btn_ap2 = st.columns([2, 1])
-    with col_btn_ap1:
-        if st.button("🎬 Gerar e Renderizar Apresentação de 3 Minutos (30 cr)", type="primary", use_container_width=True):
-            if saldo_atual < 30:
-                st.error("❌ Saldo insuficiente!")
-            else:
-                barra_ap = st.progress(0.0)
-                with st.spinner(f"Gerando 13 cenas em {idioma_ap} e sintetizando pitch com ElevenLabs..."):
-                    cenas_p = gerar_roteiro_apresentacao_3min_ia(p_nome, p_nicho, p_prom, p_pub, p_oft, idioma=idioma_ap)
-                    st.session_state["roteiro_pitch_salvo"] = cenas_p
-                    v_pitch = renderizar_vsl_completa(cenas_p, plat_ap, voz_ap, PEXELS_API_KEY, marca_dagua=m_ap, progress_bar=barra_ap)
-                    debitar_creditos_cloud(email_usuario, f"Apresentação Pitch ({idioma_ap})", 30)
-                    st.session_state["video_pitch_pronto"] = v_pitch
-                    st.success(f"✅ Apresentação de 3 minutos pronta com áudio estéreo em {idioma_ap}!")
-                    st.rerun()
-
-    with col_btn_ap2:
-        if st.button("🌐 Traduzir Pitch Atual", use_container_width=True):
-            cenas_pitch_atuais = st.session_state.get("roteiro_pitch_salvo", [])
-            if not cenas_pitch_atuais:
-                cenas_pitch_atuais = gerar_roteiro_apresentacao_3min_ia(p_nome, p_nicho, p_prom, p_pub, p_oft, idioma="Português (Brasil)")
-            with st.spinner(f"Traduzindo pitch para {idioma_ap}..."):
-                cenas_p_tr = traduzir_cenas_vsl_ia(cenas_pitch_atuais, idioma_ap)
-                st.session_state["roteiro_pitch_salvo"] = cenas_p_tr
-                st.success(f"✅ Pitch traduzido com sucesso para {idioma_ap}!")
+    if st.button("🎬 Gerar Apresentação de 3 Minutos (30 cr)", type="primary", use_container_width=True):
+        if saldo_atual < 30:
+            st.error("❌ Saldo insuficiente!")
+        else:
+            barra_ap = st.progress(0.0)
+            with st.spinner("Gerando 13 cenas e sintetizando pitch..."):
+                cenas_p = gerar_roteiro_apresentacao_3min_ia(p_nome, p_nicho, p_prom, p_pub, p_oft, idioma=idioma_ap)
+                st.session_state["roteiro_pitch_salvo"] = cenas_p
+                v_pitch = renderizar_vsl_completa(cenas_p, plat_ap, voz_ap, PEXELS_API_KEY, marca_dagua=m_ap, progress_bar=barra_ap)
+                debitar_creditos_cloud(email_usuario, f"Pitch 3 Min ({idioma_ap})", 30)
+                st.session_state["video_pitch_pronto"] = v_pitch
+                st.success("✅ Apresentação de 3 minutos pronta!")
+                st.rerun()
 
     caminho_pitch_pronto = st.session_state.get("video_pitch_pronto")
     if caminho_pitch_pronto and os.path.exists(caminho_pitch_pronto):
         st.markdown("---")
-        st.markdown("#### 🎬 Apresentação Pronta para Uso:")
-        tam_mb_pitch = os.path.getsize(caminho_pitch_pronto) / (1024 * 1024)
-        st.caption(f"📁 **Salvo no computador em:** `{caminho_pitch_pronto}` ({tam_mb_pitch:.1f} MB)")
-        
         with open(caminho_pitch_pronto, "rb") as arq_pitch:
             bytes_pitch = arq_pitch.read()
             st.video(bytes_pitch, format="video/mp4")
-            st.download_button(
-                label=f"⬇️ Baixar Apresentação MP4 no Computador (3 Min - {idioma_ap})",
-                data=bytes_pitch,
-                file_name=f"apresentacao_3min_{idioma_ap[:2].lower()}.mp4",
-                mime="video/mp4",
-                type="primary",
-                use_container_width=True
-            )
+            st.download_button("⬇️ Baixar Apresentação MP4 (3 Min)", data=bytes_pitch, file_name="apresentacao_3min.mp4", mime="video/mp4", use_container_width=True)
 
 # ------------------------------------------------------------------------------
-# ABA 4: JUNÇÃO CONTÍNUA & TRILHA DE FUNDO COM DOWNLOAD
+# ABA 4: JUNÇÃO CONTÍNUA & TRILHA DE FUNDO
 # ------------------------------------------------------------------------------
 with tab_fusao:
     st.markdown("## 🎞️ 4. Junção Contínua dos Vídeos & Masterização")
-    st.caption("Funde o gancho de 27s com a Apresentação, já otimizando o bitrate para carregar instantaneamente na Landing Page.")
+    st.caption("Funde o gancho de 27s com a Apresentação, gerando o arquivo final da VSL.")
 
     col_f1, col_f2 = st.columns(2)
     with col_f1:
@@ -1635,70 +1556,56 @@ with tab_fusao:
     col_t1, col_t2 = st.columns(2)
     with col_t1:
         musicas = listar_musicas_locais()
-        trilha_sel = st.selectbox("Trilha Sonora de Fundo:", list(musicas.keys()))
+        trilha_sel = st.selectbox("Trilha Sonora:", list(musicas.keys()))
         caminho_m = musicas[trilha_sel]
     with col_t2:
-        vol_m = st.slider("Volume da Trilha Sonora:", 0.02, 0.20, 0.08, 0.01)
+        vol_m = st.slider("Volume da Trilha:", 0.02, 0.20, 0.08, 0.01)
 
-    if st.button("⚡ Executar Fusão Contínua com Trilha Sonora", type="primary", use_container_width=True):
+    if st.button("⚡ Executar Fusão dos Vídeos", type="primary", use_container_width=True):
         if not caminho_v1 or not os.path.exists(caminho_v1):
-            st.error("Selecione ou gere o Vídeo 1 (27s).")
+            st.error("Gere ou selecione o Vídeo 1 (27s).")
         elif not caminho_v2 or not os.path.exists(caminho_v2):
-            st.error("Selecione ou gere o Vídeo 2 (Apresentação).")
+            st.error("Gere ou selecione o Vídeo 2 (Apresentação).")
         else:
-            with st.spinner("Concatenando e masterizando com áudio estéreo contínuo..."):
+            with st.spinner("Concatenando e masterizando com áudio estéreo..."):
                 try:
                     saida_fusao = os.path.join(DIR_FUSAO, f"vsl_master_fundida_{int(time.time())}.mp4")
                     fundir_videos_com_trilha(caminho_v1, caminho_v2, saida_fusao, caminho_m, vol_m)
                     st.session_state["video_master_fundido"] = saida_fusao
-                    tam_mb = os.path.getsize(saida_fusao) / (1024 * 1024)
-                    st.success(f"🎉 Vídeo Master gerado com sucesso! Tamanho: {tam_mb:.1f} MB.")
+                    st.success("🎉 Vídeo Master fundido com sucesso!")
                     st.rerun()
                 except Exception as e_f:
-                    st.error(f"Erro na fusão dos vídeos: {e_f}")
+                    st.error(f"Erro na fusão: {e_f}")
 
     caminho_fusao_pronto = st.session_state.get("video_master_fundido")
     if caminho_fusao_pronto and os.path.exists(caminho_fusao_pronto):
         st.markdown("---")
-        st.markdown("#### 🎬 Vídeo Master Fundido:")
-        tam_mb_f = os.path.getsize(caminho_fusao_pronto) / (1024 * 1024)
-        st.caption(f"📁 **Salvo no computador em:** `{caminho_fusao_pronto}` ({tam_mb_f:.1f} MB)")
-        
         with open(caminho_fusao_pronto, "rb") as arq_fusao:
             bytes_fusao = arq_fusao.read()
             st.video(bytes_fusao, format="video/mp4")
-            st.download_button(
-                label="⬇️ Baixar Vídeo Master Fundido (.mp4)",
-                data=bytes_fusao,
-                file_name="vsl_master_fundido.mp4",
-                mime="video/mp4",
-                type="primary",
-                use_container_width=True
-            )
+            st.download_button("⬇️ Baixar Vídeo Master Fundido (.mp4)", data=bytes_fusao, file_name="vsl_master_fundido.mp4", mime="video/mp4", use_container_width=True)
 
 # ------------------------------------------------------------------------------
-# ABA 5: LIVRO TÉCNICO COMPLETO (14-16 PÁGINAS) & ORDER BUMP MULTILÍNGUE
+# ABA 5: LIVRO TÉCNICO & ORDER BUMP
 # ------------------------------------------------------------------------------
 with tab_ebook:
     st.markdown("## 📚 5. Entrega Digital (.PDF) & Order Bump")
-    st.caption("Compila o livro técnico completo com 14 a 16 páginas estruturadas e o checklist complementar no idioma selecionado.")
-
     col_eb_lang1, col_eb_lang2 = st.columns([1.5, 2.5])
     with col_eb_lang1:
         idx_id_eb = IDIOMAS_DISPONIVEIS.index(st.session_state["idioma_funil_ativo"]) if st.session_state["idioma_funil_ativo"] in IDIOMAS_DISPONIVEIS else 0
-        idioma_ebook = st.selectbox("Idioma do Livro Digital:", IDIOMAS_DISPONIVEIS, index=idx_id_eb, key="idioma_eb_sel")
+        idioma_ebook = st.selectbox("Idioma do Material:", IDIOMAS_DISPONIVEIS, index=idx_id_eb, key="idioma_eb_sel")
     with col_eb_lang2:
-        chk_bump = st.checkbox("Incluir Order Bump (Checklist de Implementação Rápida)", value=True)
+        chk_bump = st.checkbox("Incluir Checklist (Order Bump)", value=True)
 
     col_eb1, col_eb2 = st.columns(2)
     with col_eb1:
-        t_eb = st.text_input("Título do Manual Técnico:", key="ebook_input_tema")
+        t_eb = st.text_input("Título do Manual:", key="ebook_input_tema")
         sub_eb = st.text_input("Subtítulo da Capa:", value="Guia Prático Operacional Passo a Passo")
     with col_eb2:
         p_eb = st.text_input("Público-Alvo:", key="ebook_input_publico")
 
-    if st.button("📖 Compilar Kit Digital Completo (14-16 Páginas)", type="primary", use_container_width=True):
-        with st.spinner(f"Escrevendo capítulos em {idioma_ebook} e diagramando manual técnico de 15 páginas..."):
+    if st.button("📖 Compilar Kit Digital em PDF", type="primary", use_container_width=True):
+        with st.spinner("Diagramando capítulos técnicos..."):
             p_pdf_manual = os.path.join(DIR_EBOOKS, f"manual_tecnico_{int(time.time())}.pdf")
             promessa_atual = st.session_state.get("miner_promessa", "Método Prático e Lucrativo")
             compilar_livro_tecnico_pdf(t_eb, sub_eb, p_eb, p_pdf_manual, promessa=promessa_atual, idioma=idioma_ebook)
@@ -1709,243 +1616,116 @@ with tab_ebook:
                 compilar_order_bump_pdf(t_eb, p_pdf_bump, idioma=idioma_ebook)
                 st.session_state["pdf_bump_gerado"] = p_pdf_bump
 
-            st.success(f"✅ Kit de entrega digital compilado com sucesso em {idioma_ebook} (15 páginas numeradas)!")
+            st.success("✅ Kit de entrega digital compilado!")
             st.rerun()
 
     col_dw1, col_dw2 = st.columns(2)
     with col_dw1:
         if st.session_state.get("pdf_manual_gerado") and os.path.exists(st.session_state["pdf_manual_gerado"]):
             with open(st.session_state["pdf_manual_gerado"], "rb") as f_man:
-                st.download_button(
-                    label=f"⬇️ Baixar Manual Técnico Completo (.PDF - 15 Páginas em {idioma_ebook})",
-                    data=f_man.read(),
-                    file_name=f"manual_tecnico_{idioma_ebook[:2].lower()}.pdf",
-                    mime="application/pdf",
-                    type="primary",
-                    use_container_width=True
-                )
+                st.download_button("⬇️ Baixar Manual (.PDF)", data=f_man.read(), file_name="manual_tecnico.pdf", mime="application/pdf", use_container_width=True)
     with col_dw2:
         if st.session_state.get("pdf_bump_gerado") and os.path.exists(st.session_state["pdf_bump_gerado"]):
             with open(st.session_state["pdf_bump_gerado"], "rb") as f_bmp:
-                st.download_button(
-                    label=f"⬇️ Baixar Order Bump Checklist (.PDF em {idioma_ebook})",
-                    data=f_bmp.read(),
-                    file_name=f"order_bump_{idioma_ebook[:2].lower()}.pdf",
-                    mime="application/pdf",
-                    use_container_width=True
-                )
+                st.download_button("⬇️ Baixar Checklist (.PDF)", data=f_bmp.read(), file_name="checklist_bump.pdf", mime="application/pdf", use_container_width=True)
 
 # ------------------------------------------------------------------------------
-# ABA 6: CENTRAL DE LANÇAMENTO & LANDING PAGE (COM UPLOAD MANUAL DE CRIATIVO)
+# ABA 6: CENTRAL LANDING PAGE & KIWIFY (CORRIGIDO PARA SAAS)
 # ------------------------------------------------------------------------------
 with tab_ads:
-    st.markdown("## 🎯 6. Central de Lançamento & Funil de Vendas")
-    st.caption("Gere a Landing Page, pegue seu criativo pronto e suba a campanha no TikTok Ads em minutos.")
+    st.markdown("## 🎯 6. Central de Lançamento da Página de Vendas")
+    st.caption("Gere a Landing Page completa com o botão verde da Kiwify que abre em nova aba sem travar.")
 
-    aba_tt_lp, aba_tt_manual, aba_tt_api = st.tabs([
-        "🌐 1. Gerador da Landing Page (index.html)",
-        "🚀 2. Subir Anúncio no TikTok Ads (Recomendado)",
-        "⚙️ 3. Disparo Automático via API (Avançado)"
-    ])
+    col_h1, col_h2 = st.columns([1.3, 1])
+    with col_h1:
+        st.markdown("##### 1. Hospedar Vídeo no Supabase")
+        v_master = st.session_state.get("video_master_fundido")
+        caminho_para_enviar = None
 
-    # SUB-ABA 1: GERADOR LANDING PAGE
-    with aba_tt_lp:
-        st.markdown("### 📄 Hospedagem do Vídeo & Criação do index.html")
+        origem_lp = st.radio("Fonte do Arquivo de Vídeo:", ["Usar Vídeo Master Fundido (Aba 4)", "Upload MP4 do Computador"], key="origem_lp_radio")
 
-        col_h1, col_h2 = st.columns([1.4, 1])
-        with col_h1:
-            st.markdown("##### 1. Vídeo da Apresentação (Master Fundido)")
-            v_master = st.session_state.get("video_master_fundido")
-            caminho_para_enviar = None
-
-            origem_lp = st.radio(
-                "Fonte do Vídeo da Página:",
-                ["Usar Vídeo Master Fundido (Aba 4)", "Enviar arquivo .MP4 do meu PC"],
-                key="origem_lp_radio"
-            )
-
-            if origem_lp == "Usar Vídeo Master Fundido (Aba 4)":
-                if v_master and os.path.exists(v_master):
-                    mb_v = os.path.getsize(v_master) / (1024 * 1024)
-                    st.success(f"✅ Vídeo Master Fundido detectado: `{os.path.basename(v_master)}` ({mb_v:.1f} MB)")
-                    caminho_para_enviar = v_master
-                else:
-                    st.warning("⚠️ Gere a fusão na Aba 4 ou envie o arquivo MP4 diretamente.")
+        if origem_lp == "Usar Vídeo Master Fundido (Aba 4)":
+            if v_master and os.path.exists(v_master):
+                mb_v = os.path.getsize(v_master) / (1024 * 1024)
+                st.success(f"✅ Vídeo detectado: `{os.path.basename(v_master)}` ({mb_v:.1f} MB)")
+                caminho_para_enviar = v_master
             else:
-                up_mp4 = st.file_uploader("Selecione o arquivo .MP4 do seu computador:", type=["mp4"], key="up_mp4_direto")
-                if up_mp4:
-                    p_up = os.path.join(DIR_FUSAO, f"upload_lp_{int(time.time())}.mp4")
-                    with open(p_up, "wb") as f_u: f_u.write(up_mp4.read())
-                    caminho_para_enviar = p_up
-                    st.success(f"✅ Arquivo carregado: `{up_mp4.name}`")
-
-            if st.button("☁️ Hospedar Vídeo na Nuvem (Comprime & Gera URL)", type="primary", use_container_width=True):
-                if not caminho_para_enviar or not os.path.exists(caminho_para_enviar):
-                    st.error("Nenhum vídeo selecionado ou carregado.")
-                else:
-                    barra_up = st.progress(0.0)
-                    texto_up = st.empty()
-
-                    url_pronta = hospedar_video_supabase(
-                        caminho_local=caminho_para_enviar,
-                        barra_progresso=barra_up,
-                        texto_status=texto_up
-                    )
-                    if url_pronta:
-                        st.session_state["lp_video_url_ativa"] = url_pronta
-                        texto_up.empty()
-                        barra_up.progress(1.0)
-                        st.success("🎉 Vídeo comprimido e hospedado com sucesso!")
-                        st.rerun()
-
-        with col_h2:
-            st.markdown("##### 2. Status do Link Direto")
-            url_atual = st.session_state.get("lp_video_url_ativa", "")
-            lp_v_url = st.text_input("URL Direta do Vídeo (.mp4):", value=url_atual, placeholder="https://...supabase.co/.../vsl.mp4")
-            if lp_v_url:
-                st.caption("✅ Link do vídeo conectado ao reprodutor.")
-
-        st.markdown("---")
-        st.markdown("##### 3. Configurações da Página de Vendas")
-        col_lp_lang, col_lp_blank = st.columns([1.5, 2.5])
-        with col_lp_lang:
-            idx_id_lp = IDIOMAS_DISPONIVEIS.index(st.session_state["idioma_funil_ativo"]) if st.session_state["idioma_funil_ativo"] in IDIOMAS_DISPONIVEIS else 0
-            idioma_lp = st.selectbox("Idioma dos Elementos da Página:", IDIOMAS_DISPONIVEIS, index=idx_id_lp, key="idioma_lp_sel")
-
-        col_lp1, col_lp2 = st.columns(2)
-        with col_lp1:
-            lp_tit = st.text_input("Título da Página:", value="Apresentação Exclusiva")
-            lp_prom = st.text_input("Headline do Topo:", value=st.session_state.get("miner_promessa", "Descubra o Método Exato em Menos de 3 Minutos"))
-        with col_lp2:
-            lp_chk = st.text_input("Link de Pagamento (Kiwify):", placeholder="https://pay.kiwify.com.br/...")
-            lp_delay = st.number_input("Tempo para Revelar Botão (Segundos):", value=147)
-            lp_px = st.text_input("ID do Pixel do TikTok (Opcional):", placeholder="Ex: C9ABC12345DEF678")
-
-        if lp_v_url and lp_chk:
-            html_final = gerar_html_landing_page(
-                titulo=lp_tit, promessa=lp_prom, url_video_mp4=lp_v_url,
-                link_kiwify=lp_chk, delay_segundos=int(lp_delay), pixel_id=lp_px,
-                idioma=idioma_lp
-            )
-            st.markdown("---")
-            col_d1, col_d2 = st.columns([1, 1])
-            with col_d1:
-                st.download_button(
-                    "⬇️ 1. Baixar index.html Pronto",
-                    data=html_final,
-                    file_name="index.html",
-                    mime="text/html",
-                    type="primary",
-                    use_container_width=True
-                )
-            with col_d2:
-                st.link_button("🌐 2. Abrir Netlify Drop (Publicar Site)", "https://app.netlify.com/drop", use_container_width=True)
+                st.warning("Gere o vídeo na Aba 4 ou envie o arquivo MP4 diretamente.")
         else:
-            st.info("💡 Cole o link de checkout da Kiwify e a URL do vídeo para liberar o download do index.html.")
+            up_mp4 = st.file_uploader("Selecione o arquivo .MP4 do seu computador:", type=["mp4"], key="up_mp4_direto")
+            if up_mp4:
+                p_up = os.path.join(DIR_FUSAO, f"upload_lp_{int(time.time())}.mp4")
+                with open(p_up, "wb") as f_u: f_u.write(up_mp4.read())
+                caminho_para_enviar = p_up
+                st.success(f"✅ Arquivo carregado: `{up_mp4.name}`")
 
-    # SUB-ABA 2: SUBIR NO TIKTOK ADS (COM UPLOAD MANUAL DIRETO)
-    with aba_tt_manual:
-        st.markdown("### 🚀 Subir Campanha no TikTok Ads (Sem API / Sem Token)")
-        st.caption("Envie o criativo que você tem no PC ou use o gerado no app, pegue seu link rastreado e suba o anúncio.")
-
-        col_an1, col_an2 = st.columns(2)
-        with col_an1:
-            st.markdown("##### 1. Criativo do Anúncio (Vídeo)")
-            origem_ad = st.radio(
-                "Origem do Vídeo do Anúncio:",
-                ["Enviar arquivo MP4 do meu PC (Vídeo Pronto)", "Usar Vídeo da Aba 2 (27s)"],
-                key="origem_ad_manual_sel"
-            )
-
-            video_para_ad = None
-            if origem_ad == "Enviar arquivo MP4 do meu PC (Vídeo Pronto)":
-                up_ad_manual = st.file_uploader("Selecione o arquivo do criativo (.mp4):", type=["mp4"], key="up_ad_manual_file")
-                if up_ad_manual:
-                    p_up_ad = os.path.join(DIR_VSL, f"ad_manual_{int(time.time())}.mp4")
-                    with open(p_up_ad, "wb") as f_mad:
-                        f_mad.write(up_ad_manual.read())
-                    video_para_ad = p_up_ad
-                    st.session_state["video_vsl_pronto"] = p_up_ad
-                    st.success(f"✅ Criativo carregado: `{up_ad_manual.name}`")
+        if st.button("☁️ Subir para o Supabase (Comprime e Hospeda)", type="primary", use_container_width=True):
+            if not caminho_para_enviar or not os.path.exists(caminho_para_enviar):
+                st.error("Nenhum arquivo de vídeo selecionado.")
             else:
-                v_aba2 = st.session_state.get("video_vsl_pronto")
-                if v_aba2 and os.path.exists(v_aba2):
-                    video_para_ad = v_aba2
-                else:
-                    st.warning("⚠️ O vídeo da Aba 2 ainda não foi gerado.")
+                barra_up = st.progress(0.0)
+                texto_up = st.empty()
+                url_pronta = hospedar_video_supabase(caminho_local=caminho_para_enviar, barra_progresso=barra_up, texto_status=texto_up)
+                if url_pronta:
+                    st.session_state["lp_video_url_ativa"] = url_pronta
+                    texto_up.empty()
+                    barra_up.progress(1.0)
+                    st.success("🎉 Vídeo comprimido e hospedado no Supabase com sucesso!")
+                    st.rerun()
 
-            if video_para_ad and os.path.exists(video_para_ad):
-                with open(video_para_ad, "rb") as vf_ad:
-                    b_ad = vf_ad.read()
-                    st.video(b_ad, format="video/mp4")
-                    st.download_button(
-                        "⬇️ Baixar Criativo do Anúncio (.mp4)",
-                        data=b_ad,
-                        file_name="anuncio_tiktok.mp4",
-                        mime="video/mp4",
-                        type="primary",
-                        use_container_width=True
-                    )
+    with col_h2:
+        st.markdown("##### 2. Link do Vídeo (Supabase ou YouTube)")
+        url_atual = st.session_state.get("lp_video_url_ativa", "")
+        lp_v_url = st.text_input(
+            "URL do Vídeo (Aceita .mp4 do Supabase ou link do YouTube):",
+            value=url_atual,
+            placeholder="https://...supabase.co/.../vsl.mp4 ou https://youtube.com/watch?v=..."
+        )
+        if lp_v_url:
+            st.session_state["lp_video_url_ativa"] = lp_v_url
+            st.caption("✅ Link do vídeo conectado ao player.")
 
-        with col_an2:
-            st.markdown("##### 2. Link Rastreado da Landing Page")
-            url_site_netlify = st.text_input(
-                "Cole o link do seu site no Netlify:",
-                placeholder="https://sua-pagina.netlify.app"
-            )
+    st.markdown("---")
+    st.markdown("##### 3. Configurações da Campanha")
 
-            nome_campanha_utm = st.text_input("Nome de Identificação da Campanha:", value="CONV_PROD01_V1")
+    col_lp1, col_lp2 = st.columns(2)
+    with col_lp1:
+        lp_tit = st.text_input("Título da Página:", value="Manual Prático - Pães Sem Glúten")
+        lp_prom = st.text_input("Headline Principal:", value=st.session_state.get("miner_promessa", "Aprenda o método prático em menos de 3 minutos"))
+    with col_lp2:
+        lp_chk = st.text_input("Link de Checkout (Kiwify):", value=st.session_state.get("lp_kiwify_url_ativa", "https://pay.kiwify.com.br/ysOcAav"))
+        st.session_state["lp_kiwify_url_ativa"] = lp_chk
+        lp_delay = st.number_input("Delay para o Botão Verde aparecer (Segundos - 0 para imediato):", min_value=0, value=0, step=5)
 
-            separador = "&" if "?" in url_site_netlify else "?"
-            url_rastreada = f"{url_site_netlify}{separador}utm_source=tiktok&utm_medium=cpc&utm_campaign={nome_campanha_utm}&src={nome_campanha_utm}" if url_site_netlify else ""
-
-            if url_rastreada:
-                st.markdown("**Copie esta URL para colocar no anúncio:**")
-                st.code(url_rastreada, language="text")
-
-            st.markdown("##### 3. Legenda Sugerida para o Anúncio")
-            copy_sugerida = st.text_area(
-                "Texto do Anúncio:",
-                value="Método revelado em menos de 3 minutos! Toque em Saiba Mais 👇",
-                height=70
-            )
+    if lp_v_url and lp_chk:
+        html_final = gerar_html_landing_page(
+            titulo=lp_tit,
+            promessa=lp_prom,
+            url_video_mp4=lp_v_url,
+            link_kiwify=lp_chk,
+            delay_segundos=int(lp_delay),
+            idioma=st.session_state.get("idioma_funil_ativo", "Português (Brasil)")
+        )
 
         st.markdown("---")
-        col_cta_tt1, col_cta_tt2 = st.columns([1, 2])
-        with col_cta_tt1:
-            st.link_button("🚀 Abrir TikTok Ads Manager", "https://ads.tiktok.com", type="primary", use_container_width=True)
-        with col_cta_tt2:
-            st.info("💡 **Publicação:** Abra o gerenciador, clique em **Criar** > Escolha **Tráfego** > Suba o vídeo de 27s > Cole a URL rastreada e publique.")
+        col_d1, col_d2 = st.columns([1, 1])
+        with col_d1:
+            st.download_button(
+                "⬇️ 1. Baixar index.html Pronto para Publicar",
+                data=html_final,
+                file_name="index.html",
+                mime="text/html",
+                type="primary",
+                use_container_width=True
+            )
+        with col_d2:
+            st.link_button("🌐 2. Abrir Netlify Drop (Arraste o index.html lá)", "https://app.netlify.com/drop", use_container_width=True)
 
-    # SUB-ABA 3: DISPARO VIA API (OPCIONAL/AVANÇADO)
-    with aba_tt_api:
-        st.markdown("### ⚙️ Disparo Automático via API (Para quem já tem App aprovado)")
-        col_ad_api1, col_ad_api2 = st.columns(2)
-        with col_ad_api1:
-            nome_camp_api = st.text_input("Nome da Campanha (API):", value=f"CONV - {datetime.now().strftime('%d/%m')}")
-            url_lp_api = st.text_input("URL da Landing Page (API):", placeholder="https://sua-pagina.netlify.app")
-            orcamento_api = st.number_input("Orçamento Diário (R$):", min_value=30.0, value=60.0, step=10.0)
-            copy_ad_api = st.text_area("Texto do Anúncio (API):", value="Método revelado em menos de 3 minutos! Toque em Saiba Mais 👇")
-        with col_ad_api2:
-            adv_id_api = st.text_input("Advertiser ID:", value=TIKTOK_ADVERTISER_ID)
-            tok_ad_api = st.text_input("TikTok Access Token:", value=TIKTOK_ACCESS_TOKEN, type="password")
-
-        if st.button("Disparar Campanha via API", use_container_width=True):
-            video_para_ad_api = st.session_state.get("video_vsl_pronto")
-            if not tok_ad_api or not url_lp_api or not video_para_ad_api:
-                st.error("Preencha o Token, a URL da Landing Page e selecione ou envie o vídeo do anúncio.")
-            else:
-                with st.spinner("Publicando via API..."):
-                    try:
-                        res = disparar_campanha_tiktok_completa(
-                            advertiser_id=adv_id_api, access_token=tok_ad_api, video_path=video_para_ad_api,
-                            campaign_name=nome_camp_api, copy_text=copy_ad_api, landing_page_url=url_lp_api,
-                            orcamento_diario=orcamento_api
-                        )
-                        st.success("Campanha publicada!")
-                        st.json(res)
-                    except Exception as e_ad:
-                        st.error(f"Erro na API: {e_ad}")
+        with st.expander("👁️ Pré-visualização da Página de Vendas (Teste o Botão Verde)", expanded=True):
+            st.caption("Abaixo está a visualização real da página. Ao clicar no botão verde, ele abrirá o checkout da Kiwify em nova aba sem travar.")
+            components.html(html_final, height=620, scrolling=True)
+    else:
+        st.info("💡 Preencha o link do vídeo e o checkout da Kiwify para gerar o arquivo index.html.")
 
 # ------------------------------------------------------------------------------
 # ABA 7: GESTÃO MASTER
